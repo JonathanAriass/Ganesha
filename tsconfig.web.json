@@ -11,6 +11,8 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
+    "baseUrl": ".",
+    "paths": { "@shared/*": ["src/shared/*"] },
     "types": ["vite/client"]
   },
   "include": ["src/renderer/src", "src/shared"]

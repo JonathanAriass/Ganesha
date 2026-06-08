@@ -7,6 +7,7 @@ dist-electron/
 out/
 build/
 release/
+*.tsbuildinfo
 
 # Logs
 *.log
