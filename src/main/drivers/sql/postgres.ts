@@ -20,7 +20,8 @@ export class PostgresDriver implements DatabaseDriver {
       database: p.database,
       ssl: p.ssl ? { rejectUnauthorized: false } : undefined,
       max: 4,
-      connectionTimeoutMillis: 10_000
+      connectionTimeoutMillis: 10_000,
+      idleTimeoutMillis: 30_000
     }
   }
 
@@ -34,6 +35,8 @@ export class PostgresDriver implements DatabaseDriver {
   }
 
   async connect(p: ConnectParams): Promise<void> {
+    // Idempotent: an existing pool keeps its original credentials. To apply changed
+    // credentials, callers must disconnect() first. The query pipeline relies on this.
     if (!this.pools.has(p.id)) this.pools.set(p.id, new Pool(this.poolConfig(p)))
   }
 
@@ -51,6 +54,9 @@ export class PostgresDriver implements DatabaseDriver {
     if (!pool) throw new Error(`Connection '${id}' is not open`)
 
     const client = await pool.connect()
+    // pg.PoolClient wraps a pg.Client whose `processID` (backend PID, needed for
+    // pg_cancel_backend) is populated during the auth handshake before pool.connect()
+    // resolves, but isn't typed on PoolClient — hence the cast.
     const pid = (client as unknown as { processID: number }).processID
     this.running.set(opts.queryId, pid)
     const start = Date.now()
