@@ -29,7 +29,8 @@ export function isSqlReadOnly(sql: string): boolean {
     if ((kw === 'WITH' || kw === 'EXPLAIN') && WRITE_RE.test(stmt)) return false
     if (kw === 'EXPLAIN' && /\bANALYZE\b/i.test(stmt)) return false
     // SELECT ... INTO creates a table (Postgres) or writes a file (MySQL INTO OUTFILE/DUMPFILE).
-    if (kw === 'SELECT' && /\bINTO\b/i.test(stmt)) return false
+    // Reachable under a leading WITH too: WITH cte AS (...) SELECT ... INTO t FROM cte.
+    if ((kw === 'SELECT' || kw === 'WITH') && /\bINTO\b/i.test(stmt)) return false
   }
   return true
 }

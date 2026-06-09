@@ -32,6 +32,7 @@ describe('isSqlReadOnly', () => {
   it('blocks data-modifying CTEs and EXPLAIN ANALYZE (they execute writes)', () => {
     expect(isSqlReadOnly('WITH x AS (DELETE FROM t RETURNING *) SELECT * FROM x')).toBe(false)
     expect(isSqlReadOnly('EXPLAIN ANALYZE DELETE FROM t')).toBe(false)
+    expect(isSqlReadOnly('WITH x AS (SELECT 1) SELECT * INTO t FROM x')).toBe(false)
   })
 
   it('blocks unrecognized leading keywords (conservative)', () => {
