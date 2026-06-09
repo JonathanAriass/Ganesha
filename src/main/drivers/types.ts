@@ -37,6 +37,8 @@ export interface RunOptions {
   maxRows: number
   /** Caller-supplied id so an in-flight query can be cancelled. */
   queryId: string
+  /** When true, the driver ALSO enforces read-only at the server (defense-in-depth). */
+  readOnly: boolean
 }
 
 /** A query to run: SQL text for relational drivers, a structured command for Mongo. */
