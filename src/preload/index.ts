@@ -7,7 +7,24 @@ function invoke<K extends ChannelName>(channel: K, req: Req<K>): Promise<IpcResu
 }
 
 const api: DbClientApi = {
-  ping: (message) => invoke('ping', message)
+  ping: (message) => invoke('ping', message),
+  connections: {
+    list: () => invoke('connections.list', undefined),
+    get: (id) => invoke('connections.get', id),
+    create: (input, password) => invoke('connections.create', { input, password }),
+    update: (id, patch, password) => invoke('connections.update', { id, patch, password }),
+    delete: (id) => invoke('connections.delete', id)
+  },
+  history: {
+    add: (entry) => invoke('history.add', entry),
+    list: (connectionId, limit) => invoke('history.list', { connectionId, limit })
+  },
+  settings: {
+    get: () => invoke('settings.get', undefined),
+    set: (key, value) => invoke('settings.set', { key, value }),
+    getDataDir: () => invoke('settings.dataDir.get', undefined),
+    setDataDir: (dir) => invoke('settings.dataDir.set', dir)
+  }
 }
 
 contextBridge.exposeInMainWorld('api', api)
