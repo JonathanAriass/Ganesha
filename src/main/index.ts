@@ -3,7 +3,7 @@ import { join } from 'path'
 import { registerIpcHandlers } from './ipc'
 
 function createWindow(): void {
-  const window = new BrowserWindow({
+  const win = new BrowserWindow({
     width: 1280,
     height: 800,
     show: false,
@@ -15,13 +15,13 @@ function createWindow(): void {
     }
   })
 
-  window.on('ready-to-show', () => window.show())
+  win.on('ready-to-show', () => win.show())
 
   const devUrl = process.env['ELECTRON_RENDERER_URL']
   if (devUrl) {
-    window.loadURL(devUrl)
+    win.loadURL(devUrl)
   } else {
-    window.loadFile(join(__dirname, '../renderer/index.html'))
+    win.loadFile(join(__dirname, '../renderer/index.html'))
   }
 }
 
