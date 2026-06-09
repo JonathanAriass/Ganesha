@@ -22,10 +22,10 @@ export interface MongoCommand {
 }
 
 const READ_OPS = new Set<MongoOp>(['find', 'findOne', 'aggregate', 'count', 'countDocuments', 'distinct'])
-const ALL_OPS = new Set<MongoOp>([
-  ...READ_OPS,
+const WRITE_OPS = new Set<MongoWriteOp>([
   'insertOne', 'insertMany', 'updateOne', 'updateMany', 'deleteOne', 'deleteMany', 'replaceOne'
 ])
+const ALL_OPS = new Set<MongoOp>([...READ_OPS, ...WRITE_OPS])
 
 export function isMongoOp(s: string): s is MongoOp {
   return ALL_OPS.has(s as MongoOp)

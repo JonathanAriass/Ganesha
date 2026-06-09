@@ -26,6 +26,7 @@ describe('isSqlReadOnly', () => {
     expect(isSqlReadOnly('DROP TABLE t')).toBe(false)
     expect(isSqlReadOnly('TRUNCATE t')).toBe(false)
     expect(isSqlReadOnly('SELECT 1; DELETE FROM t')).toBe(false)
+    expect(isSqlReadOnly('SELECT * INTO new_table FROM users')).toBe(false)
   })
 
   it('blocks data-modifying CTEs and EXPLAIN ANALYZE (they execute writes)', () => {

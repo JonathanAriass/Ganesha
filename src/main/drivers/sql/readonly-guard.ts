@@ -28,6 +28,8 @@ export function isSqlReadOnly(sql: string): boolean {
     // WITH ... (data-modifying CTE) and EXPLAIN ANALYZE actually perform writes.
     if ((kw === 'WITH' || kw === 'EXPLAIN') && WRITE_RE.test(stmt)) return false
     if (kw === 'EXPLAIN' && /\bANALYZE\b/i.test(stmt)) return false
+    // SELECT ... INTO creates a table (Postgres) or writes a file (MySQL INTO OUTFILE/DUMPFILE).
+    if (kw === 'SELECT' && /\bINTO\b/i.test(stmt)) return false
   }
   return true
 }
