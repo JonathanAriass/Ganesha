@@ -17,7 +17,7 @@ export function addHistory(db: DB, e: HistoryEntryInput): HistoryEntry {
     `INSERT INTO query_history (connection_id, query, ran_at, duration_ms, success)
      VALUES (@connectionId, @query, @ranAt, @durationMs, @success)`
   ).run({ ...e, success: e.success === null ? null : e.success ? 1 : 0 })
-  return toEntry(db.prepare('SELECT * FROM query_history WHERE id = ?').get(info.lastInsertRowid) as Row)
+  return toEntry(db.prepare('SELECT * FROM query_history WHERE id = ?').get(Number(info.lastInsertRowid)) as Row)
 }
 
 export function listHistory(db: DB, connectionId: string, limit = 100): HistoryEntry[] {

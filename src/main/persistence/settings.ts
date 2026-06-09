@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync } from 'fs'
+import { copyFileSync, existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import type { DB } from './db'
 import { type AppSettings, DEFAULT_SETTINGS } from '../../shared/domain'
@@ -35,6 +35,7 @@ export function relocateDataDir(newDir: string): void {
   const from = join(getDataDir(), DB_FILENAME)
   const to = join(newDir, DB_FILENAME)
   closeDb()
-  setDataDir(newDir) // creates newDir
-  if (existsSync(from) && from !== to) copyFileSync(from, to)
+  mkdirSync(newDir, { recursive: true })
+  if (existsSync(from) && from !== to) copyFileSync(from, to) // copy data BEFORE repointing
+  setDataDir(newDir) // repoint only after the copy succeeds, so a crash can't orphan the data
 }
