@@ -256,7 +256,7 @@ Expected: FAIL — `./db` has no `migrate` export.
 - [ ] **Step 5: Create `src/main/persistence/db.ts`:**
 
 ```ts
-import Database from 'better-sqlite3'
+import type Database from 'better-sqlite3'
 import { getDbPath } from './paths'
 
 export type DB = Database.Database
@@ -305,7 +305,11 @@ let singleton: DB | null = null
 /** Open (once) the on-disk database at the current data dir and migrate it. */
 export function openDb(): DB {
   if (singleton) return singleton
-  singleton = new Database(getDbPath())
+  // Lazy-load the native addon so it stays OUT of the main-process startup path
+  // (it loads only on first DB use), keeping the app launchable until the Electron
+  // ABI rebuild lands in Plan 4; Node tests construct their own Database.
+  const DatabaseCtor = require('better-sqlite3') as new (path: string) => DB
+  singleton = new DatabaseCtor(getDbPath())
   migrate(singleton)
   return singleton
 }
@@ -951,7 +955,7 @@ npm install -D eslint@^8.57.0 @typescript-eslint/parser@^7.18.0 @typescript-esli
 module.exports = {
   root: true,
   parser: '@typescript-eslint/parser',
-  parserOptions: { ecmaVersion: 2022, sourceType: 'module' },
+  parserOptions: { ecmaVersion: 2022, sourceType: 'module', ecmaFeatures: { jsx: true } },
   plugins: ['@typescript-eslint', 'react-hooks'],
   extends: ['eslint:recommended', 'plugin:@typescript-eslint/recommended', 'prettier'],
   env: { node: true, browser: true, es2022: true },
@@ -969,6 +973,12 @@ module.exports = {
             message: 'Renderer must not import from main or electron — use window.api.' }]
         }]
       }
+    },
+    {
+      // Main process intentionally uses lazy require('electron') so persistence
+      // modules import cleanly under Node/Vitest. Allow it here only.
+      files: ['src/main/**/*.ts'],
+      rules: { '@typescript-eslint/no-var-requires': 'off' }
     }
   ]
 }

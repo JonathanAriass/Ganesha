@@ -1,4 +1,4 @@
-import Database from 'better-sqlite3'
+import type Database from 'better-sqlite3'
 import { getDbPath } from './paths'
 
 export type DB = Database.Database
@@ -47,7 +47,11 @@ let singleton: DB | null = null
 /** Open (once) the on-disk database at the current data dir and migrate it. */
 export function openDb(): DB {
   if (singleton) return singleton
-  singleton = new Database(getDbPath())
+  // Lazy-load the native addon so it stays OUT of the main-process startup path
+  // (it loads only on first DB use). Keeps the app launchable until the Electron
+  // ABI rebuild lands in Plan 4; Node-based tests construct their own Database.
+  const DatabaseCtor = require('better-sqlite3') as new (path: string) => DB
+  singleton = new DatabaseCtor(getDbPath())
   migrate(singleton)
   return singleton
 }
