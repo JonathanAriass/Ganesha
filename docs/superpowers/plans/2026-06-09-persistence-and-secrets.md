@@ -180,16 +180,21 @@ Expected: installs cleanly (better-sqlite3 ships prebuilt binaries).
 - [ ] **Step 2: Create `src/main/persistence/paths.ts`** — locates the data dir via a fixed pointer file so the data dir itself is relocatable:
 
 ```ts
-import { app } from 'electron'
 import { join } from 'path'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 
 const POINTER_FILE = 'data-location.json'
 export const DB_FILENAME = 'db-client.sqlite'
 
+/** Electron userData dir, resolved lazily via require so this module imports cleanly under Node/Vitest. */
+function userDataDir(): string {
+  const { app } = require('electron') as typeof import('electron')
+  return app.getPath('userData')
+}
+
 /** The fixed userData path that records where the (relocatable) data dir lives. */
 function pointerPath(): string {
-  return join(app.getPath('userData'), POINTER_FILE)
+  return join(userDataDir(), POINTER_FILE)
 }
 
 /** Current data directory (defaults to userData on first run). */
@@ -199,7 +204,7 @@ export function getDataDir(): string {
     const parsed = JSON.parse(readFileSync(pointer, 'utf8')) as { dataDir?: string }
     if (parsed.dataDir) return parsed.dataDir
   }
-  return app.getPath('userData')
+  return userDataDir()
 }
 
 /** Persist a new data directory location (creates it if needed). */
@@ -872,20 +877,29 @@ function now(): number {
   return Date.now()
 }
 
-export function registerIpcHandlers(): void {
+/**
+ * Resolve the CURRENT db + a secret store on every call. openDb() returns the
+ * live singleton (reopened after any data-dir relocation), so handlers never
+ * hold a stale/closed connection.
+ */
+function store(): { db: ReturnType<typeof openDb>; secrets: ReturnType<typeof makeSecretStore> } {
   const db = openDb()
-  const secrets = makeSecretStore(db, safeStorageEncryptor())
+  return { db, secrets: makeSecretStore(db, safeStorageEncryptor()) }
+}
 
+export function registerIpcHandlers(): void {
   handle('ping', (message) => ok({ pong: message }))
 
-  handle('connections.list', () => ok(conns.listConnections(db)))
-  handle('connections.get', (id) => ok(conns.getConnection(db, id)))
+  handle('connections.list', () => ok(conns.listConnections(store().db)))
+  handle('connections.get', (id) => ok(conns.getConnection(store().db, id)))
   handle('connections.create', ({ input, password }) => {
+    const { db, secrets } = store()
     const c = conns.createConnection(db, input, now())
     if (password) secrets.setPassword(c.id, password)
     return ok(c)
   })
   handle('connections.update', ({ id, patch, password }) => {
+    const { db, secrets } = store()
     const c = conns.updateConnection(db, id, patch, now())
     if (password !== undefined) {
       if (password === null) secrets.deletePassword(id)
@@ -893,13 +907,17 @@ export function registerIpcHandlers(): void {
     }
     return ok(c)
   })
-  handle('connections.delete', (id) => { conns.deleteConnection(db, id); return ok(null) })
+  handle('connections.delete', (id) => { conns.deleteConnection(store().db, id); return ok(null) })
 
-  handle('history.add', (entry) => ok(hist.addHistory(db, entry)))
-  handle('history.list', ({ connectionId, limit }) => ok(hist.listHistory(db, connectionId, limit)))
+  handle('history.add', (entry) => ok(hist.addHistory(store().db, entry)))
+  handle('history.list', ({ connectionId, limit }) => ok(hist.listHistory(store().db, connectionId, limit)))
 
-  handle('settings.get', () => ok(settings.getSettings(db)))
-  handle('settings.set', ({ key, value }) => { settings.setSetting(db, key, value); return ok(settings.getSettings(db)) })
+  handle('settings.get', () => ok(settings.getSettings(store().db)))
+  handle('settings.set', ({ key, value }) => {
+    const { db } = store()
+    settings.setSetting(db, key, value)
+    return ok(settings.getSettings(db))
+  })
   handle('settings.dataDir.get', () => ok(settings.getCurrentDataDir()))
   handle('settings.dataDir.set', (dir) => { settings.relocateDataDir(dir); openDb(); return ok(dir) })
 }
