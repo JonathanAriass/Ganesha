@@ -7,8 +7,10 @@ function asObject(v: unknown, field: string): Record<string, unknown> {
   return v as Record<string, unknown>
 }
 
-function asNumber(v: unknown, field: string): number {
-  if (typeof v !== 'number' || Number.isNaN(v)) throw new Error(`'${field}' must be a number`)
+function asNonNegInt(v: unknown, field: string): number {
+  if (typeof v !== 'number' || !Number.isInteger(v) || v < 0) {
+    throw new Error(`'${field}' must be a non-negative integer`)
+  }
   return v
 }
 
@@ -43,8 +45,8 @@ export function parseMongoJson(input: string): MongoCommand {
       if (obj.filter !== undefined) cmd.filter = asObject(obj.filter, 'filter')
       if (obj.projection !== undefined) cmd.projection = asObject(obj.projection, 'projection')
       if (obj.sort !== undefined) cmd.sort = asObject(obj.sort, 'sort')
-      if (obj.limit !== undefined) cmd.limit = asNumber(obj.limit, 'limit')
-      if (obj.skip !== undefined) cmd.skip = asNumber(obj.skip, 'skip')
+      if (obj.limit !== undefined) cmd.limit = asNonNegInt(obj.limit, 'limit')
+      if (obj.skip !== undefined) cmd.skip = asNonNegInt(obj.skip, 'skip')
       break
     }
     case 'aggregate': {

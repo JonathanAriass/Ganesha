@@ -32,6 +32,8 @@ describe('parseMongoJson', () => {
     expect(() => parseMongoJson(JSON.stringify({ op: 'nope', collection: 'c' }))).toThrow(/op/i)
     expect(() => parseMongoJson(JSON.stringify({ op: 'find', collection: '' }))).toThrow(/collection/i)
     expect(() => parseMongoJson(JSON.stringify({ op: 'find', collection: 'c', limit: 'x' }))).toThrow(/limit/i)
+    expect(() => parseMongoJson(JSON.stringify({ op: 'find', collection: 'c', limit: -1 }))).toThrow(/non-negative/i)
+    expect(() => parseMongoJson(JSON.stringify({ op: 'find', collection: 'c', skip: 1.5 }))).toThrow(/non-negative/i)
     expect(() => parseMongoJson(JSON.stringify({ op: 'aggregate', collection: 'c' }))).toThrow(/pipeline/i)
     expect(() => parseMongoJson(JSON.stringify({ op: 'insertOne', collection: 'c' }))).toThrow(/document/i)
   })
