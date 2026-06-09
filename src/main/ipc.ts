@@ -6,6 +6,12 @@ import { safeStorageEncryptor, makeSecretStore } from './persistence/secrets'
 import * as conns from './persistence/connections'
 import * as hist from './persistence/history'
 import * as settings from './persistence/settings'
+import { DriverManager } from './drivers/registry'
+import { PostgresDriver } from './drivers/sql/postgres'
+import { runUserQuery } from './query-service'
+
+const drivers = new DriverManager()
+drivers.register(new PostgresDriver())
 
 type Handler<K extends ChannelName> = (req: Req<K>) => Result<Res<K>> | Promise<Result<Res<K>>>
 
@@ -68,4 +74,30 @@ export function registerIpcHandlers(): void {
   })
   handle('settings.dataDir.get', () => ok(settings.getCurrentDataDir()))
   handle('settings.dataDir.set', (dir) => { settings.relocateDataDir(dir); void openDb(); return ok(dir) })
+
+  handle('connections.test', async ({ input, password }) => {
+    const driver = drivers.get(input.type)
+    await driver.testConnection({
+      id: 'test', type: input.type, host: input.host, port: input.port,
+      username: input.username, password, database: input.database, ssl: input.ssl
+    })
+    return ok(null)
+  })
+  handle('connections.disconnect', async (id) => {
+    const c = conns.getConnection(store().db, id)
+    if (c && drivers.has(c.type)) await drivers.get(c.type).disconnect(id)
+    return ok(null)
+  })
+  handle('query.run', async ({ connectionId, sql }) => {
+    const { db, secrets } = store()
+    const c = conns.getConnection(db, connectionId)
+    if (!c) throw new Error(`Connection not found: ${connectionId}`)
+    const result = await runUserQuery({ db, secrets, driver: drivers.get(c.type), connectionId, sql, now: () => Date.now() })
+    return ok(result)
+  })
+  handle('query.cancel', async ({ connectionId, queryId }) => {
+    const c = conns.getConnection(store().db, connectionId)
+    if (c && drivers.has(c.type)) await drivers.get(c.type).cancel(connectionId, queryId)
+    return ok(null)
+  })
 }

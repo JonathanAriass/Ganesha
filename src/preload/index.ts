@@ -13,7 +13,9 @@ const api: DbClientApi = {
     get: (id) => invoke('connections.get', id),
     create: (input, password) => invoke('connections.create', { input, password }),
     update: (id, patch, password) => invoke('connections.update', { id, patch, password }),
-    delete: (id) => invoke('connections.delete', id)
+    delete: (id) => invoke('connections.delete', id),
+    test: (input, password) => invoke('connections.test', { input, password }),
+    disconnect: (id) => invoke('connections.disconnect', id)
   },
   history: {
     add: (entry) => invoke('history.add', entry),
@@ -24,6 +26,10 @@ const api: DbClientApi = {
     set: (key, value) => invoke('settings.set', { key, value }),
     getDataDir: () => invoke('settings.dataDir.get', undefined),
     setDataDir: (dir) => invoke('settings.dataDir.set', dir)
+  },
+  query: {
+    run: (connectionId, sql) => invoke('query.run', { connectionId, sql }),
+    cancel: (connectionId, queryId) => invoke('query.cancel', { connectionId, queryId })
   }
 }
 

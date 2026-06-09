@@ -9,6 +9,8 @@ export interface DbClientApi {
     create(input: ConnectionInput, password: string | null): Promise<IpcResult<'connections.create'>>
     update(id: string, patch: Partial<ConnectionInput>, password?: string | null): Promise<IpcResult<'connections.update'>>
     delete(id: string): Promise<IpcResult<'connections.delete'>>
+    test(input: ConnectionInput, password: string | null): Promise<IpcResult<'connections.test'>>
+    disconnect(id: string): Promise<IpcResult<'connections.disconnect'>>
   }
   history: {
     add(entry: HistoryEntryInput): Promise<IpcResult<'history.add'>>
@@ -19,5 +21,9 @@ export interface DbClientApi {
     set(key: string, value: string): Promise<IpcResult<'settings.set'>>
     getDataDir(): Promise<IpcResult<'settings.dataDir.get'>>
     setDataDir(dir: string): Promise<IpcResult<'settings.dataDir.set'>>
+  }
+  query: {
+    run(connectionId: string, sql: string): Promise<IpcResult<'query.run'>>
+    cancel(connectionId: string, queryId: string): Promise<IpcResult<'query.cancel'>>
   }
 }

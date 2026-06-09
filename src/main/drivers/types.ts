@@ -1,24 +1,7 @@
 import type { ConnectionType } from '../../shared/domain'
 import type { MongoCommand } from './mongo/command'
-
-export interface ColumnMeta {
-  name: string
-  /** Driver-reported type label if available (e.g. 'int4', 'varchar', 'ObjectId'). */
-  dataType: string | null
-}
-
-/** Normalized, IPC-serializable result set returned by every driver. */
-export interface QueryResult {
-  columns: ColumnMeta[]
-  /** Row-major: each inner array aligns positionally to `columns`. */
-  rows: unknown[][]
-  rowCount: number
-  durationMs: number
-  /** True when the driver capped the row set (see RunOptions.maxRows). */
-  truncated: boolean
-  /** For document stores (Mongo) / JSON columns: raw objects for a tree view; null otherwise. */
-  documents: Record<string, unknown>[] | null
-}
+import type { ColumnMeta, QueryResult } from '../../shared/query'
+export type { ColumnMeta, QueryResult }
 
 /** Everything a driver needs to open a connection. Password is resolved by main from the secret store. */
 export interface ConnectParams {
