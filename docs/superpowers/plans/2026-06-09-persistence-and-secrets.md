@@ -1040,11 +1040,17 @@ git commit -m "build: add ESLint, Prettier, and CI; enforce renderer/main import
 
 ## Self-Review (completed by plan author)
 
-- **Spec coverage:** connection persistence (CRUD + SSL/readOnly/color fields) ✓ T3; passwords never in plaintext (safeStorage, encrypted BLOB, never read back over IPC) ✓ T4; query history ✓ T5; configurable data dir + theme setting ✓ T6; all reachable from the renderer ✓ T7. Drivers/connect/test are correctly deferred to Plan 3; real UI to Plan 4.
+- **Spec coverage:** connection persistence (CRUD + SSL/readOnly/color fields) ✓ T3; passwords never in plaintext (safeStorage, encrypted BLOB, never read back over IPC) ✓ T4; query history ✓ T5; configurable data dir + theme setting ✓ T6; wired to the renderer over the typed IPC contract ✓ T7 (exercised live only under the Node test ABI — see the Definition of Done note: the Electron `better-sqlite3` ABI rebuild + dual-ABI test strategy is a Plan 4 prerequisite for live persistence). Drivers/connect/test are correctly deferred to Plan 3; real UI to Plan 4.
 - **Placeholder scan:** none — every step has full code and exact commands.
 - **Type consistency:** `ConnectionInput`/`ConnectionConfig`/`HistoryEntry(Input)`/`AppSettings` are defined once in `shared/domain.ts` and reused across services, IPC contract, and api; the `IpcChannels` keys used in `handle()`/`invoke()`/`DbClientApi` match exactly; `migrate`/`openDb`/`closeDb`/`DB` line up across db/settings/ipc.
 
 ## Definition of Done
 
-`npm run typecheck`, `npm run lint`, and `npm test` all pass (connections, secrets, history, settings, db, and ipc-type tests green), the dev app still starts and shows "IPC ok: hello", and the renderer can list/create/update/delete connections, append/list history, and read/write settings + data dir entirely through the typed `window.api`. On green → **Plan 3 — Database Drivers**.
+`npm run typecheck`, `npm run lint`, and `npm test` all pass (connections, secrets, history, settings, db, and ipc-type tests green); the dev app still **launches** and shows "IPC ok: hello"; and the persistence services are fully exercised through the typed `window.api` contract **under the Node/Vitest ABI** (the unit-test suite).
+
+> ⚠️ **Live-in-Electron persistence is NOT yet functional — and that is intentional for this plan.** `better-sqlite3` is compiled for **Node's** ABI (so the Vitest suite can load it). `openDb()` lazy-loads the addon, which keeps the app *launchable*, but the **first** persistence call inside the running Electron app would throw `ERR_DLOPEN_FAILED` (Node vs Electron ABI mismatch). The persistence logic is therefore verified by the Node unit tests only; no UI exercises it live yet.
+>
+> **Plan 4 prerequisite (blocker for live persistence):** rebuild `better-sqlite3` for Electron (`electron-builder install-app-deps` / `@electron/rebuild`) **and** adopt a dual-ABI test strategy — because rebuilding for Electron breaks the Node-ABI Vitest run (one prebuilt binary can't serve both ABIs). Options: run the DB tests under Electron, keep a separate Node-ABI copy for tests, or swap to a pure-JS SQLite for the test layer. This must be resolved in Plan 4 before any UI reads/writes the database.
+
+On green → **Plan 3 — Database Drivers** (drivers build on the services-take-`DB` seam + the `Result<T>` envelope; they do not depend on live-in-Electron SQLite).
 ```
