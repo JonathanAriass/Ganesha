@@ -1,9 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import { IPC, type PingResult } from '../shared/ipc'
+import type { ChannelName, Req, IpcResult } from '../shared/ipc'
 import type { DbClientApi } from '../shared/api'
 
+function invoke<K extends ChannelName>(channel: K, req: Req<K>): Promise<IpcResult<K>> {
+  return ipcRenderer.invoke(channel, req)
+}
+
 const api: DbClientApi = {
-  ping: (message: string): Promise<PingResult> => ipcRenderer.invoke(IPC.ping, message)
+  ping: (message) => invoke('ping', message)
 }
 
 contextBridge.exposeInMainWorld('api', api)
