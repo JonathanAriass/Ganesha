@@ -895,7 +895,7 @@ export function registerIpcHandlers(): void {
   handle('connections.create', ({ input, password }) => {
     const { db, secrets } = store()
     const c = conns.createConnection(db, input, now())
-    if (password) secrets.setPassword(c.id, password)
+    if (password !== null) secrets.setPassword(c.id, password)
     return ok(c)
   })
   handle('connections.update', ({ id, patch, password }) => {
@@ -919,7 +919,7 @@ export function registerIpcHandlers(): void {
     return ok(settings.getSettings(db))
   })
   handle('settings.dataDir.get', () => ok(settings.getCurrentDataDir()))
-  handle('settings.dataDir.set', (dir) => { settings.relocateDataDir(dir); openDb(); return ok(dir) })
+  handle('settings.dataDir.set', (dir) => { settings.relocateDataDir(dir); void openDb(); return ok(dir) })
 }
 ```
 
