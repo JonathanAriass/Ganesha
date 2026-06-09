@@ -279,6 +279,8 @@ export function isSqlReadOnly(sql: string): boolean {
     // WITH ... (data-modifying CTE) and EXPLAIN ANALYZE actually perform writes.
     if ((kw === 'WITH' || kw === 'EXPLAIN') && WRITE_RE.test(stmt)) return false
     if (kw === 'EXPLAIN' && /\bANALYZE\b/i.test(stmt)) return false
+    // SELECT ... INTO creates a table (Postgres) or writes a file (MySQL INTO OUTFILE/DUMPFILE).
+    if (kw === 'SELECT' && /\bINTO\b/i.test(stmt)) return false
   }
   return true
 }
@@ -466,6 +468,7 @@ git commit -m "feat: add MongoDB raw-JSON command parser with per-op validation"
 - **No new dependencies / no DB:** every unit is pure TS, unit-tested under Node — no Docker, no native modules, no Electron.
 - **Placeholder scan:** none; full code + exact commands throughout. The one documented limitation (string-literal edge case in the SQL splitter) is intentional and safe-by-blocking.
 - **Type consistency:** `MongoCommand`/`MongoOp` defined once in `mongo/command.ts` and reused by `raw.ts` and `types.ts`’s `QueryRequest`; `ConnectionType` reused from `shared/domain.ts`; `QueryResult`/`ConnectParams`/`RunOptions` are the exact shapes Plan 3b drivers must satisfy.
+- **Carried to Plan 3b (from review):** the Mongo op allow-list blocks write *ops*, but `aggregate` is a read op that can still write via `$out`/`$merge` pipeline stages — 3b's Mongo driver must scan the pipeline and treat `$out`/`$merge` as writes under a read-only connection. `ConnectParams` will likely need Mongo-specific fields (authSource/replicaSet); the `rows[][]` tabular shape needs a documented key-union policy for heterogeneous documents.
 
 ## Definition of Done
 
