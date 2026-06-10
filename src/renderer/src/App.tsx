@@ -12,6 +12,7 @@ import QueryTab from './components/QueryTab'
 import HistorySection from './components/HistorySection'
 import { useSettings } from './lib/hooks'
 import { applyTheme } from './lib/theme'
+import { useGlobalShortcuts } from './lib/use-global-shortcuts'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -20,6 +21,7 @@ const queryClient = new QueryClient({
 })
 
 function AppShell(): JSX.Element {
+  useGlobalShortcuts()
   const connectionModal = useAppStore((s) => s.connectionModal)
   const settingsOpen = useAppStore((s) => s.settingsOpen)
   const paletteOpen = useAppStore((s) => s.paletteOpen)
