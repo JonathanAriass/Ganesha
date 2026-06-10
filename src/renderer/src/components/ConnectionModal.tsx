@@ -338,6 +338,7 @@ export default function ConnectionModal(): JSX.Element {
             className="btn ghost"
             onClick={handleTest}
             disabled={testStatus.kind === 'pending' || !canSave}
+            aria-label="Test connection"
           >
             {testStatus.kind === 'pending' ? 'Testing…' : 'Test'}
           </button>

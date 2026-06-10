@@ -69,7 +69,10 @@ export default function QueryTab({ tab }: Props): JSX.Element {
         >
           ▶ Run
         </button>
-        {tab.running && tab.queryId && (
+        {/* Mongo ops can't be killed mid-flight (driver cancel is a no-op; they
+            bound themselves via maxTimeMS) — a Cancel that silently does nothing
+            is worse than no button. */}
+        {tab.running && tab.queryId && connection?.type !== 'mongodb' && (
           <button
             className="btn ghost"
             onClick={() =>

@@ -90,12 +90,14 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
           )}
           <button
             className="btn"
+            title="Exports all rows (ignores the filter)"
             onClick={() => download('result.csv', toCsv(result.columns, result.rows), 'text/csv')}
           >
             CSV
           </button>
           <button
             className="btn"
+            title="Exports all rows (ignores the filter)"
             onClick={() => download('result.json', toJsonText(result), 'application/json')}
           >
             JSON
