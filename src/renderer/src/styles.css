@@ -981,3 +981,30 @@ input[type="password"]::placeholder {
   font-size: 12px;
   color: var(--text-2);
 }
+
+/* ── Settings modal ── */
+.datadir-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.datadir-path {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 5px 9px;
+  font-family: ui-monospace, 'SF Mono', 'Fira Mono', monospace;
+  font-size: 11px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.form-hint {
+  font-size: 11px;
+  color: var(--text-2);
+  line-height: 1.5;
+}

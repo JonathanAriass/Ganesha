@@ -22,6 +22,8 @@ export interface QueryTabData {
 interface AppState {
   activeConnectionId: string | null
   connectionModal: ConnectionModalState | null
+  settingsOpen: boolean
+  paletteOpen: boolean
 
   // ── Tabs ──────────────────────────────────────────────────────────────────
   tabs: QueryTabData[]
@@ -31,6 +33,10 @@ interface AppState {
   setActiveConnection: (id: string | null) => void
   openModal: (state: ConnectionModalState) => void
   closeModal: () => void
+
+  openSettings: () => void
+  closeSettings: () => void
+  setPaletteOpen: (open: boolean) => void
 
   openQueryTab: (args: { connectionId: string; title?: string; text?: string; runOnOpen?: boolean }) => void
   closeTab: (id: string) => void
@@ -45,6 +51,8 @@ interface AppState {
 export const useAppStore = create<AppState>((set) => ({
   activeConnectionId: null,
   connectionModal: null,
+  settingsOpen: false,
+  paletteOpen: false,
   tabs: [],
   activeTabId: null,
   _queryCounter: 0,
@@ -52,6 +60,10 @@ export const useAppStore = create<AppState>((set) => ({
   setActiveConnection: (id) => set({ activeConnectionId: id }),
   openModal: (state) => set({ connectionModal: state }),
   closeModal: () => set({ connectionModal: null }),
+
+  openSettings: () => set({ settingsOpen: true, paletteOpen: false }),
+  closeSettings: () => set({ settingsOpen: false }),
+  setPaletteOpen: (open) => set({ paletteOpen: open }),
 
   openQueryTab: ({ connectionId, title, text, runOnOpen }) =>
     set((s) => {

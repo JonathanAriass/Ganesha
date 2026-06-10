@@ -6,6 +6,7 @@ export default function TopBar(): JSX.Element {
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
   const setActiveConnection = useAppStore((s) => s.setActiveConnection)
   const openModal = useAppStore((s) => s.openModal)
+  const openSettings = useAppStore((s) => s.openSettings)
 
   const { data: connections = [] } = useConnections()
 
@@ -59,6 +60,15 @@ export default function TopBar(): JSX.Element {
         onClick={() => openModal({ mode: 'create' })}
       >
         + New connection
+      </button>
+
+      <button
+        className="btn ghost"
+        onClick={openSettings}
+        aria-label="Settings"
+        title="Settings (⌘,)"
+      >
+        ⚙
       </button>
     </header>
   )
