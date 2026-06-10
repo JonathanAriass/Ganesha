@@ -8,9 +8,11 @@ function toPlain<T = Record<string, unknown>>(value: unknown): T {
 
 /** find / findOne / aggregate → flat key-union table + raw EJSON documents. */
 export function normalizeFind(docs: unknown[], maxRows: number, durationMs: number): QueryResult {
-  const plain = docs.map((d) => toPlain(d))
-  const truncated = plain.length > maxRows
-  const capped = truncated ? plain.slice(0, maxRows) : plain
+  const total = docs.length
+  const truncated = total > maxRows
+  // Serialize only the visible subset — aggregate has no cursor-level limit, so this
+  // avoids EJSON-serializing thousands of docs we'd immediately discard.
+  const capped = (truncated ? docs.slice(0, maxRows) : docs).map((d) => toPlain(d))
 
   const keys: string[] = []
   const seen = new Set<string>()
@@ -24,7 +26,7 @@ export function normalizeFind(docs: unknown[], maxRows: number, durationMs: numb
   }
   const columns: ColumnMeta[] = keys.map((name) => ({ name, dataType: null }))
   const rows = capped.map((d) => keys.map((k) => (k in d ? d[k] : null)))
-  return { columns, rows, rowCount: plain.length, durationMs, truncated, documents: capped }
+  return { columns, rows, rowCount: total, durationMs, truncated, documents: capped }
 }
 
 /** count / countDocuments → single scalar cell. */
