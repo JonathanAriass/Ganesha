@@ -25,7 +25,7 @@ export interface IpcChannels {
   'settings.set': { req: { key: string; value: string }; res: AppSettings }
   'settings.dataDir.get': { req: void; res: string }
   'settings.dataDir.set': { req: string; res: string }
-  'query.run': { req: { connectionId: string; sql: string }; res: QueryResult }
+  'query.run': { req: { connectionId: string; query: string }; res: QueryResult }
   'query.cancel': { req: { connectionId: string; queryId: string }; res: null }
   'connections.test': { req: { input: ConnectionInput; password: string | null }; res: null }
   'connections.disconnect': { req: string; res: null }

@@ -2,8 +2,10 @@ import type { DB } from './persistence/db'
 import { getConnection } from './persistence/connections'
 import { addHistory } from './persistence/history'
 import type { makeSecretStore } from './persistence/secrets'
-import type { DatabaseDriver, QueryResult } from './drivers/types'
+import type { DatabaseDriver, QueryResult, QueryRequest } from './drivers/types'
 import { assertSqlWritable } from './drivers/sql/readonly-guard'
+import { parseMongoJson } from './drivers/mongo/raw'
+import { assertMongoCommandWritable } from './drivers/mongo/command'
 
 const DEFAULT_MAX_ROWS = 1000
 
@@ -12,14 +14,15 @@ interface RunArgs {
   secrets: ReturnType<typeof makeSecretStore>
   driver: DatabaseDriver
   connectionId: string
-  sql: string
+  query: string
   /** Injected clock for deterministic history timestamps. */
   now: () => number
 }
 
-/** Orchestrate a SQL run: load config+secret, guard, connect, run, log history. */
+/** Orchestrate a run: load config+secret, connect, dispatch by type (SQL vs Mongo) through the
+ *  read-only guard, run on the driver, and log history on success or failure. */
 export async function runUserQuery(args: RunArgs): Promise<QueryResult> {
-  const { db, secrets, driver, connectionId, sql, now } = args
+  const { db, secrets, driver, connectionId, query, now } = args
   const config = getConnection(db, connectionId)
   if (!config) throw new Error(`Connection not found: ${connectionId}`)
 
@@ -31,16 +34,22 @@ export async function runUserQuery(args: RunArgs): Promise<QueryResult> {
 
   const started = now()
   try {
-    assertSqlWritable(sql, config.readOnly)
-    const result = await driver.runQuery(
-      config.id,
-      { kind: 'sql', sql },
-      { maxRows: DEFAULT_MAX_ROWS, queryId: `${config.id}:${started}`, readOnly: config.readOnly }
-    )
-    addHistory(db, { connectionId: config.id, query: sql, ranAt: started, durationMs: result.durationMs, success: true })
+    let request: QueryRequest
+    if (config.type === 'mongodb') {
+      const command = parseMongoJson(query)
+      assertMongoCommandWritable(command, config.readOnly)
+      request = { kind: 'mongo', command }
+    } else {
+      assertSqlWritable(query, config.readOnly)
+      request = { kind: 'sql', sql: query }
+    }
+    const result = await driver.runQuery(config.id, request, {
+      maxRows: DEFAULT_MAX_ROWS, queryId: `${config.id}:${started}`, readOnly: config.readOnly
+    })
+    addHistory(db, { connectionId: config.id, query, ranAt: started, durationMs: result.durationMs, success: true })
     return result
   } catch (e) {
-    addHistory(db, { connectionId: config.id, query: sql, ranAt: started, durationMs: null, success: false })
+    addHistory(db, { connectionId: config.id, query, ranAt: started, durationMs: null, success: false })
     throw e
   }
 }
