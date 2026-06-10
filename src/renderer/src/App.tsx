@@ -4,6 +4,8 @@ import TopBar from './components/TopBar'
 import Welcome from './components/Welcome'
 import ObjectTree from './components/ObjectTree'
 import ConnectionModal from './components/ConnectionModal'
+import TabBar from './components/TabBar'
+import QueryTab from './components/QueryTab'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -13,6 +15,10 @@ const queryClient = new QueryClient({
 
 function AppShell(): JSX.Element {
   const connectionModal = useAppStore((s) => s.connectionModal)
+  const tabs = useAppStore((s) => s.tabs)
+  const activeTabId = useAppStore((s) => s.activeTabId)
+
+  const activeTab = tabs.find((t) => t.id === activeTabId)
 
   return (
     <div className="app">
@@ -22,7 +28,18 @@ function AppShell(): JSX.Element {
           <ObjectTree />
         </aside>
         <main className="main">
-          <Welcome />
+          {tabs.length > 0 ? (
+            <>
+              <TabBar />
+              {activeTab ? (
+                <QueryTab key={activeTabId} tab={activeTab} />
+              ) : (
+                <Welcome />
+              )}
+            </>
+          ) : (
+            <Welcome />
+          )}
         </main>
       </div>
       {connectionModal && <ConnectionModal />}

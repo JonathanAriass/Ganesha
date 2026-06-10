@@ -61,7 +61,7 @@ export default function Welcome(): JSX.Element {
         {conn.readOnly ? ' · read-only' : ''}
       </p>
       <p style={{ color: 'var(--text-2)', fontSize: '12px' }}>
-        Browse objects in the sidebar. Query editor coming in a future update.
+        Double-click a table to query it, or open a new query tab.
       </p>
     </div>
   )

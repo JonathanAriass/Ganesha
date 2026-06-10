@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { ConnectionInput } from '@shared/domain'
 import type { ObjectRef } from '@shared/schema'
 import { unwrap } from './result'
+import type { QueryResult } from '@shared/query'
 
 // ── Connections ──────────────────────────────────────────────────────────────
 
@@ -97,5 +98,32 @@ export function useTestConnection() {
       input: ConnectionInput
       password: string | null
     }) => window.api.connections.test(input, password).then(unwrap),
+  })
+}
+
+export function useRunQuery() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ connectionId, query, queryId }: { connectionId: string; query: string; queryId: string }): Promise<QueryResult> =>
+      window.api.query.run(connectionId, query, queryId).then(unwrap),
+    onSettled: (_d, _e, vars) => {
+      void qc.invalidateQueries({ queryKey: ['history', vars.connectionId] })
+    },
+  })
+}
+
+export function useCancelQuery() {
+  return useMutation({
+    mutationFn: ({ connectionId, queryId }: { connectionId: string; queryId: string }) =>
+      window.api.query.cancel(connectionId, queryId).then(unwrap),
+  })
+}
+
+export function useHistory(connectionId: string | null) {
+  return useQuery({
+    queryKey: ['history', connectionId],
+    queryFn: () => window.api.history.list(connectionId!, 50).then(unwrap),
+    enabled: connectionId != null,
+    retry: false,
   })
 }

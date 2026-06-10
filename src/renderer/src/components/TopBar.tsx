@@ -1,3 +1,4 @@
+import type { ChangeEvent } from 'react'
 import { useAppStore } from '../state/store'
 import { useConnections } from '../lib/hooks'
 
@@ -10,7 +11,7 @@ export default function TopBar(): JSX.Element {
 
   const activeConn = connections.find((c) => c.id === activeConnectionId) ?? null
 
-  function handleSelectChange(e: React.ChangeEvent<HTMLSelectElement>) {
+  function handleSelectChange(e: ChangeEvent<HTMLSelectElement>) {
     const val = e.target.value
     setActiveConnection(val === '' ? null : val)
   }

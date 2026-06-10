@@ -1,16 +1,18 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import type { DbObject } from '@shared/schema'
 import { useAppStore } from '../state/store'
-import { useObjects, useColumns } from '../lib/hooks'
+import { useObjects, useColumns, useConnections } from '../lib/hooks'
+import { defaultTableQuery } from '../lib/tabquery'
 
 // ── ObjectNode ────────────────────────────────────────────────────────────────
 
 interface ObjectNodeProps {
   connectionId: string
   obj: DbObject
+  onDoubleClick: (obj: DbObject) => void
 }
 
-function ObjectNode({ connectionId, obj }: ObjectNodeProps): JSX.Element {
+function ObjectNode({ connectionId, obj, onDoubleClick }: ObjectNodeProps): JSX.Element {
   const [expanded, setExpanded] = useState(false)
   const ref = { schema: obj.schema, name: obj.name }
 
@@ -27,6 +29,7 @@ function ObjectNode({ connectionId, obj }: ObjectNodeProps): JSX.Element {
       <button
         className="tree-row"
         onClick={() => setExpanded((e) => !e)}
+        onDoubleClick={() => onDoubleClick(obj)}
         aria-expanded={expanded}
       >
         <span className={`tree-caret${expanded ? ' open' : ''}`} aria-hidden="true">
@@ -74,8 +77,23 @@ function ObjectNode({ connectionId, obj }: ObjectNodeProps): JSX.Element {
 
 export default function ObjectTree(): JSX.Element {
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
+  const openQueryTab = useAppStore((s) => s.openQueryTab)
 
+  const { data: connections = [] } = useConnections()
   const { data: objects, isLoading, error } = useObjects(activeConnectionId)
+
+  const activeConn = connections.find((c) => c.id === activeConnectionId)
+
+  function handleDoubleClick(obj: DbObject) {
+    if (!activeConnectionId || !activeConn) return
+    const ref = { schema: obj.schema, name: obj.name }
+    openQueryTab({
+      connectionId: activeConnectionId,
+      title: obj.name,
+      text: defaultTableQuery(activeConn.type, ref),
+      runOnOpen: true,
+    })
+  }
 
   if (!activeConnectionId) {
     return (
@@ -122,6 +140,7 @@ export default function ObjectTree(): JSX.Element {
             key={`${obj.schema ?? ''}:${obj.name}`}
             connectionId={activeConnectionId}
             obj={obj}
+            onDoubleClick={handleDoubleClick}
           />
         ))}
       </nav>
@@ -150,6 +169,7 @@ export default function ObjectTree(): JSX.Element {
               key={`${obj.schema ?? ''}:${obj.name}`}
               connectionId={activeConnectionId}
               obj={obj}
+              onDoubleClick={handleDoubleClick}
             />
           ))}
         </div>
