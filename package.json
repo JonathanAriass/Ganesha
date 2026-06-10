@@ -25,6 +25,7 @@
     "@testcontainers/mysql": "^10.28.0",
     "@testcontainers/postgresql": "^10.28.0",
     "@types/better-sqlite3": "^7.6.13",
+    "@types/estree": "^1.0.9",
     "@types/node": "^20.14.0",
     "@types/pg": "^8.20.0",
     "@types/react": "^18.3.3",
@@ -45,6 +46,7 @@
     "vitest": "^2.0.5"
   },
   "dependencies": {
+    "acorn": "^8.16.0",
     "better-sqlite3": "^11.10.0",
     "bson": "^6.10.4",
     "mongodb": "^6.21.0",
