@@ -8,10 +8,13 @@ import * as hist from './persistence/history'
 import * as settings from './persistence/settings'
 import { DriverManager } from './drivers/registry'
 import { PostgresDriver } from './drivers/sql/postgres'
+import { MySqlDriver } from './drivers/sql/mysql'
 import { runUserQuery } from './query-service'
 
 const drivers = new DriverManager()
 drivers.register(new PostgresDriver())
+drivers.register(new MySqlDriver('mysql'))
+drivers.register(new MySqlDriver('mariadb'))
 
 type Handler<K extends ChannelName> = (req: Req<K>) => Result<Res<K>> | Promise<Result<Res<K>>>
 
