@@ -41,3 +41,21 @@ export function assertMongoWritable(op: MongoOp, readOnly: boolean): void {
     throw new Error(`This connection is read-only — '${op}' is a write operation and is blocked.`)
   }
 }
+
+function pipelineHasWriteStage(pipeline: Record<string, unknown>[] | undefined): boolean {
+  return !!pipeline?.some((stage) => '$out' in stage || '$merge' in stage)
+}
+
+/** True if the command writes — a write op, or an aggregate with a $out/$merge stage. */
+export function isMongoCommandWrite(cmd: MongoCommand): boolean {
+  if (!isMongoReadOp(cmd.op)) return true
+  return cmd.op === 'aggregate' && pipelineHasWriteStage(cmd.pipeline)
+}
+
+/** Throw if the command writes on a read-only connection (covers aggregate $out/$merge). */
+export function assertMongoCommandWritable(cmd: MongoCommand, readOnly: boolean): void {
+  if (readOnly && isMongoCommandWrite(cmd)) {
+    const detail = cmd.op === 'aggregate' ? `'aggregate' with $out/$merge` : `'${cmd.op}'`
+    throw new Error(`This connection is read-only — ${detail} is a write operation and is blocked.`)
+  }
+}
