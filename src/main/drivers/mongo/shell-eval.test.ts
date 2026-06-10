@@ -38,4 +38,9 @@ describe('evalArg', () => {
     expect(() => evalArg(expr('fetch("http://x")'))).toThrow(/unsupported helper/i)
     expect(() => evalArg(expr('a + b'))).toThrow(/unsupported/i)
   })
+
+  it('rejects __proto__ keys and computed keys (defense-in-depth)', () => {
+    expect(() => evalArg(expr('{ "__proto__": { "x": 1 } }'))).toThrow(/__proto__/)
+    expect(() => evalArg(expr('{ [foo]: 1 }'))).toThrow(/computed/i)
+  })
 })

@@ -38,10 +38,13 @@ export function evalArg(node: Expression | null): unknown {
       for (const p of (node as ObjectExpression).properties) {
         if (p.type !== 'Property') throw new Error('Unsupported object property (spread not allowed)')
         const prop = p as Property
+        if (prop.computed) throw new Error('Computed object keys are not supported in mongo shell input')
         const key =
           prop.key.type === 'Identifier'
             ? (prop.key as Identifier).name
             : String((prop.key as Literal).value)
+        // Reject __proto__ so a parsed object can never carry an attacker-controlled prototype.
+        if (key === '__proto__') throw new Error("Object key '__proto__' is not allowed in mongo shell input")
         out[key] = evalArg(prop.value as Expression)
       }
       return out
