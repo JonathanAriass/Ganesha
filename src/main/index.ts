@@ -1,12 +1,28 @@
 import { app, BrowserWindow } from 'electron'
 import { join } from 'path'
 import { registerIpcHandlers } from './ipc'
+import { installAppMenu } from './menu'
+import { openDb } from './persistence/db'
+import { getSettings } from './persistence/settings'
+
+/**
+ * Match the window background to the saved theme so launch doesn't flash
+ * the wrong color. Guarded: a broken better-sqlite3 must never stop the
+ * app from launching (openDb is deliberately lazy everywhere else).
+ */
+function windowBackground(): string {
+  try {
+    return getSettings(openDb()).theme === 'light' ? '#f7f8fa' : '#0f1117'
+  } catch {
+    return '#0f1117'
+  }
+}
 
 function createWindow(): void {
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
-    backgroundColor: '#0f1117',
+    backgroundColor: windowBackground(),
     minWidth: 940,
     minHeight: 600,
     show: false,
@@ -21,6 +37,16 @@ function createWindow(): void {
   win.on('ready-to-show', () => win.show())
 
   const devUrl = process.env['ELECTRON_RENDERER_URL']
+
+  // The renderer shows DB-sourced content; it must never become a browser.
+  // Deny popups outright and block navigation away from the app itself
+  // (dev-server full reloads emit will-navigate to the same dev URL — allowed).
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  win.webContents.on('will-navigate', (event, url) => {
+    if (devUrl && url.startsWith(devUrl)) return
+    event.preventDefault()
+  })
+
   if (devUrl) {
     win.loadURL(devUrl)
   } else {
@@ -29,6 +55,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  installAppMenu()
   registerIpcHandlers()
   createWindow()
 
