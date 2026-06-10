@@ -180,8 +180,9 @@ button, input, select, textarea {
   flex-shrink: 0;
   background: var(--bg-2);
   border-right: 1px solid var(--border);
-  overflow-y: auto;
-  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 /* ── Main area ── */

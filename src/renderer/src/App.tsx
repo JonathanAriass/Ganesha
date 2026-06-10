@@ -6,6 +6,7 @@ import ObjectTree from './components/ObjectTree'
 import ConnectionModal from './components/ConnectionModal'
 import TabBar from './components/TabBar'
 import QueryTab from './components/QueryTab'
+import HistorySection from './components/HistorySection'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -25,7 +26,10 @@ function AppShell(): JSX.Element {
       <TopBar />
       <div className="app-body">
         <aside className="sidebar">
-          <ObjectTree />
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
+            <ObjectTree />
+          </div>
+          <HistorySection />
         </aside>
         <main className="main">
           {tabs.length > 0 ? (
