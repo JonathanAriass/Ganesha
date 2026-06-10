@@ -108,11 +108,11 @@ export function registerIpcHandlers(): void {
     if (c && drivers.has(c.type)) await drivers.get(c.type).disconnect(id)
     return ok(null)
   })
-  handle('query.run', async ({ connectionId, query }) => {
+  handle('query.run', async ({ connectionId, query, queryId }) => {
     const { db, secrets } = store()
     const c = conns.getConnection(db, connectionId)
     if (!c) throw new Error(`Connection not found: ${connectionId}`)
-    const result = await runUserQuery({ db, secrets, driver: drivers.get(c.type), connectionId, query, now: () => Date.now() })
+    const result = await runUserQuery({ db, secrets, driver: drivers.get(c.type), connectionId, query, queryId, now: () => Date.now() })
     return ok(result)
   })
   handle('query.cancel', async ({ connectionId, queryId }) => {

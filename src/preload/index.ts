@@ -28,7 +28,7 @@ const api: DbClientApi = {
     setDataDir: (dir) => invoke('settings.dataDir.set', dir)
   },
   query: {
-    run: (connectionId, query) => invoke('query.run', { connectionId, query }),
+    run: (connectionId, query, queryId) => invoke('query.run', { connectionId, query, queryId }),
     cancel: (connectionId, queryId) => invoke('query.cancel', { connectionId, queryId })
   },
   schema: {

@@ -17,13 +17,17 @@ const fakeResult: QueryResult = {
   columns: [{ name: 'n', dataType: '23' }], rows: [[1]], rowCount: 1, durationMs: 3, truncated: false, documents: null
 }
 
-function fakeDriver(calls: string[]): DatabaseDriver {
+function fakeDriver(calls: string[], queryIds?: string[]): DatabaseDriver {
   return {
     type: 'postgres',
     testConnection: async () => {},
     connect: async () => { calls.push('connect') },
     disconnect: async () => {},
-    runQuery: async (_id, req) => { calls.push('run:' + (req.kind === 'sql' ? req.sql : 'mongo')); return fakeResult },
+    runQuery: async (_id, req, opts) => {
+      calls.push('run:' + (req.kind === 'sql' ? req.sql : 'mongo'))
+      if (queryIds) queryIds.push(opts.queryId)
+      return fakeResult
+    },
     cancel: async () => {},
     listObjects: async () => [],
     describeObject: async () => []
@@ -36,14 +40,16 @@ beforeEach(() => { db = new Database(':memory:'); migrate(db) })
 describe('runUserQuery', () => {
   it('runs a read on a read-only connection, returns the result, and logs history', async () => {
     const calls: string[] = []
+    const queryIds: string[] = []
     const c = createConnection(db, input, 1)
     const secrets = makeSecretStore(db, enc)
     secrets.setPassword(c.id, 'pw')
     const res = await runUserQuery({
-      db, secrets, driver: fakeDriver(calls), connectionId: c.id, query: 'SELECT 1', now: () => 42
+      db, secrets, driver: fakeDriver(calls, queryIds), connectionId: c.id, query: 'SELECT 1', queryId: 'q1', now: () => 42
     })
     expect(res).toEqual(fakeResult)
     expect(calls).toEqual(['connect', 'run:SELECT 1'])
+    expect(queryIds).toEqual(['q1'])
     const hist = listHistory(db, c.id)
     expect(hist).toHaveLength(1)
     expect(hist[0].query).toBe('SELECT 1')
@@ -54,7 +60,7 @@ describe('runUserQuery', () => {
     const calls: string[] = []
     const c = createConnection(db, input, 1)
     await expect(
-      runUserQuery({ db, secrets: makeSecretStore(db, enc), driver: fakeDriver(calls), connectionId: c.id, query: 'DELETE FROM t', now: () => 42 })
+      runUserQuery({ db, secrets: makeSecretStore(db, enc), driver: fakeDriver(calls), connectionId: c.id, query: 'DELETE FROM t', queryId: 'q2', now: () => 42 })
     ).rejects.toThrow(/read-only/i)
     expect(calls).toEqual(['connect']) // driver.runQuery NOT called
     expect(listHistory(db, c.id)[0].success).toBe(false)
@@ -62,7 +68,7 @@ describe('runUserQuery', () => {
 
   it('throws if the connection id is unknown', async () => {
     await expect(
-      runUserQuery({ db, secrets: makeSecretStore(db, enc), driver: fakeDriver([]), connectionId: 'nope', query: 'SELECT 1', now: () => 1 })
+      runUserQuery({ db, secrets: makeSecretStore(db, enc), driver: fakeDriver([]), connectionId: 'nope', query: 'SELECT 1', queryId: 'q3', now: () => 1 })
     ).rejects.toThrow(/not found/i)
   })
 
@@ -72,13 +78,13 @@ describe('runUserQuery', () => {
     const c = createConnection(db, mongoInput, 1)
     const res = await runUserQuery({
       db, secrets: makeSecretStore(db, enc), driver: fakeDriver(calls), connectionId: c.id,
-      query: JSON.stringify({ op: 'find', collection: 'users', filter: { age: { $gt: 21 } } }), now: () => 7
+      query: JSON.stringify({ op: 'find', collection: 'users', filter: { age: { $gt: 21 } } }), queryId: 'q4', now: () => 7
     })
     expect(res).toEqual(fakeResult)
     expect(calls).toEqual(['connect', 'run:mongo'])
     await expect(runUserQuery({
       db, secrets: makeSecretStore(db, enc), driver: fakeDriver([]), connectionId: c.id,
-      query: JSON.stringify({ op: 'deleteOne', collection: 'users', filter: {} }), now: () => 7
+      query: JSON.stringify({ op: 'deleteOne', collection: 'users', filter: {} }), queryId: 'q5', now: () => 7
     })).rejects.toThrow(/read-only/i)
   })
 })

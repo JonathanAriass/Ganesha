@@ -16,6 +16,7 @@ interface RunArgs {
   driver: DatabaseDriver
   connectionId: string
   query: string
+  queryId: string
   /** Injected clock for deterministic history timestamps. */
   now: () => number
 }
@@ -23,7 +24,7 @@ interface RunArgs {
 /** Orchestrate a run: load config+secret, connect, dispatch by type (SQL vs Mongo) through the
  *  read-only guard, run on the driver, and log history on success or failure. */
 export async function runUserQuery(args: RunArgs): Promise<QueryResult> {
-  const { db, secrets, driver, connectionId, query, now } = args
+  const { db, secrets, driver, connectionId, query, queryId, now } = args
   const config = getConnection(db, connectionId)
   if (!config) throw new Error(`Connection not found: ${connectionId}`)
 
@@ -41,7 +42,7 @@ export async function runUserQuery(args: RunArgs): Promise<QueryResult> {
       request = { kind: 'sql', sql: query }
     }
     const result = await driver.runQuery(config.id, request, {
-      maxRows: DEFAULT_MAX_ROWS, queryId: `${config.id}:${started}`, readOnly: config.readOnly
+      maxRows: DEFAULT_MAX_ROWS, queryId, readOnly: config.readOnly
     })
     addHistory(db, { connectionId: config.id, query, ranAt: started, durationMs: result.durationMs, success: true })
     return result

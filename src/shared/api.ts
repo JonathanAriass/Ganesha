@@ -24,7 +24,7 @@ export interface DbClientApi {
     setDataDir(dir: string): Promise<IpcResult<'settings.dataDir.set'>>
   }
   query: {
-    run(connectionId: string, query: string): Promise<IpcResult<'query.run'>>
+    run(connectionId: string, query: string, queryId: string): Promise<IpcResult<'query.run'>>
     cancel(connectionId: string, queryId: string): Promise<IpcResult<'query.cancel'>>
   }
   schema: {
