@@ -5,7 +5,11 @@ node_modules/
 dist/
 dist-electron/
 out/
-build/
+# build/ is also the electron-builder buildResources dir (icon sources live there).
+# Exclude generated package artifacts but track the icon source assets.
+build/**
+!build/icon.svg
+!build/icon.png
 release/
 *.tsbuildinfo
 
