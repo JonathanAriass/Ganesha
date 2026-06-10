@@ -1,3 +1,4 @@
+import { EJSON } from 'bson'
 import { type MongoCommand, type MongoOp, isMongoOp } from './command'
 
 function asObject(v: unknown, field: string): Record<string, unknown> {
@@ -20,7 +21,7 @@ export function parseMongoJson(input: string): MongoCommand {
   try {
     // EJSON.parse is a JSON superset: it deserializes type wrappers ({$oid},{$date},
     // {$numberLong}, ...) into BSON instances while leaving query operators ($gt, $set) intact.
-    raw = (require('bson') as typeof import('bson')).EJSON.parse(input, { relaxed: true })
+    raw = EJSON.parse(input, { relaxed: true })
   } catch (e) {
     throw new Error(`Invalid JSON: ${(e as Error).message}`)
   }

@@ -1,7 +1,14 @@
 import { describe, it, expect } from 'vitest'
+import { ObjectId } from 'bson'
 import { parseMongoJson } from './raw'
 
 describe('parseMongoJson', () => {
+  it('deserializes EJSON type wrappers to BSON (e.g. {$oid} -> ObjectId)', () => {
+    const cmd = parseMongoJson('{ "op": "find", "collection": "c", "filter": { "_id": { "$oid": "507f1f77bcf86cd799439011" } } }')
+    expect(cmd.filter!._id).toBeInstanceOf(ObjectId)
+    expect((cmd.filter!._id as ObjectId).toHexString()).toBe('507f1f77bcf86cd799439011')
+  })
+
   it('parses a find with filter/projection/sort/limit/skip', () => {
     const cmd = parseMongoJson(JSON.stringify({
       op: 'find', collection: 'users',

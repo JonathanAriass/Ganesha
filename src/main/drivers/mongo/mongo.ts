@@ -92,7 +92,7 @@ export class MongoDriver implements DatabaseDriver {
     }
   }
 
-  async cancel(): Promise<void> {
+  async cancel(_id: string, _queryId: string): Promise<void> {
     // v1: MongoDB has no simple per-query cancel; ops carry maxTimeMS. killOp is a future enhancement.
   }
 }

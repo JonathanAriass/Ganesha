@@ -5,7 +5,7 @@ import type {
 import { evalArg } from './shell-eval'
 import { isMongoOp, type MongoCommand, type MongoOp } from './command'
 
-const MODIFIERS = new Set(['sort', 'limit', 'skip', 'project', 'projection'])
+const MODIFIERS = new Set(['sort', 'limit', 'skip', 'projection'])
 
 function asObj(v: unknown, field: string): Record<string, unknown> {
   if (v === null || typeof v !== 'object' || Array.isArray(v)) throw new Error(`'${field}' must be an object`)
@@ -113,7 +113,7 @@ function buildCommand(op: MongoOp, collection: string, args: unknown[], modifier
       break
   }
   for (const m of modifiers) {
-    if (op !== 'find' && op !== 'findOne') throw new Error(`'.${m.name}()' is only supported on find/findOne`)
+    if (op !== 'find') throw new Error(`'.${m.name}()' is only supported on find (findOne returns a single document)`)
     if (m.name === 'sort') cmd.sort = asObj(m.args[0], 'sort')
     else if (m.name === 'limit') cmd.limit = asNonNegInt(m.args[0], 'limit')
     else if (m.name === 'skip') cmd.skip = asNonNegInt(m.args[0], 'skip')

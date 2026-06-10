@@ -8,7 +8,9 @@ module.exports = {
   ignorePatterns: ['out/', 'dist/', 'node_modules/', '*.cjs'],
   rules: {
     'react-hooks/rules-of-hooks': 'error',
-    'react-hooks/exhaustive-deps': 'warn'
+    'react-hooks/exhaustive-deps': 'warn',
+    // Allow intentionally-unused args/vars when prefixed with _ (e.g. interface-mandated params).
+    '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }]
   },
   overrides: [
     {
