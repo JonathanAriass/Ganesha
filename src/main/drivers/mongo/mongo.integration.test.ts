@@ -40,4 +40,14 @@ describe('MongoDriver (integration, requires Docker)', () => {
     expect(res.rows).toHaveLength(1)
     expect(res.truncated).toBe(true)
   })
+
+  it('listObjects contains users; describeObject contains _id and name', async () => {
+    const objects = await driver.listObjects(id)
+    expect(objects).toContainEqual({ schema: null, name: 'users', kind: 'collection' })
+
+    const columns = await driver.describeObject(id, { schema: null, name: 'users' })
+    const names = columns.map((c) => c.name)
+    expect(names).toContain('_id')
+    expect(names).toContain('name')
+  })
 })

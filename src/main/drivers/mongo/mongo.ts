@@ -1,7 +1,8 @@
 import { MongoClient } from 'mongodb'
 import type { Document, Filter, Sort, UpdateFilter } from 'mongodb'
-import type { DatabaseDriver, ConnectParams, RunOptions, QueryRequest, QueryResult } from '../types'
+import type { DatabaseDriver, ConnectParams, RunOptions, QueryRequest, QueryResult, DbObject, ObjectRef, ColumnInfo } from '../types'
 import { normalizeFind, normalizeScalar, normalizeValues, normalizeWriteResult } from './normalize'
+import { inferFieldTypes } from './infer'
 
 /** MongoDB driver. Read-only is enforced upstream by the command guard (no SQL-style RO txn). */
 export class MongoDriver implements DatabaseDriver {
@@ -94,5 +95,23 @@ export class MongoDriver implements DatabaseDriver {
 
   async cancel(_id: string, _queryId: string): Promise<void> {
     // v1: MongoDB has no simple per-query cancel; ops carry maxTimeMS. killOp is a future enhancement.
+  }
+
+  private requireClient(id: string): MongoClient {
+    const client = this.clients.get(id)
+    if (!client) throw new Error(`Connection '${id}' is not open`)
+    return client
+  }
+
+  async listObjects(id: string): Promise<DbObject[]> {
+    const cols = await this.requireClient(id).db().listCollections({}, { nameOnly: true }).toArray()
+    return cols
+      .map((c) => ({ schema: null, name: c.name, kind: 'collection' as const }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }
+
+  async describeObject(id: string, ref: ObjectRef): Promise<ColumnInfo[]> {
+    const sample = await this.requireClient(id).db().collection(ref.name).findOne({})
+    return inferFieldTypes(sample as Record<string, unknown> | null)
   }
 }

@@ -55,4 +55,20 @@ describe('MySqlDriver (integration, requires Docker)', () => {
       driver.runQuery(id, { kind: 'sql', sql: 'INSERT INTO nums VALUES (99)' }, { maxRows: 1000, queryId: 'q5', readOnly: true })
     ).rejects.toThrow(/read[- ]?only/i)
   })
+
+  it('listObjects and describeObject return correct schema metadata', async () => {
+    await driver.runQuery(
+      id,
+      { kind: 'sql', sql: 'CREATE TABLE t_intro (a int NOT NULL, b text)' },
+      { maxRows: 1000, queryId: 'q6', readOnly: false }
+    )
+    const objects = await driver.listObjects(id)
+    expect(objects).toContainEqual({ schema: null, name: 't_intro', kind: 'table' })
+
+    const columns = await driver.describeObject(id, { schema: null, name: 't_intro' })
+    expect(columns).toEqual([
+      { name: 'a', dataType: 'int', nullable: false },
+      { name: 'b', dataType: 'text', nullable: true }
+    ])
+  })
 })

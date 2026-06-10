@@ -1,7 +1,9 @@
 import type { ConnectionType } from '../../shared/domain'
 import type { MongoCommand } from './mongo/command'
 import type { ColumnMeta, QueryResult } from '../../shared/query'
+import type { DbObject, ObjectRef, ColumnInfo } from '../../shared/schema'
 export type { ColumnMeta, QueryResult }
+export type { DbObject, ObjectRef, ColumnInfo }
 
 /** Everything a driver needs to open a connection. Password is resolved by main from the secret store. */
 export interface ConnectParams {
@@ -42,4 +44,8 @@ export interface DatabaseDriver {
   runQuery(id: string, request: QueryRequest, opts: RunOptions): Promise<QueryResult>
   /** Best-effort cancellation of an in-flight query by its RunOptions.queryId. */
   cancel(id: string, queryId: string): Promise<void>
+  /** List user tables/views/collections visible on this connection. */
+  listObjects(id: string): Promise<DbObject[]>
+  /** Describe an object's columns/fields. */
+  describeObject(id: string, ref: ObjectRef): Promise<ColumnInfo[]>
 }

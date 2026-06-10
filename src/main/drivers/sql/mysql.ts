@@ -1,6 +1,7 @@
 import mysql from 'mysql2/promise'
 import type {
-  DatabaseDriver, ConnectParams, RunOptions, QueryRequest, QueryResult, ColumnMeta
+  DatabaseDriver, ConnectParams, RunOptions, QueryRequest, QueryResult, ColumnMeta,
+  DbObject, ObjectRef, ColumnInfo
 } from '../types'
 import type { ConnectionType } from '../../../shared/domain'
 
@@ -106,5 +107,33 @@ export class MySqlDriver implements DatabaseDriver {
     const threadId = this.running.get(queryId)
     const pool = this.pools.get(id)
     if (threadId && pool) await pool.query('KILL QUERY ?', [threadId])
+  }
+
+  private requirePool(id: string): mysql.Pool {
+    const pool = this.pools.get(id)
+    if (!pool) throw new Error(`Connection '${id}' is not open`)
+    return pool
+  }
+
+  async listObjects(id: string): Promise<DbObject[]> {
+    const [rows] = await this.requirePool(id).query(
+      `SELECT TABLE_NAME AS name, TABLE_TYPE AS tableType
+       FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() ORDER BY TABLE_NAME`
+    )
+    return (rows as { name: string; tableType: string }[]).map((r) => ({
+      schema: null, name: r.name, kind: r.tableType === 'VIEW' ? ('view' as const) : ('table' as const)
+    }))
+  }
+
+  async describeObject(id: string, ref: ObjectRef): Promise<ColumnInfo[]> {
+    const [rows] = await this.requirePool(id).query(
+      `SELECT COLUMN_NAME AS name, DATA_TYPE AS dataType, (IS_NULLABLE = 'YES') AS nullable
+       FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION`,
+      [ref.name]
+    )
+    return (rows as { name: string; dataType: string; nullable: number }[]).map((r) => ({
+      name: r.name, dataType: r.dataType, nullable: !!r.nullable
+    }))
   }
 }

@@ -24,7 +24,9 @@ function fakeDriver(calls: string[]): DatabaseDriver {
     connect: async () => { calls.push('connect') },
     disconnect: async () => {},
     runQuery: async (_id, req) => { calls.push('run:' + (req.kind === 'sql' ? req.sql : 'mongo')); return fakeResult },
-    cancel: async () => {}
+    cancel: async () => {},
+    listObjects: async () => [],
+    describeObject: async () => []
   }
 }
 

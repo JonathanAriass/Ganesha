@@ -1,6 +1,7 @@
 import pg from 'pg'
 import type {
-  DatabaseDriver, ConnectParams, RunOptions, QueryRequest, QueryResult, ColumnMeta
+  DatabaseDriver, ConnectParams, RunOptions, QueryRequest, QueryResult, ColumnMeta,
+  DbObject, ObjectRef, ColumnInfo
 } from '../types'
 
 const { Pool } = pg
@@ -97,5 +98,33 @@ export class PostgresDriver implements DatabaseDriver {
     const pid = this.running.get(queryId)
     const pool = this.pools.get(id)
     if (pid && pool) await pool.query('SELECT pg_cancel_backend($1)', [pid])
+  }
+
+  private requirePool(id: string): pg.Pool {
+    const pool = this.pools.get(id)
+    if (!pool) throw new Error(`Connection '${id}' is not open`)
+    return pool
+  }
+
+  async listObjects(id: string): Promise<DbObject[]> {
+    const res = await this.requirePool(id).query(
+      `SELECT table_schema AS schema, table_name AS name,
+              CASE table_type WHEN 'VIEW' THEN 'view' ELSE 'table' END AS kind
+       FROM information_schema.tables
+       WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+       ORDER BY table_schema, table_name`
+    )
+    return res.rows as DbObject[]
+  }
+
+  async describeObject(id: string, ref: ObjectRef): Promise<ColumnInfo[]> {
+    const res = await this.requirePool(id).query(
+      `SELECT column_name AS name, data_type AS "dataType", (is_nullable = 'YES') AS nullable
+       FROM information_schema.columns
+       WHERE table_schema = $1 AND table_name = $2
+       ORDER BY ordinal_position`,
+      [ref.schema ?? 'public', ref.name]
+    )
+    return res.rows as ColumnInfo[]
   }
 }

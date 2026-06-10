@@ -65,4 +65,20 @@ describe('PostgresDriver (integration, requires Docker)', () => {
       )
     ).rejects.toThrow(/read-only transaction/i)
   })
+
+  it('listObjects and describeObject return correct schema metadata', async () => {
+    await driver.runQuery(
+      id,
+      { kind: 'sql', sql: 'CREATE TABLE t_intro (a int NOT NULL, b text)' },
+      { maxRows: 1000, queryId: 'q5', readOnly: false }
+    )
+    const objects = await driver.listObjects(id)
+    expect(objects).toContainEqual({ schema: 'public', name: 't_intro', kind: 'table' })
+
+    const columns = await driver.describeObject(id, { schema: 'public', name: 't_intro' })
+    expect(columns).toEqual([
+      { name: 'a', dataType: 'integer', nullable: false },
+      { name: 'b', dataType: 'text', nullable: true }
+    ])
+  })
 })
