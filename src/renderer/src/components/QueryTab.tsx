@@ -26,6 +26,7 @@ export default function QueryTab({ tab }: Props): JSX.Element {
   const cancelQuery = useCancelQuery()
 
   function run() {
+    // Re-checks live tab.running each render (run is recreated per render) — keep that if memoizing.
     if (!tab.text.trim() || tab.running) return
     const queryId = crypto.randomUUID()
     startRun(tab.id, queryId)

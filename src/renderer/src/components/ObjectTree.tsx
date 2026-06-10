@@ -28,7 +28,11 @@ function ObjectNode({ connectionId, obj, onDoubleClick }: ObjectNodeProps): JSX.
     <div className="tree-node">
       <button
         className="tree-row"
-        onClick={() => setExpanded((e) => !e)}
+        onClick={(e) => {
+          // Clicks that are part of a double-click would toggle twice before onDoubleClick fires.
+          if (e.detail > 1) return
+          setExpanded((ex) => !ex)
+        }}
         onDoubleClick={() => onDoubleClick(obj)}
         aria-expanded={expanded}
       >

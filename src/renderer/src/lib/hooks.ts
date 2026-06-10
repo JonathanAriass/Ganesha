@@ -3,6 +3,7 @@ import type { ConnectionInput } from '@shared/domain'
 import type { ObjectRef } from '@shared/schema'
 import { unwrap } from './result'
 import type { QueryResult } from '@shared/query'
+import { useAppStore } from '../state/store'
 
 // ── Connections ──────────────────────────────────────────────────────────────
 
@@ -81,7 +82,9 @@ export function useDeleteConnection() {
   return useMutation({
     mutationFn: (id: string) =>
       window.api.connections.delete(id).then(unwrap),
-    onSuccess: () => {
+    onSuccess: (_d, id) => {
+      // Tabs pointing at the deleted connection would linger with a dead Run.
+      useAppStore.getState().closeTabsForConnection(id)
       void qc.invalidateQueries({ queryKey: ['connections'] })
       void qc.invalidateQueries({ queryKey: ['objects'] })
       void qc.invalidateQueries({ queryKey: ['columns'] })

@@ -34,6 +34,7 @@ interface AppState {
 
   openQueryTab: (args: { connectionId: string; title?: string; text?: string; runOnOpen?: boolean }) => void
   closeTab: (id: string) => void
+  closeTabsForConnection: (connectionId: string) => void
   setActiveTab: (id: string) => void
   setTabText: (id: string, text: string) => void
   loadQueryText: (id: string, text: string) => void
@@ -82,6 +83,14 @@ export const useAppStore = create<AppState>((set) => ({
         activeTabId = neighbor ? neighbor.id : null
       }
       return { tabs: next, activeTabId }
+    }),
+
+  closeTabsForConnection: (connectionId) =>
+    set((s) => {
+      const next = s.tabs.filter((t) => t.connectionId !== connectionId)
+      if (next.length === s.tabs.length) return s
+      const stillActive = next.some((t) => t.id === s.activeTabId)
+      return { tabs: next, activeTabId: stillActive ? s.activeTabId : (next[0]?.id ?? null) }
     }),
 
   setActiveTab: (id) => set({ activeTabId: id }),

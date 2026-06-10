@@ -25,6 +25,7 @@ export default function MonacoEditor({ initialValue, language, onChange, onRun }
       theme: 'midnight',
       minimap: { enabled: false },
       fontSize: 13,
+      // Installs a per-editor resize watcher — deliberate while editor instances are few; revisit if tab counts grow.
       automaticLayout: true,
       scrollBeyondLastLine: false,
       padding: { top: 8 },
