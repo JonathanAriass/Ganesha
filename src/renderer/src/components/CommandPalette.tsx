@@ -2,6 +2,8 @@ import { Command } from 'cmdk'
 import { useAppStore } from '../state/store'
 import { useConnections, useObjects, useSettings, useSetSetting } from '../lib/hooks'
 import { defaultTableQuery } from '../lib/tabquery'
+import { mod } from '../lib/platform'
+import { useRestoreFocus } from '../lib/use-restore-focus'
 
 /** Rendered only while open (parent gates on store.paletteOpen). */
 export default function CommandPalette(): JSX.Element {
@@ -17,6 +19,8 @@ export default function CommandPalette(): JSX.Element {
   const setSetting = useSetSetting()
 
   const activeConn = connections.find((c) => c.id === activeConnectionId)
+
+  useRestoreFocus()
 
   function close(): void {
     setPaletteOpen(false)
@@ -40,7 +44,7 @@ export default function CommandPalette(): JSX.Element {
                   }}
                 >
                   New query tab
-                  <span className="kbd">⌘T</span>
+                  <span className="kbd">{mod}T</span>
                 </Command.Item>
               )}
               <Command.Item
@@ -48,7 +52,9 @@ export default function CommandPalette(): JSX.Element {
                 onSelect={() => {
                   setSetting.mutate({
                     key: 'theme',
-                    value: settings?.theme === 'light' ? 'midnight' : 'light',
+                    // Default before settings load, so the toggle can't flip
+                    // a midnight app to 'light' just because data is in flight.
+                    value: (settings?.theme ?? 'midnight') === 'light' ? 'midnight' : 'light',
                   })
                   close()
                 }}
@@ -57,7 +63,7 @@ export default function CommandPalette(): JSX.Element {
               </Command.Item>
               <Command.Item value="action open settings" onSelect={openSettings}>
                 Open settings
-                <span className="kbd">⌘,</span>
+                <span className="kbd">{mod},</span>
               </Command.Item>
             </Command.Group>
 
@@ -66,7 +72,9 @@ export default function CommandPalette(): JSX.Element {
                 {connections.map((c) => (
                   <Command.Item
                     key={c.id}
-                    value={`connection ${c.name} ${c.type}`}
+                    // id keeps the value unique when two connections share a
+                    // name — duplicate cmdk values break selection.
+                    value={`connection ${c.name} ${c.type} ${c.id}`}
                     onSelect={() => {
                       setActiveConnection(c.id)
                       close()
@@ -89,7 +97,7 @@ export default function CommandPalette(): JSX.Element {
                 {objects.map((o) => (
                   <Command.Item
                     key={`${o.schema ?? ''}:${o.name}`}
-                    value={`object ${o.schema ?? ''} ${o.name}`}
+                    value={`object ${o.kind} ${o.schema ?? ''} ${o.name}`}
                     onSelect={() => {
                       openQueryTab({
                         connectionId: activeConn.id,

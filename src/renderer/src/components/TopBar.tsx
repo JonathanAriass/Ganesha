@@ -1,6 +1,7 @@
 import type { ChangeEvent } from 'react'
 import { useAppStore } from '../state/store'
 import { useConnections } from '../lib/hooks'
+import { mod } from '../lib/platform'
 
 export default function TopBar(): JSX.Element {
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
@@ -66,7 +67,7 @@ export default function TopBar(): JSX.Element {
         className="btn ghost"
         onClick={openSettings}
         aria-label="Settings"
-        title="Settings (⌘,)"
+        title={`Settings (${mod},)`}
       >
         ⚙
       </button>

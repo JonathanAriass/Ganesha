@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { useAppStore } from '../state/store'
 import { useSettings, useSetSetting, useDataDir, useSetDataDir } from '../lib/hooks'
 import { unwrap } from '../lib/result'
+import { useRestoreFocus } from '../lib/use-restore-focus'
 
 export default function SettingsModal(): JSX.Element {
   const closeSettings = useAppStore((s) => s.closeSettings)
@@ -9,12 +11,22 @@ export default function SettingsModal(): JSX.Element {
   const { data: dataDir } = useDataDir()
   const setSetting = useSetSetting()
   const setDataDir = useSetDataDir()
+  const [pickError, setPickError] = useState<string | null>(null)
+
+  useRestoreFocus()
 
   const theme = settings?.theme ?? 'midnight'
 
   async function changeDataDir(): Promise<void> {
-    const dir = await window.api.dialog.pickDirectory().then(unwrap)
-    if (dir) setDataDir.mutate(dir)
+    setPickError(null)
+    try {
+      const dir = await window.api.dialog.pickDirectory().then(unwrap)
+      if (dir) setDataDir.mutate(dir)
+    } catch (e) {
+      // The picker itself failing is near-impossible, but a swallowed error
+      // would leave the button looking dead — surface it like mutation errors.
+      setPickError(e instanceof Error ? e.message : String(e))
+    }
   }
 
   return (
@@ -71,11 +83,12 @@ export default function SettingsModal(): JSX.Element {
                 Connections, history and settings live here. Changing it copies your data
                 to the new folder.
               </p>
-              {setDataDir.isError && (
+              {(pickError !== null || setDataDir.isError) && (
                 <div className="status err" role="alert">
-                  {setDataDir.error instanceof Error
-                    ? setDataDir.error.message
-                    : String(setDataDir.error)}
+                  {pickError ??
+                    (setDataDir.error instanceof Error
+                      ? setDataDir.error.message
+                      : String(setDataDir.error))}
                 </div>
               )}
             </div>
