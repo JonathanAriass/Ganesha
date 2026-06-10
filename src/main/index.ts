@@ -43,14 +43,20 @@ function createWindow(): void {
   // (dev-server full reloads emit will-navigate to the same dev origin — allowed).
   // Compared by origin, not string prefix: "http://localhost:5173.evil.com"
   // must not pass for a devUrl of "http://localhost:5173".
+  const navigationAllowed = (url: string): boolean => {
+    try {
+      return Boolean(devUrl && new URL(url).origin === new URL(devUrl).origin)
+    } catch {
+      return false // unparseable URL → deny
+    }
+  }
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   win.webContents.on('will-navigate', (event, url) => {
-    try {
-      if (devUrl && new URL(url).origin === new URL(devUrl).origin) return
-    } catch {
-      /* unparseable URL → deny */
-    }
-    event.preventDefault()
+    if (!navigationAllowed(url)) event.preventDefault()
+  })
+  // Server-side redirects bypass will-navigate; hold them to the same policy.
+  win.webContents.on('will-redirect', (event, url) => {
+    if (!navigationAllowed(url)) event.preventDefault()
   })
 
   if (devUrl) {

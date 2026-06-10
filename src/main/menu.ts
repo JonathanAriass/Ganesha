@@ -19,7 +19,14 @@ export function installAppMenu(): void {
     },
     { role: 'editMenu' },
     { role: 'viewMenu' },
-    { role: 'windowMenu' }
+    // On mac the windowMenu role is Minimize/Zoom/Front — no close item. On
+    // win/linux it would add Close with the default CmdOrCtrl+W accelerator,
+    // eating the tab-close chord again, so build it without one.
+    ...(isMac
+      ? ([{ role: 'windowMenu' }] as MenuItemConstructorOptions[])
+      : ([
+          { label: 'Window', submenu: [{ role: 'minimize' }, { role: 'zoom' }] }
+        ] as MenuItemConstructorOptions[]))
   ]
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
 }
