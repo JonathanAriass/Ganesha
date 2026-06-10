@@ -21,10 +21,12 @@ export class MySqlDriver implements DatabaseDriver {
       port: p.port,
       user: p.username,
       password: p.password ?? undefined,
+      // mysql2 allows connecting with no default database; '' means "none selected".
       database: p.database || undefined,
       ssl: p.ssl ? { rejectUnauthorized: false } : undefined,
       connectionLimit: 4,
-      connectTimeout: 10_000
+      connectTimeout: 10_000,
+      idleTimeout: 30_000
     }
   }
 
@@ -56,7 +58,9 @@ export class MySqlDriver implements DatabaseDriver {
     if (!pool) throw new Error(`Connection '${id}' is not open`)
 
     const conn = await pool.getConnection()
-    this.running.set(opts.queryId, conn.threadId)
+    // conn.threadId is the server connection id cancel() targets with KILL QUERY;
+    // only track a valid (>0) id so cancel can never aim at the wrong connection.
+    if (conn.threadId > 0) this.running.set(opts.queryId, conn.threadId)
     const start = Date.now()
     try {
       if (opts.readOnly) await conn.query('START TRANSACTION READ ONLY')
