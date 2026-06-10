@@ -5,6 +5,7 @@ import { useConnections, useRunQuery, useCancelQuery } from '../lib/hooks'
 import MonacoEditor from './MonacoEditor'
 import ResultsPanel from './ResultsPanel'
 import type { ConnectionType } from '@shared/domain'
+import { mod } from '../lib/platform'
 
 function langFor(type: ConnectionType | undefined): string {
   return type === 'mongodb' ? 'javascript' : 'sql'
@@ -65,7 +66,7 @@ export default function QueryTab({ tab }: Props): JSX.Element {
           className="btn primary"
           disabled={tab.running || !tab.text.trim()}
           onClick={run}
-          title="Run (⌘↵)"
+          title={`Run (${mod}↵)`}
         >
           ▶ Run
         </button>

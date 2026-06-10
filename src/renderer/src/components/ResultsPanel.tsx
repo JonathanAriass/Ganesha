@@ -3,6 +3,7 @@ import type { QueryTabData } from '../state/store'
 import ResultsGrid from './ResultsGrid'
 import DocumentView from './DocumentView'
 import { toCsv, toJsonText, download } from '../lib/export'
+import { mod } from '../lib/platform'
 
 interface Props {
   tab: QueryTabData
@@ -40,7 +41,7 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
   if (!tab.result) {
     return (
       <div className="results">
-        <div className="results-empty">Run a query — ⌘↵</div>
+        <div className="results-empty">Run a query — {mod}↵</div>
       </div>
     )
   }

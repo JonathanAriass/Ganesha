@@ -6,7 +6,7 @@ describe('overlay state invariants', () => {
     useAppStore.setState({ settingsOpen: false, paletteOpen: false, connectionModal: null })
   })
 
-  it('openSettings closes the palette — at most one overlay at a time', () => {
+  it('openSettings closes the palette', () => {
     useAppStore.getState().setPaletteOpen(true)
     useAppStore.getState().openSettings()
     const s = useAppStore.getState()

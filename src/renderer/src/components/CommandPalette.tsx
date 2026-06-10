@@ -50,11 +50,10 @@ export default function CommandPalette(): JSX.Element {
               <Command.Item
                 value="action toggle theme"
                 onSelect={() => {
+                  if (!settings) return // theme unknown while loading — don't guess
                   setSetting.mutate({
                     key: 'theme',
-                    // Default before settings load, so the toggle can't flip
-                    // a midnight app to 'light' just because data is in flight.
-                    value: (settings?.theme ?? 'midnight') === 'light' ? 'midnight' : 'light',
+                    value: settings.theme === 'light' ? 'midnight' : 'light',
                   })
                   close()
                 }}
