@@ -1,4 +1,4 @@
-import { ipcMain, clipboard } from 'electron'
+import { ipcMain, clipboard, dialog, BrowserWindow } from 'electron'
 import type { ChannelName, Req, Res } from '../shared/ipc'
 import { ok, err, type Result } from '../shared/result'
 import { openDb } from './persistence/db'
@@ -139,4 +139,11 @@ export function registerIpcHandlers(): void {
 
   // navigator.clipboard is permission-gated in the sandboxed renderer; route via main.
   handle('clipboard.copy', (text) => { clipboard.writeText(text); return ok(null) })
+
+  handle('dialog.pickDirectory', async () => {
+    const win = BrowserWindow.getFocusedWindow()
+    const opts = { properties: ['openDirectory', 'createDirectory'] as Array<'openDirectory' | 'createDirectory'> }
+    const r = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
+    return ok(r.canceled || r.filePaths.length === 0 ? null : r.filePaths[0])
+  })
 }

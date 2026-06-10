@@ -33,6 +33,7 @@ export interface IpcChannels {
   'schema.objects': { req: string; res: DbObject[] }
   'schema.columns': { req: { connectionId: string; ref: ObjectRef }; res: ColumnInfo[] }
   'clipboard.copy': { req: string; res: null }
+  'dialog.pickDirectory': { req: void; res: string | null }
 }
 
 export type ChannelName = keyof IpcChannels

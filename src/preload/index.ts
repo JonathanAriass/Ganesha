@@ -37,6 +37,9 @@ const api: DbClientApi = {
   },
   clipboard: {
     copy: (text) => invoke('clipboard.copy', text)
+  },
+  dialog: {
+    pickDirectory: () => invoke('dialog.pickDirectory', undefined)
   }
 }
 

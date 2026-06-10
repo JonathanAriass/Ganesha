@@ -34,4 +34,7 @@ export interface DbClientApi {
   clipboard: {
     copy(text: string): Promise<IpcResult<'clipboard.copy'>>
   }
+  dialog: {
+    pickDirectory(): Promise<IpcResult<'dialog.pickDirectory'>>
+  }
 }
