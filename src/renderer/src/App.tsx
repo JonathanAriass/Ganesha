@@ -6,6 +6,7 @@ import Welcome from './components/Welcome'
 import ObjectTree from './components/ObjectTree'
 import ConnectionModal from './components/ConnectionModal'
 import SettingsModal from './components/SettingsModal'
+import CommandPalette from './components/CommandPalette'
 import TabBar from './components/TabBar'
 import QueryTab from './components/QueryTab'
 import HistorySection from './components/HistorySection'
@@ -21,6 +22,7 @@ const queryClient = new QueryClient({
 function AppShell(): JSX.Element {
   const connectionModal = useAppStore((s) => s.connectionModal)
   const settingsOpen = useAppStore((s) => s.settingsOpen)
+  const paletteOpen = useAppStore((s) => s.paletteOpen)
   const tabs = useAppStore((s) => s.tabs)
   const activeTabId = useAppStore((s) => s.activeTabId)
 
@@ -58,6 +60,7 @@ function AppShell(): JSX.Element {
       </div>
       {connectionModal && <ConnectionModal />}
       {settingsOpen && <SettingsModal />}
+      {paletteOpen && <CommandPalette />}
     </div>
   )
 }

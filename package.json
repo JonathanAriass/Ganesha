@@ -54,6 +54,7 @@
     "acorn": "^8.16.0",
     "better-sqlite3": "^11.10.0",
     "bson": "^6.10.4",
+    "cmdk": "^1.1.1",
     "monaco-editor": "^0.50.0",
     "mongodb": "^6.21.0",
     "mysql2": "^3.22.5",
