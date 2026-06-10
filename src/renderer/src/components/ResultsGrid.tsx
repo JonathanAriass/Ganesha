@@ -47,6 +47,9 @@ export default function ResultsGrid({ columns, rows, globalFilter }: Props): JSX
     // Filter on the same projection the cells render (objects stringify, not [object Object]).
     globalFilterFn: (row, columnId, filterValue) =>
       cellText(row.getValue(columnId)).toLowerCase().includes(String(filterValue).toLowerCase()),
+    // Default eligibility samples row 0 (string|number only) — would skip object-first
+    // and sparse null-first columns, the norm for Mongo key-union results.
+    getColumnCanGlobalFilter: () => true,
   })
 
   const parentRef = useRef<HTMLDivElement>(null)
