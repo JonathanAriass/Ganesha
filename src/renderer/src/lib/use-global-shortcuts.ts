@@ -30,6 +30,7 @@ export function useGlobalShortcuts(): void {
 
       // While an overlay is up, only its own toggle applies — ⌘W must not
       // close a tab hidden behind the settings modal.
+      if (s.connectionModal) return // form owns the keyboard; no chord applies
       if (s.settingsOpen && action !== 'settings') return
       if (s.paletteOpen && action !== 'palette') return
 

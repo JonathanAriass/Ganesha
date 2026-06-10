@@ -22,6 +22,7 @@ export default function SettingsModal(): JSX.Element {
       <div
         className="modal"
         role="dialog"
+        aria-modal="true"
         aria-label="Settings"
         onClick={(e) => e.stopPropagation()}
       >
@@ -34,12 +35,16 @@ export default function SettingsModal(): JSX.Element {
               <label>Theme</label>
               <div className="seg" role="radiogroup" aria-label="Theme">
                 <button
+                  role="radio"
+                  aria-checked={theme === 'midnight'}
                   className={`seg-btn${theme === 'midnight' ? ' active' : ''}`}
                   onClick={() => setSetting.mutate({ key: 'theme', value: 'midnight' })}
                 >
                   Midnight
                 </button>
                 <button
+                  role="radio"
+                  aria-checked={theme === 'light'}
                   className={`seg-btn${theme === 'light' ? ' active' : ''}`}
                   onClick={() => setSetting.mutate({ key: 'theme', value: 'light' })}
                 >
