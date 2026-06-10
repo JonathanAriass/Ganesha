@@ -34,6 +34,9 @@ const api: DbClientApi = {
   schema: {
     objects: (connectionId) => invoke('schema.objects', connectionId),
     columns: (connectionId, ref) => invoke('schema.columns', { connectionId, ref })
+  },
+  clipboard: {
+    copy: (text) => invoke('clipboard.copy', text)
   }
 }
 

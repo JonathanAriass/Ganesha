@@ -56,7 +56,7 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
   }
 
   return (
-    <div className="results" style={{ display: 'flex', flexDirection: 'column' }}>
+    <div className="results" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div className="results-toolbar">
         {hasDocuments && (
           <div className="seg">

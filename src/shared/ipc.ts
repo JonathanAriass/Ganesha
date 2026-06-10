@@ -32,6 +32,7 @@ export interface IpcChannels {
   'connections.disconnect': { req: string; res: null }
   'schema.objects': { req: string; res: DbObject[] }
   'schema.columns': { req: { connectionId: string; ref: ObjectRef }; res: ColumnInfo[] }
+  'clipboard.copy': { req: string; res: null }
 }
 
 export type ChannelName = keyof IpcChannels

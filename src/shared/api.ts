@@ -31,4 +31,7 @@ export interface DbClientApi {
     objects(connectionId: string): Promise<IpcResult<'schema.objects'>>
     columns(connectionId: string, ref: ObjectRef): Promise<IpcResult<'schema.columns'>>
   }
+  clipboard: {
+    copy(text: string): Promise<IpcResult<'clipboard.copy'>>
+  }
 }

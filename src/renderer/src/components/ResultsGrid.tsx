@@ -44,7 +44,9 @@ export default function ResultsGrid({ columns, rows, globalFilter }: Props): JSX
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
-    globalFilterFn: 'includesString',
+    // Filter on the same projection the cells render (objects stringify, not [object Object]).
+    globalFilterFn: (row, columnId, filterValue) =>
+      cellText(row.getValue(columnId)).toLowerCase().includes(String(filterValue).toLowerCase()),
   })
 
   const parentRef = useRef<HTMLDivElement>(null)
@@ -57,11 +59,14 @@ export default function ResultsGrid({ columns, rows, globalFilter }: Props): JSX
   })
 
   const gridTemplateColumns = `repeat(${columns.length}, minmax(140px, 1fr))`
+  // Header and row spacer must share a min width or rows resolve to the viewport
+  // while the header scrolls to 140×N, drifting the columns apart.
+  const minW = `${columns.length * 140}px`
 
   return (
     <div className="grid-wrap" ref={parentRef}>
       {/* sticky header */}
-      <div className="grid-head" style={{ gridTemplateColumns }}>
+      <div className="grid-head" style={{ gridTemplateColumns, minWidth: minW }}>
         {table.getHeaderGroups()[0]?.headers.map((header) => {
           const sorted = header.column.getIsSorted()
           return (
@@ -79,7 +84,7 @@ export default function ResultsGrid({ columns, rows, globalFilter }: Props): JSX
       </div>
 
       {/* virtualized rows */}
-      <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
+      <div style={{ height: virtualizer.getTotalSize(), position: 'relative', minWidth: minW }}>
         {virtualizer.getVirtualItems().map((virtualRow) => {
           const row = tableRows[virtualRow.index]
           return (
@@ -96,7 +101,7 @@ export default function ResultsGrid({ columns, rows, globalFilter }: Props): JSX
                     key={cell.id}
                     className="grid-cell"
                     title={text}
-                    onDoubleClick={() => void navigator.clipboard.writeText(text)}
+                    onDoubleClick={() => void window.api.clipboard.copy(text)}
                   >
                     {raw === null || raw === undefined ? (
                       <span className="cell-null">NULL</span>

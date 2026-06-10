@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron'
+import { ipcMain, clipboard } from 'electron'
 import type { ChannelName, Req, Res } from '../shared/ipc'
 import { ok, err, type Result } from '../shared/result'
 import { openDb } from './persistence/db'
@@ -136,4 +136,7 @@ export function registerIpcHandlers(): void {
     await driver.connect(buildConnectParams(c, secrets.getPassword(c.id)))
     return ok(await driver.describeObject(c.id, ref))
   })
+
+  // navigator.clipboard is permission-gated in the sandboxed renderer; route via main.
+  handle('clipboard.copy', (text) => { clipboard.writeText(text); return ok(null) })
 }
