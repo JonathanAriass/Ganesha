@@ -4,7 +4,7 @@ import { addHistory } from './persistence/history'
 import type { makeSecretStore } from './persistence/secrets'
 import type { DatabaseDriver, QueryResult, QueryRequest } from './drivers/types'
 import { assertSqlWritable } from './drivers/sql/readonly-guard'
-import { parseMongoJson } from './drivers/mongo/raw'
+import { parseMongoQuery } from './drivers/mongo/parse'
 import { assertMongoCommandWritable } from './drivers/mongo/command'
 
 const DEFAULT_MAX_ROWS = 1000
@@ -36,7 +36,7 @@ export async function runUserQuery(args: RunArgs): Promise<QueryResult> {
   try {
     let request: QueryRequest
     if (config.type === 'mongodb') {
-      const command = parseMongoJson(query)
+      const command = parseMongoQuery(query)
       assertMongoCommandWritable(command, config.readOnly)
       request = { kind: 'mongo', command }
     } else {

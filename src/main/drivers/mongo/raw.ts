@@ -18,7 +18,9 @@ function asNonNegInt(v: unknown, field: string): number {
 export function parseMongoJson(input: string): MongoCommand {
   let raw: unknown
   try {
-    raw = JSON.parse(input)
+    // EJSON.parse is a JSON superset: it deserializes type wrappers ({$oid},{$date},
+    // {$numberLong}, ...) into BSON instances while leaving query operators ($gt, $set) intact.
+    raw = (require('bson') as typeof import('bson')).EJSON.parse(input, { relaxed: true })
   } catch (e) {
     throw new Error(`Invalid JSON: ${(e as Error).message}`)
   }
