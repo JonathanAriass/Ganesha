@@ -11,9 +11,12 @@ interface Props {
 type View = 'table' | 'documents'
 
 export default function ResultsPanel({ tab }: Props): JSX.Element {
-  const hasDocuments = tab.result?.documents !== null && tab.result?.documents != null
-  const [view, setView] = useState<View>(hasDocuments ? 'documents' : 'table')
+  const hasDocuments = tab.result?.documents != null
+  // Only the explicit user choice is state; the panel mounts before any result
+  // exists, so the default must be derived at render time once one arrives.
+  const [userView, setUserView] = useState<View | null>(null)
   const [filter, setFilter] = useState('')
+  const view: View = userView ?? (hasDocuments ? 'documents' : 'table')
 
   if (tab.running) {
     return (
@@ -59,13 +62,13 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
           <div className="seg">
             <button
               className={`seg-btn${view === 'table' ? ' active' : ''}`}
-              onClick={() => setView('table')}
+              onClick={() => setUserView('table')}
             >
               Table
             </button>
             <button
               className={`seg-btn${view === 'documents' ? ' active' : ''}`}
-              onClick={() => setView('documents')}
+              onClick={() => setUserView('documents')}
             >
               Documents
             </button>
