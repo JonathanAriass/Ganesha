@@ -6,6 +6,7 @@ import type { DatabaseDriver, QueryResult, QueryRequest } from './drivers/types'
 import { assertSqlWritable } from './drivers/sql/readonly-guard'
 import { parseMongoQuery } from './drivers/mongo/parse'
 import { assertMongoCommandWritable } from './drivers/mongo/command'
+import { buildConnectParams } from './drivers/params'
 
 const DEFAULT_MAX_ROWS = 1000
 
@@ -26,11 +27,7 @@ export async function runUserQuery(args: RunArgs): Promise<QueryResult> {
   const config = getConnection(db, connectionId)
   if (!config) throw new Error(`Connection not found: ${connectionId}`)
 
-  await driver.connect({
-    id: config.id, type: config.type, host: config.host, port: config.port,
-    username: config.username, password: secrets.getPassword(config.id),
-    database: config.database, ssl: config.ssl
-  })
+  await driver.connect(buildConnectParams(config, secrets.getPassword(config.id)))
 
   const started = now()
   try {

@@ -1,5 +1,6 @@
 import type { IpcResult } from './ipc'
 import type { ConnectionInput, HistoryEntryInput } from './domain'
+import type { ObjectRef } from './schema'
 
 export interface DbClientApi {
   ping(message: string): Promise<IpcResult<'ping'>>
@@ -25,5 +26,9 @@ export interface DbClientApi {
   query: {
     run(connectionId: string, query: string): Promise<IpcResult<'query.run'>>
     cancel(connectionId: string, queryId: string): Promise<IpcResult<'query.cancel'>>
+  }
+  schema: {
+    objects(connectionId: string): Promise<IpcResult<'schema.objects'>>
+    columns(connectionId: string, ref: ObjectRef): Promise<IpcResult<'schema.columns'>>
   }
 }

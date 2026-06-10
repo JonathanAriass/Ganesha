@@ -30,6 +30,10 @@ const api: DbClientApi = {
   query: {
     run: (connectionId, query) => invoke('query.run', { connectionId, query }),
     cancel: (connectionId, queryId) => invoke('query.cancel', { connectionId, queryId })
+  },
+  schema: {
+    objects: (connectionId) => invoke('schema.objects', connectionId),
+    columns: (connectionId, ref) => invoke('schema.columns', { connectionId, ref })
   }
 }
 

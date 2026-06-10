@@ -3,6 +3,7 @@ import type {
   ConnectionConfig, ConnectionInput, HistoryEntry, HistoryEntryInput, AppSettings
 } from './domain'
 import type { QueryResult } from './query'
+import type { DbObject, ObjectRef, ColumnInfo } from './schema'
 
 export interface PingPayload {
   pong: string
@@ -29,6 +30,8 @@ export interface IpcChannels {
   'query.cancel': { req: { connectionId: string; queryId: string }; res: null }
   'connections.test': { req: { input: ConnectionInput; password: string | null }; res: null }
   'connections.disconnect': { req: string; res: null }
+  'schema.objects': { req: string; res: DbObject[] }
+  'schema.columns': { req: { connectionId: string; ref: ObjectRef }; res: ColumnInfo[] }
 }
 
 export type ChannelName = keyof IpcChannels

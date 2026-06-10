@@ -11,6 +11,7 @@ import { PostgresDriver } from './drivers/sql/postgres'
 import { MySqlDriver } from './drivers/sql/mysql'
 import { MongoDriver } from './drivers/mongo/mongo'
 import { runUserQuery } from './query-service'
+import { buildConnectParams } from './drivers/params'
 
 const drivers = new DriverManager()
 drivers.register(new PostgresDriver())
@@ -104,5 +105,21 @@ export function registerIpcHandlers(): void {
     const c = conns.getConnection(store().db, connectionId)
     if (c && drivers.has(c.type)) await drivers.get(c.type).cancel(connectionId, queryId)
     return ok(null)
+  })
+  handle('schema.objects', async (connectionId) => {
+    const { db, secrets } = store()
+    const c = conns.getConnection(db, connectionId)
+    if (!c) throw new Error(`Connection not found: ${connectionId}`)
+    const driver = drivers.get(c.type)
+    await driver.connect(buildConnectParams(c, secrets.getPassword(c.id)))
+    return ok(await driver.listObjects(c.id))
+  })
+  handle('schema.columns', async ({ connectionId, ref }) => {
+    const { db, secrets } = store()
+    const c = conns.getConnection(db, connectionId)
+    if (!c) throw new Error(`Connection not found: ${connectionId}`)
+    const driver = drivers.get(c.type)
+    await driver.connect(buildConnectParams(c, secrets.getPassword(c.id)))
+    return ok(await driver.describeObject(c.id, ref))
   })
 }
