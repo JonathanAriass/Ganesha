@@ -37,4 +37,29 @@ monaco.editor.defineTheme('midnight', {
   }
 })
 
+monaco.editor.defineTheme('daylight', {
+  base: 'vs',
+  inherit: true,
+  rules: [
+    { token: 'keyword', foreground: '4f46e5' },
+    { token: 'string', foreground: '047857' },
+    { token: 'number', foreground: 'b45309' },
+    { token: 'comment', foreground: '9aa3b5' }
+  ],
+  colors: {
+    'editor.background': '#ffffff',
+    'editor.foreground': '#1b2230',
+    'editor.lineHighlightBackground': '#f1f3f780',
+    'editorLineNumber.foreground': '#c0c7d4',
+    'editorCursor.foreground': '#4f46e5',
+    'editor.selectionBackground': '#6366f133'
+  }
+})
+
+/** Monaco theme name for each app theme. */
+export const MONACO_THEME = { midnight: 'midnight', light: 'daylight' } as const
+
+// Default until settings load; applyTheme() re-applies the saved choice.
+monaco.editor.setTheme('midnight')
+
 export { monaco }

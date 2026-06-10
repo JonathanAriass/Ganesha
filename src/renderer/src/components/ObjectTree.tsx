@@ -118,7 +118,7 @@ export default function ObjectTree(): JSX.Element {
   if (error) {
     return (
       <div className="sidebar-empty">
-        <p style={{ color: '#fca5a5' }} role="alert">
+        <p style={{ color: 'var(--danger-text)' }} role="alert">
           {error instanceof Error ? error.message : String(error)}
         </p>
       </div>

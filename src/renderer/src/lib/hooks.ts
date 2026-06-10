@@ -130,3 +130,40 @@ export function useHistory(connectionId: string | null) {
     retry: false,
   })
 }
+
+// ── Settings ─────────────────────────────────────────────────────────────────
+
+export function useSettings() {
+  return useQuery({
+    queryKey: ['settings'],
+    queryFn: () => window.api.settings.get().then(unwrap),
+    retry: false,
+  })
+}
+
+export function useSetSetting() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ key, value }: { key: string; value: string }) =>
+      window.api.settings.set(key, value).then(unwrap),
+    // settings.set returns the full updated AppSettings — write it straight into the cache.
+    onSuccess: (settings) => qc.setQueryData(['settings'], settings),
+  })
+}
+
+export function useDataDir() {
+  return useQuery({
+    queryKey: ['dataDir'],
+    queryFn: () => window.api.settings.getDataDir().then(unwrap),
+    retry: false,
+  })
+}
+
+export function useSetDataDir() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (dir: string) => window.api.settings.setDataDir(dir).then(unwrap),
+    // Relocation swaps the underlying database file — every cached read is stale.
+    onSuccess: () => void qc.invalidateQueries(),
+  })
+}

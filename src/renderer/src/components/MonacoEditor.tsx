@@ -22,7 +22,8 @@ export default function MonacoEditor({ initialValue, language, onChange, onRun }
     const editor = monaco.editor.create(host, {
       value: initialValue,
       language,
-      theme: 'midnight',
+      // No theme here: monaco themes are global, and passing one at create()
+      // would reset the app-wide choice every time a tab mounts.
       minimap: { enabled: false },
       fontSize: 13,
       // Installs a per-editor resize watcher — deliberate while editor instances are few; revisit if tab counts grow.
