@@ -1,21 +1,39 @@
-import { useEffect, useState } from 'react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { useAppStore } from './state/store'
+import TopBar from './components/TopBar'
+import Welcome from './components/Welcome'
+import ObjectTree from './components/ObjectTree'
+import ConnectionModal from './components/ConnectionModal'
 
-export default function App(): JSX.Element {
-  const [status, setStatus] = useState('pinging main…')
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { refetchOnWindowFocus: false },
+  },
+})
 
-  useEffect(() => {
-    window.api
-      .ping('hello')
-      .then((res) => {
-        setStatus(res.ok ? `IPC ok: ${res.data.pong}` : `IPC error: ${res.error}`)
-      })
-      .catch((e: unknown) => setStatus(`IPC threw: ${String(e)}`))
-  }, [])
+function AppShell(): JSX.Element {
+  const connectionModal = useAppStore((s) => s.connectionModal)
 
   return (
-    <div style={{ fontFamily: 'system-ui, sans-serif', padding: 24 }}>
-      <h1>DB Client</h1>
-      <p data-testid="ipc-status">{status}</p>
+    <div className="app">
+      <TopBar />
+      <div className="app-body">
+        <aside className="sidebar">
+          <ObjectTree />
+        </aside>
+        <main className="main">
+          <Welcome />
+        </main>
+      </div>
+      {connectionModal && <ConnectionModal />}
     </div>
+  )
+}
+
+export default function App(): JSX.Element {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AppShell />
+    </QueryClientProvider>
   )
 }
