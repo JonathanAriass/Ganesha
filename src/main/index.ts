@@ -40,10 +40,16 @@ function createWindow(): void {
 
   // The renderer shows DB-sourced content; it must never become a browser.
   // Deny popups outright and block navigation away from the app itself
-  // (dev-server full reloads emit will-navigate to the same dev URL — allowed).
+  // (dev-server full reloads emit will-navigate to the same dev origin — allowed).
+  // Compared by origin, not string prefix: "http://localhost:5173.evil.com"
+  // must not pass for a devUrl of "http://localhost:5173".
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   win.webContents.on('will-navigate', (event, url) => {
-    if (devUrl && url.startsWith(devUrl)) return
+    try {
+      if (devUrl && new URL(url).origin === new URL(devUrl).origin) return
+    } catch {
+      /* unparseable URL → deny */
+    }
     event.preventDefault()
   })
 
