@@ -58,16 +58,30 @@ export function registerIpcHandlers(): void {
     if (password !== null) secrets.setPassword(c.id, password)
     return ok(c)
   })
-  handle('connections.update', ({ id, patch, password }) => {
+  handle('connections.update', async ({ id, patch, password }) => {
     const { db, secrets } = store()
+    const before = conns.getConnection(db, id)
     const c = conns.updateConnection(db, id, patch, now())
+    // If the type changed, the live pool is registered under the OLD type's driver.
+    if (before && before.type !== c.type && drivers.has(before.type)) {
+      await drivers.get(before.type).disconnect(id)
+    }
     if (password !== undefined) {
       if (password === null) secrets.deletePassword(id)
       else secrets.setPassword(id, password)
     }
+    // Pools keep their original credentials (connect() is idempotent) — drop the live
+    // pool so the next access reconnects with the just-saved config + password.
+    if (drivers.has(c.type)) await drivers.get(c.type).disconnect(id)
     return ok(c)
   })
-  handle('connections.delete', (id) => { conns.deleteConnection(store().db, id); return ok(null) })
+  handle('connections.delete', async (id) => {
+    const { db } = store()
+    const c = conns.getConnection(db, id)
+    if (c && drivers.has(c.type)) await drivers.get(c.type).disconnect(id)
+    conns.deleteConnection(db, id)
+    return ok(null)
+  })
 
   handle('history.add', (entry) => ok(hist.addHistory(store().db, entry)))
   handle('history.list', ({ connectionId, limit }) => ok(hist.listHistory(store().db, connectionId, limit)))

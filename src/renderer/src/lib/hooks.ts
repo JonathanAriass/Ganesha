@@ -66,7 +66,12 @@ export function useSaveConnection() {
           .then(unwrap)
       }
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['connections'] }),
+    onSuccess: () => {
+      // Saved config (host/creds/db) may change what's visible — refetch the tree too.
+      void qc.invalidateQueries({ queryKey: ['connections'] })
+      void qc.invalidateQueries({ queryKey: ['objects'] })
+      void qc.invalidateQueries({ queryKey: ['columns'] })
+    },
   })
 }
 
@@ -75,7 +80,11 @@ export function useDeleteConnection() {
   return useMutation({
     mutationFn: (id: string) =>
       window.api.connections.delete(id).then(unwrap),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['connections'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['connections'] })
+      void qc.invalidateQueries({ queryKey: ['objects'] })
+      void qc.invalidateQueries({ queryKey: ['columns'] })
+    },
   })
 }
 
