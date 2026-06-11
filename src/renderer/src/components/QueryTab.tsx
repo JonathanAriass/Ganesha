@@ -11,10 +11,14 @@ import { mod } from '../lib/platform'
 import { rowCountLabel } from '../lib/result-label'
 import { unwrap } from '../lib/result'
 import type { CompletionCtx } from '../lib/monaco-completions'
-import { splitSqlStatements, splitJsCommands, statementAt } from '../lib/statements'
+import { splitSqlStatements, splitJsCommands, statementAt, type SqlDialect } from '../lib/statements'
 
 function langFor(type: ConnectionType | undefined): string {
   return type === 'mongodb' ? 'javascript' : 'sql'
+}
+
+function sqlDialectFor(type: ConnectionType | undefined): SqlDialect {
+  return type === 'mysql' || type === 'mariadb' ? 'mysql' : 'postgres'
 }
 
 interface Props {
@@ -57,12 +61,14 @@ export default function QueryTab({ tab }: Props): JSX.Element {
     if (!editor) return tab.text // runOnOpen can fire before the editor mounts
     const selection = editor.selectionText()
     if (selection) return selection
-    const split = langFor(connection?.type) === 'sql' ? splitSqlStatements : splitJsCommands
-    const statements = split(tab.text)
+    const statements =
+      langFor(connection?.type) === 'sql'
+        ? splitSqlStatements(tab.text, sqlDialectFor(connection?.type))
+        : splitJsCommands(tab.text)
     // A single statement (or none — all comments) runs as the whole tab, so
     // single-statement tabs behave exactly as before this feature existed.
     if (statements.length < 2) return tab.text
-    return statementAt(statements, editor.cursorOffset())?.text ?? tab.text
+    return statementAt(tab.text, statements, editor.cursorOffset())?.text ?? tab.text
   }
 
   function run() {

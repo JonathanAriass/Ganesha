@@ -2,118 +2,243 @@ import { describe, expect, it } from 'vitest'
 import { splitSqlStatements, splitJsCommands, statementAt, type Statement } from './statements'
 
 const texts = (out: Statement[]): string[] => out.map((s) => s.text)
+const pg = (source: string): Statement[] => splitSqlStatements(source, 'postgres')
+const my = (source: string): Statement[] => splitSqlStatements(source, 'mysql')
 
-describe('splitSqlStatements', () => {
+describe('splitSqlStatements (both dialects)', () => {
   it('splits on semicolons, keeping the semicolon and exact offsets', () => {
-    const out = splitSqlStatements('select 1; select 2')
-    expect(out).toEqual([
-      { text: 'select 1;', start: 0, end: 9 },
-      { text: 'select 2', start: 10, end: 18 }
-    ])
+    for (const split of [pg, my]) {
+      expect(split('select 1; select 2')).toEqual([
+        { text: 'select 1;', start: 0, end: 9 },
+        { text: 'select 2', start: 10, end: 18 }
+      ])
+    }
   })
 
   it('a tab without semicolons is one statement', () => {
-    expect(texts(splitSqlStatements('select *\nfrom users'))).toEqual(['select *\nfrom users'])
+    expect(texts(pg('select *\nfrom users'))).toEqual(['select *\nfrom users'])
   })
 
   it("ignores semicolons inside 'single quotes'", () => {
-    expect(texts(splitSqlStatements("select 'a;b' as x; select 2"))).toEqual([
-      "select 'a;b' as x;",
-      'select 2'
-    ])
+    for (const split of [pg, my]) {
+      expect(texts(split("select 'a;b' as x; select 2"))).toEqual([
+        "select 'a;b' as x;",
+        'select 2'
+      ])
+    }
   })
 
   it("handles doubled-quote escaping: 'it''s'", () => {
-    expect(texts(splitSqlStatements("select 'it''s; fine'; select 2"))).toEqual([
-      "select 'it''s; fine';",
-      'select 2'
-    ])
+    for (const split of [pg, my]) {
+      expect(texts(split("select 'it''s; fine'; select 2"))).toEqual([
+        "select 'it''s; fine';",
+        'select 2'
+      ])
+    }
   })
 
-  it('handles backslash escapes (mysql strings)', () => {
-    expect(texts(splitSqlStatements("select 'a\\';b'; select 2"))).toEqual([
-      "select 'a\\';b';",
-      'select 2'
-    ])
-  })
-
-  it('ignores semicolons inside "double" and `backtick` identifiers', () => {
-    expect(texts(splitSqlStatements('select "a;b", `c;d` from t; select 2'))).toEqual([
-      'select "a;b", `c;d` from t;',
-      'select 2'
-    ])
+  it('ignores semicolons inside "double" and `backtick` quoting', () => {
+    for (const split of [pg, my]) {
+      expect(texts(split('select "a;b", `c;d` from t; select 2'))).toEqual([
+        'select "a;b", `c;d` from t;',
+        'select 2'
+      ])
+    }
   })
 
   it('ignores semicolons inside -- line comments', () => {
-    expect(texts(splitSqlStatements('select 1 -- not a split ;\n; select 2'))).toEqual([
+    expect(texts(pg('select 1 -- not a split ;\n; select 2'))).toEqual([
       'select 1 -- not a split ;\n;',
       'select 2'
     ])
   })
 
   it('ignores semicolons inside /* block comments */ and nests them (pg)', () => {
-    expect(texts(splitSqlStatements('select 1 /* a ; /* b ; */ c ; */; select 2'))).toEqual([
+    expect(texts(pg('select 1 /* a ; /* b ; */ c ; */; select 2'))).toEqual([
       'select 1 /* a ; /* b ; */ c ; */;',
       'select 2'
     ])
   })
 
-  it('ignores semicolons inside $$ dollar quotes', () => {
-    expect(texts(splitSqlStatements('select $$a;b$$; select 2'))).toEqual([
-      'select $$a;b$$;',
+  it('drops empty chunks from stray semicolons', () => {
+    expect(texts(pg(';;select 1;; ;'))).toEqual(['select 1;'])
+  })
+
+  it('drops a trailing comment-only chunk', () => {
+    expect(texts(pg('select 1;\n-- the end'))).toEqual(['select 1;'])
+  })
+
+  it('drops a comment-only chunk between statements', () => {
+    expect(texts(pg('select 1;\n/* between */;\nselect 2'))).toEqual(['select 1;', 'select 2'])
+  })
+
+  it('whitespace-only input yields no statements', () => {
+    expect(pg('  \n\t ')).toEqual([])
+  })
+
+  it('an unterminated string swallows the rest (no-split beats mis-split)', () => {
+    for (const split of [pg, my]) {
+      expect(texts(split("select 'oops; select 2"))).toEqual(["select 'oops; select 2"])
+    }
+  })
+
+  it('handles CRLF line endings', () => {
+    expect(pg('select 1;\r\nselect 2')).toEqual([
+      { text: 'select 1;', start: 0, end: 9 },
+      { text: 'select 2', start: 11, end: 19 }
+    ])
+  })
+
+  it('statement start skips leading comments and whitespace', () => {
+    expect(pg('-- header\nselect 1;')).toEqual([{ text: 'select 1;', start: 10, end: 19 }])
+  })
+})
+
+describe('splitSqlStatements (postgres)', () => {
+  it('takes backslash literally in plain strings (standard_conforming_strings)', () => {
+    // 'C:\' is a complete pg string; treating \ as an escape would over-scan,
+    // flip string/code parity, and split inside the next real string.
+    expect(texts(pg("select 'C:\\' || name; select 2"))).toEqual([
+      "select 'C:\\' || name;",
       'select 2'
     ])
   })
 
+  it('treats backslash as an escape inside e-strings', () => {
+    expect(texts(pg("select e'a\\';b' as x; select 2"))).toEqual([
+      "select e'a\\';b' as x;",
+      'select 2'
+    ])
+  })
+
+  it("an identifier ending in e does not make the next string an e-string", () => {
+    expect(texts(pg("select name_e'a\\'; select 2"))).toEqual([
+      "select name_e'a\\';",
+      'select 2'
+    ])
+  })
+
+  it('# is the XOR operator, not a comment', () => {
+    expect(texts(pg('select 5 # 3; select 2'))).toEqual(['select 5 # 3;', 'select 2'])
+  })
+
+  it('ignores semicolons inside $$ dollar quotes', () => {
+    expect(texts(pg('select $$a;b$$; select 2'))).toEqual(['select $$a;b$$;', 'select 2'])
+  })
+
   it('matches tagged dollar quotes by exact tag', () => {
     // The inner $$ must not close $fn$ — only the exact tag does.
-    const sql = 'do $fn$ begin select $$x;y$$; end $fn$; select 2'
-    expect(texts(splitSqlStatements(sql))).toEqual([
+    expect(texts(pg('do $fn$ begin select $$x;y$$; end $fn$; select 2'))).toEqual([
       'do $fn$ begin select $$x;y$$; end $fn$;',
       'select 2'
     ])
   })
 
   it('treats $1 positional params as plain text, not dollar quotes', () => {
-    expect(texts(splitSqlStatements('select $1; select $2'))).toEqual(['select $1;', 'select $2'])
-  })
-
-  it('drops empty chunks from stray semicolons', () => {
-    expect(texts(splitSqlStatements(';;select 1;; ;'))).toEqual(['select 1;'])
-  })
-
-  it('drops a trailing comment-only chunk', () => {
-    expect(texts(splitSqlStatements('select 1;\n-- the end'))).toEqual(['select 1;'])
-  })
-
-  it('drops a comment-only chunk between statements', () => {
-    const out = splitSqlStatements('select 1;\n/* between */;\nselect 2')
-    expect(texts(out)).toEqual(['select 1;', 'select 2'])
-  })
-
-  it('whitespace-only input yields no statements', () => {
-    expect(splitSqlStatements('  \n\t ')).toEqual([])
-  })
-
-  it('an unterminated string swallows the rest (no-split beats mis-split)', () => {
-    expect(texts(splitSqlStatements("select 'oops; select 2"))).toEqual(["select 'oops; select 2"])
+    expect(texts(pg('select $1; select $2'))).toEqual(['select $1;', 'select $2'])
   })
 
   it('an unterminated dollar quote swallows the rest', () => {
-    expect(texts(splitSqlStatements('select $$oops; select 2'))).toEqual(['select $$oops; select 2'])
+    expect(texts(pg('select $$oops; select 2'))).toEqual(['select $$oops; select 2'])
+  })
+})
+
+describe('splitSqlStatements (mysql)', () => {
+  it('treats backslash as an escape in strings', () => {
+    expect(texts(my("select 'a\\';b'; select 2"))).toEqual(["select 'a\\';b';", 'select 2'])
   })
 
-  it('statement start skips leading comments and whitespace', () => {
-    const sql = '-- header\nselect 1;'
-    const out = splitSqlStatements(sql)
-    expect(out).toEqual([{ text: 'select 1;', start: 10, end: 19 }])
+  it('does not treat backslash as an escape in `identifiers`', () => {
+    expect(texts(my('select `a\\`; select 2'))).toEqual(['select `a\\`;', 'select 2'])
+  })
+
+  it('treats # as a line comment', () => {
+    expect(texts(my('select 1 # note ;\n; select 2'))).toEqual([
+      'select 1 # note ;\n;',
+      'select 2'
+    ])
+  })
+
+  it('a trailing #-comment is not a statement', () => {
+    expect(texts(my('select 1;\n# done'))).toEqual(['select 1;'])
+  })
+
+  it('does not treat $tag$ as a quote (no dollar quoting in mysql)', () => {
+    expect(texts(my('select $a$ ; select $a$'))).toEqual(['select $a$ ;', 'select $a$'])
+  })
+
+  it('keeps a routine body with BEGIN…END as one statement', () => {
+    const sql =
+      'create procedure bump()\nbegin\n  update counters set n = n + 1;\n  select n from counters;\nend;\nselect 99;'
+    expect(texts(my(sql))).toEqual([
+      'create procedure bump()\nbegin\n  update counters set n = n + 1;\n  select n from counters;\nend;',
+      'select 99;'
+    ])
+  })
+
+  it('handles nested blocks and CASE expressions inside a routine body', () => {
+    const sql = [
+      'create function f() returns int',
+      'begin',
+      '  declare v int;',
+      '  begin',
+      '    set v = (select case when 1 then 2 else 3 end);',
+      '  end;',
+      '  return v;',
+      'end;',
+      'select 1;'
+    ].join('\n')
+    const out = texts(my(sql))
+    expect(out).toHaveLength(2)
+    expect(out[0].endsWith('end;')).toBe(true)
+    expect(out[1]).toBe('select 1;')
+  })
+
+  it('END IF closes its IF, not the routine BEGIN', () => {
+    const sql = [
+      'create trigger t before insert on x for each row',
+      'begin',
+      '  if new.n > 1 then',
+      '    set new.n = 1;',
+      '  end if;',
+      'end;',
+      'select 2;'
+    ].join('\n')
+    const out = texts(my(sql))
+    expect(out).toHaveLength(2)
+    expect(out[1]).toBe('select 2;')
+  })
+
+  it('a single-statement routine body (no BEGIN) ends at its semicolon', () => {
+    expect(texts(my('create procedure p() select 1; select 2;'))).toEqual([
+      'create procedure p() select 1;',
+      'select 2;'
+    ])
+  })
+
+  it('BEGIN as a transaction statement still splits normally', () => {
+    // Body suspension is gated on the chunk being a CREATE routine.
+    expect(texts(my('begin; select 1; commit;'))).toEqual(['begin;', 'select 1;', 'commit;'])
+  })
+
+  it('CASE expressions outside routines do not affect splitting', () => {
+    expect(texts(my("select case when a=1 then ';' else 'x' end from t; select 2"))).toEqual([
+      "select case when a=1 then ';' else 'x' end from t;",
+      'select 2'
+    ])
+  })
+
+  it('recognizes DEFINER routines', () => {
+    const sql = 'create definer=`root`@`localhost` procedure p()\nbegin\n  select 1;\nend;\nselect 2;'
+    const out = texts(my(sql))
+    expect(out).toHaveLength(2)
+    expect(out[1]).toBe('select 2;')
   })
 })
 
 describe('splitJsCommands', () => {
   it('splits on top-level semicolons', () => {
-    const out = splitJsCommands('db.users.find();db.orders.find()')
-    expect(out).toEqual([
+    expect(splitJsCommands('db.users.find();db.orders.find()')).toEqual([
       { text: 'db.users.find();', start: 0, end: 16 },
       { text: 'db.orders.find()', start: 16, end: 32 }
     ])
@@ -123,6 +248,13 @@ describe('splitJsCommands', () => {
     expect(texts(splitJsCommands('db.users.find()\ndb.orders.find()'))).toEqual([
       'db.users.find()',
       'db.orders.find()'
+    ])
+  })
+
+  it('splits on CRLF before db.', () => {
+    expect(texts(splitJsCommands('db.x.find()\r\ndb.y.find()'))).toEqual([
+      'db.x.find()',
+      'db.y.find()'
     ])
   })
 
@@ -150,8 +282,7 @@ describe('splitJsCommands', () => {
   })
 
   it('ignores semicolons nested in parens/braces (depth > 0)', () => {
-    const src = 'db.foo.aggregate([{ $match: { a: 1 } }]);db.bar.find()'
-    expect(texts(splitJsCommands(src))).toEqual([
+    expect(texts(splitJsCommands('db.foo.aggregate([{ $match: { a: 1 } }]);db.bar.find()'))).toEqual([
       'db.foo.aggregate([{ $match: { a: 1 } }]);',
       'db.bar.find()'
     ])
@@ -164,13 +295,14 @@ describe('splitJsCommands', () => {
   })
 
   it('skips regex literals (a ; inside one is not a boundary)', () => {
-    const out = splitJsCommands('/a;b/.test(s); db.users.find()')
-    expect(texts(out)).toEqual(['/a;b/.test(s);', 'db.users.find()'])
+    expect(texts(splitJsCommands('/a;b/.test(s); db.users.find()'))).toEqual([
+      '/a;b/.test(s);',
+      'db.users.find()'
+    ])
   })
 
   it('skips regex literals with flags and char classes', () => {
-    const src = 'db.users.find({ name: /[/;]x/gi })\ndb.orders.find()'
-    expect(texts(splitJsCommands(src))).toEqual([
+    expect(texts(splitJsCommands('db.users.find({ name: /[/;]x/gi })\ndb.orders.find()'))).toEqual([
       'db.users.find({ name: /[/;]x/gi })',
       'db.orders.find()'
     ])
@@ -185,8 +317,7 @@ describe('splitJsCommands', () => {
   })
 
   it('ignores ; and db. lines inside // comments', () => {
-    const src = 'db.users.find() // trailing ; note\ndb.orders.find()'
-    expect(texts(splitJsCommands(src))).toEqual([
+    expect(texts(splitJsCommands('db.users.find() // trailing ; note\ndb.orders.find()'))).toEqual([
       'db.users.find() // trailing ; note',
       'db.orders.find()'
     ])
@@ -217,30 +348,52 @@ describe('splitJsCommands', () => {
 })
 
 describe('statementAt', () => {
-  const stmts = splitSqlStatements('select 1; select 2')
+  const source = 'select 1; select 2'
+  const stmts = pg(source)
 
   it('returns the statement containing the offset', () => {
-    expect(statementAt(stmts, 3)?.text).toBe('select 1;')
-    expect(statementAt(stmts, 12)?.text).toBe('select 2')
+    expect(statementAt(source, stmts, 3)?.text).toBe('select 1;')
+    expect(statementAt(source, stmts, 12)?.text).toBe('select 2')
   })
 
-  it('a cursor in the gap right after a statement picks that statement', () => {
-    // Regions tile: offset 9 is just past `select 1;` but before `select 2` starts.
-    expect(statementAt(stmts, 9)?.text).toBe('select 1;')
+  it('a cursor right after a just-typed statement picks that statement', () => {
+    // Offset 9 is just past `select 1;` on the same line.
+    expect(statementAt(source, stmts, 9)?.text).toBe('select 1;')
+  })
+
+  it('a same-line trailing comment belongs to the statement before it', () => {
+    const src = 'select 1; -- one\nselect 2'
+    const out = pg(src)
+    expect(statementAt(src, out, src.indexOf('one'))?.text).toBe('select 1;')
+  })
+
+  it("a title comment's line belongs to the statement it titles", () => {
+    const src = '-- count users\nselect count(*) from users;\n\n-- count orders\nselect count(*) from orders;'
+    const out = pg(src)
+    expect(statementAt(src, out, src.indexOf('count orders'))?.text).toBe(
+      'select count(*) from orders;'
+    )
+  })
+
+  it('a blank line between statements belongs to the next statement', () => {
+    const src = 'select 1;\n\nselect 2'
+    const out = pg(src)
+    expect(statementAt(src, out, 10)?.text).toBe('select 2')
   })
 
   it('clamps offsets before the first statement to it', () => {
-    const padded = splitSqlStatements('  select 1; select 2')
+    const src = '  select 1; select 2'
+    const padded = pg(src)
     expect(padded[0].start).toBe(2)
-    expect(statementAt(padded, 0)?.text).toBe('select 1;')
+    expect(statementAt(src, padded, 0)?.text).toBe('select 1;')
   })
 
   it('an offset at or past the end picks the last statement', () => {
-    expect(statementAt(stmts, 18)?.text).toBe('select 2')
-    expect(statementAt(stmts, 999)?.text).toBe('select 2')
+    expect(statementAt(source, stmts, 18)?.text).toBe('select 2')
+    expect(statementAt(source, stmts, 999)?.text).toBe('select 2')
   })
 
   it('returns null for no statements', () => {
-    expect(statementAt([], 0)).toBeNull()
+    expect(statementAt('', [], 0)).toBeNull()
   })
 })

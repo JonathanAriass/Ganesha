@@ -16,6 +16,13 @@ export interface Statement {
   end: number
 }
 
+/** Quote/comment/escape rules differ enough between the server families that one
+ *  scanner can't serve both: \ is an escape in mysql strings but literal in pg
+ *  (standard_conforming_strings), and getting that wrong flips string/code parity
+ *  for the rest of the text — a mis-split, the failure mode this module must not
+ *  have. mariadb uses 'mysql'. */
+export type SqlDialect = 'postgres' | 'mysql'
+
 /** Accumulates chunks between boundaries, dropping comment/whitespace-only ones
  *  (a trailing `-- done` is not a runnable statement). */
 class Chunker {
@@ -32,6 +39,11 @@ class Chunker {
     return this.contentStart !== -1
   }
 
+  /** Where the current chunk's content began (-1 when none yet). */
+  get startOffset(): number {
+    return this.contentStart
+  }
+
   /** Close the current chunk; [contentStart, endExclusive) becomes a statement. */
   boundary(endExclusive: number): void {
     if (this.contentStart !== -1) {
@@ -43,16 +55,16 @@ class Chunker {
 }
 
 /** Skip a quoted run (source[start] is the quote); returns the index just past the
- *  closing quote, or end-of-source when unterminated. Handles backslash escapes and
- *  doubled-quote escaping ('' / "" / ``). Treating \ as an escape is the mysql rule;
- *  a standard-conforming pg string ending in a literal backslash ('C:\') over-scans,
- *  which at worst merges two statements — the lenient direction. */
-function skipQuoted(source: string, start: number, quote: string): number {
+ *  closing quote, or end-of-source when unterminated. Doubled-quote escaping
+ *  ('' / "" / ``) always applies; whether \ escapes is the caller's per-quote,
+ *  per-dialect decision (see SqlDialect — both directions of getting it wrong
+ *  mis-split, so there is no safe one-size-fits-all). */
+function skipQuoted(source: string, start: number, quote: string, backslashEscapes: boolean): number {
   const n = source.length
   let i = start + 1
   while (i < n) {
     const c = source[i]
-    if (c === '\\') {
+    if (backslashEscapes && c === '\\') {
       i += 2
     } else if (c === quote) {
       if (source[i + 1] === quote) i += 2
@@ -64,19 +76,69 @@ function skipQuoted(source: string, start: number, quote: string): number {
   return n
 }
 
-/** Split SQL text on top-level semicolons. Dialect-agnostic superset: '' and \
- *  escapes, "double" and `backtick` identifiers, -- line comments, nested block
- *  comments (pg nests them; plain text never closes early), $tag$ dollar quoting. */
-export function splitSqlStatements(source: string): Statement[] {
+/** Is the '...' opening at i a pg e'...' escape string (where \ does escape)?
+ *  The e must be its own token: `name_e'x'` is an identifier then a plain string. */
+function isEString(source: string, i: number): boolean {
+  const prev = source[i - 1]
+  if (prev !== 'e' && prev !== 'E') return false
+  return i < 2 || !/[\w$]/.test(source[i - 2])
+}
+
+/** source[i] starts a word ([A-Za-z_], previous char not a word char). */
+function readWord(source: string, i: number): string {
+  let j = i + 1
+  while (j < source.length && /[\w$]/.test(source[j])) j++
+  return source.slice(i, j)
+}
+
+/** The next word after whitespace, lowercased ('' when something else follows). */
+function peekWord(source: string, from: number): string {
+  let j = from
+  while (j < source.length && /\s/.test(source[j])) j++
+  if (j >= source.length || !/[A-Za-z_]/.test(source[j])) return ''
+  return readWord(source, j).toLowerCase()
+}
+
+/** mysql CREATE statements whose body is itself made of ;-separated statements.
+ *  In the CLI you'd guard these with DELIMITER, but DELIMITER is a CLI construct —
+ *  the server takes the whole CREATE as one statement, so the splitter must too. */
+const ROUTINE_HEAD =
+  /^create\s+(?:or\s+replace\s+)?(?:definer\s*=\s*\S+\s+)?(?:aggregate\s+)?(?:procedure|function|trigger|event)\b/i
+
+/** END IF/WHILE/LOOP/REPEAT close their own constructs (whose openers we never
+ *  count); bare END and END CASE close a counted `begin`/`case`. */
+const SELF_CLOSING_END = new Set(['if', 'while', 'loop', 'repeat'])
+
+/** Split SQL text on top-level semicolons. Both dialects: '' doubling, "double"
+ *  and `backtick` quoting, -- line comments, nested block comments (pg nests
+ *  them; plain text never closes early). postgres adds $tag$ dollar quoting and
+ *  e'...' escape strings (plain '...' takes \ literally); mysql adds # comments,
+ *  \ escapes in strings, and routine-body awareness: inside a CREATE
+ *  PROCEDURE/FUNCTION/TRIGGER/EVENT, BEGIN…END-block semicolons separate body
+ *  statements, not statements of the tab. */
+export function splitSqlStatements(source: string, dialect: SqlDialect): Statement[] {
   const ch = new Chunker(source)
   const n = source.length
+  const mysql = dialect === 'mysql'
   const dollarTag = /\$([A-Za-z_]\w*)?\$/y
+  // Routine-body state (mysql): bodyDepth counts open begin/case blocks, but only
+  // once the chunk's head proves it a routine — `BEGIN;` opening a transaction
+  // script must keep splitting normally.
+  let routine: boolean | null = null
+  let bodyDepth = 0
+  const isRoutineChunk = (upto: number): boolean =>
+    (routine ??= ROUTINE_HEAD.test(source.slice(ch.startOffset, upto)))
   let i = 0
   while (i < n) {
     const c = source[i]
     if (c === '-' && source[i + 1] === '-') {
       const nl = source.indexOf('\n', i)
       i = nl === -1 ? n : nl // the \n itself is plain whitespace
+      continue
+    }
+    if (mysql && c === '#') {
+      const nl = source.indexOf('\n', i)
+      i = nl === -1 ? n : nl
       continue
     }
     if (c === '/' && source[i + 1] === '*') {
@@ -97,10 +159,16 @@ export function splitSqlStatements(source: string): Statement[] {
     }
     if (c === "'" || c === '"' || c === '`') {
       ch.content(i)
-      i = skipQuoted(source, i, c)
+      // mysql: \ escapes in '...'/"..." strings but not `identifiers`;
+      // pg: only in e'...' strings (plain strings take \ literally).
+      const backslash = mysql ? c !== '`' : c === "'" && isEString(source, i)
+      i = skipQuoted(source, i, c, backslash)
       continue
     }
-    if (c === '$') {
+    if (c === '$' && !mysql) {
+      // pg-only: in mysql, $ is just an identifier character. `a$b$` identifiers
+      // can look like a tag opener even in pg; mis-splitting additionally needs a
+      // matching fake closer hidden in a string — accepted as improbable.
       dollarTag.lastIndex = i
       const m = dollarTag.exec(source)
       if (m) {
@@ -114,8 +182,30 @@ export function splitSqlStatements(source: string): Statement[] {
       continue
     }
     if (c === ';') {
+      if (bodyDepth > 0) {
+        // Inside a routine body — this ; separates body statements, not chunks.
+        ch.content(i)
+        i++
+        continue
+      }
       ch.boundary(i + 1) // the semicolon belongs to the statement
+      routine = null
       i++
+      continue
+    }
+    if (mysql && /[A-Za-z_]/.test(c) && !/[\w$]/.test(source[i - 1] ?? '')) {
+      const word = readWord(source, i)
+      ch.content(i)
+      const w = word.toLowerCase()
+      if (w === 'begin' || w === 'case') {
+        // `case` counts because a CASE *expression* ends with a bare END.
+        if (isRoutineChunk(i)) bodyDepth++
+      } else if (w === 'end' && isRoutineChunk(i)) {
+        if (!SELF_CLOSING_END.has(peekWord(source, i + word.length))) {
+          bodyDepth = Math.max(0, bodyDepth - 1)
+        }
+      }
+      i += word.length
       continue
     }
     if (!/\s/.test(c)) ch.content(i)
@@ -150,7 +240,10 @@ function skipRegex(source: string, start: number): number {
 }
 
 // A '/' starts a regex literal (not division) when the previous significant char
-// can't end an expression — the classic heuristic, plenty for shell commands.
+// can't end an expression — the classic heuristic, plenty for shell commands. A
+// regex right after a bare keyword (`return /a;b/`) is misread as division and can
+// mis-split, but such input isn't a db.* expression, so the shell evaluator
+// rejects it server-side either way.
 const BEFORE_REGEX = /[(,;:=[{!&|?+\-*%<>~^]/
 
 /** Split mongo-shell text into commands: top-level (paren/bracket/brace depth 0)
@@ -179,7 +272,7 @@ export function splitJsCommands(source: string): Statement[] {
     if (c === "'" || c === '"' || c === '`') {
       ch.content(i)
       lastSig = c
-      i = skipQuoted(source, i, c)
+      i = skipQuoted(source, i, c, true)
       continue
     }
     if (c === '/') {
@@ -234,15 +327,23 @@ function startsNewCommand(source: string, from: number): boolean {
   return source.startsWith('db.', i)
 }
 
-/** The statement the cursor is in. Regions tile the text — each statement owns
- *  [its start, next statement's start), so a cursor in the gap right after
- *  `select 1;` still picks that statement (what you want mid-typing); offsets
- *  before the first statement clamp to it. */
-export function statementAt(statements: Statement[], offset: number): Statement | null {
+/** The statement the cursor is in. Regions tile the text: a statement owns from
+ *  its start through the rest of its last line — so a cursor right after a
+ *  just-typed `select 1;` runs it — and the next line begins the following
+ *  statement's region, so a title comment above a statement runs the statement it
+ *  titles, not the previous one. Offsets before the first statement clamp to it. */
+export function statementAt(
+  source: string,
+  statements: Statement[],
+  offset: number
+): Statement | null {
   if (statements.length === 0) return null
   let pick = statements[0]
-  for (const s of statements) {
-    if (s.start <= offset) pick = s
+  for (let k = 1; k < statements.length; k++) {
+    const s = statements[k]
+    const nl = source.indexOf('\n', statements[k - 1].end)
+    const regionStart = nl !== -1 && nl < s.start ? nl + 1 : s.start
+    if (regionStart <= offset) pick = s
     else break
   }
   return pick
