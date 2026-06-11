@@ -1,7 +1,8 @@
-export type MongoReadOp = 'find' | 'findOne' | 'aggregate' | 'count' | 'countDocuments' | 'distinct'
-export type MongoWriteOp =
-  | 'insertOne' | 'insertMany' | 'updateOne' | 'updateMany' | 'deleteOne' | 'deleteMany' | 'replaceOne'
-export type MongoOp = MongoReadOp | MongoWriteOp
+import { MONGO_READ_OPS, MONGO_WRITE_OPS, type MongoOp, type MongoWriteOp } from '../../../shared/mongo-ops'
+
+// The op names live in shared (the editor's completions need them too); re-export the
+// types so driver-side code keeps a single import point for command vocabulary.
+export type { MongoReadOp, MongoWriteOp, MongoOp } from '../../../shared/mongo-ops'
 
 /** A normalized MongoDB operation. Both the raw-JSON parser (Plan 3a) and the
  *  mongosh shell parser (Plan 3c) produce this; the Mongo driver (3b) dispatches on it. */
@@ -23,10 +24,8 @@ export interface MongoCommand {
   field?: string
 }
 
-const READ_OPS = new Set<MongoOp>(['find', 'findOne', 'aggregate', 'count', 'countDocuments', 'distinct'])
-const WRITE_OPS = new Set<MongoWriteOp>([
-  'insertOne', 'insertMany', 'updateOne', 'updateMany', 'deleteOne', 'deleteMany', 'replaceOne'
-])
+const READ_OPS = new Set<MongoOp>(MONGO_READ_OPS)
+const WRITE_OPS = new Set<MongoWriteOp>(MONGO_WRITE_OPS)
 const ALL_OPS = new Set<MongoOp>([...READ_OPS, ...WRITE_OPS])
 
 export function isMongoOp(s: string): s is MongoOp {

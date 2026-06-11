@@ -1,12 +1,16 @@
 import { useEffect, useRef } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import type { QueryTabData } from '../state/store'
 import { useAppStore } from '../state/store'
-import { useConnections, useRunQuery, useCancelQuery } from '../lib/hooks'
+import { useConnections, useRunQuery, useCancelQuery, useObjects } from '../lib/hooks'
 import MonacoEditor from './MonacoEditor'
 import ResultsPanel from './ResultsPanel'
 import type { ConnectionType } from '@shared/domain'
+import type { ObjectRef } from '@shared/schema'
 import { mod } from '../lib/platform'
 import { rowCountLabel } from '../lib/result-label'
+import { unwrap } from '../lib/result'
+import type { CompletionCtx } from '../lib/monaco-completions'
 
 function langFor(type: ConnectionType | undefined): string {
   return type === 'mongodb' ? 'javascript' : 'sql'
@@ -27,14 +31,30 @@ export default function QueryTab({ tab }: Props): JSX.Element {
   const runQuery = useRunQuery()
   const cancelQuery = useCancelQuery()
 
-  function run() {
+  const { data: objects = [] } = useObjects(tab.connectionId)
+  const queryClient = useQueryClient()
+  // Editor completions. getColumns shares the schema tree's cache entry — the key
+  // must match useColumns exactly. Identity per render is fine: MonacoEditor reads
+  // it through a ref-thunk, never as an effect dependency.
+  const completions: CompletionCtx = {
+    objects,
+    getColumns: (ref: ObjectRef) =>
+      queryClient.fetchQuery({
+        queryKey: ['columns', tab.connectionId, ref.schema, ref.name],
+        queryFn: () => window.api.schema.columns(tab.connectionId, ref).then(unwrap),
+        staleTime: 60_000 // don't re-IPC on every keystroke behind `alias.`
+      })
+  }
+
+  function run(textOverride?: string) {
+    const text = textOverride ?? tab.text
     // Re-checks live tab.running each render (run is recreated per render) — keep that if memoizing.
-    if (!tab.text.trim() || tab.running) return
+    if (!text.trim() || tab.running) return
     cancelQuery.reset() // a stale "Cancel failed" must not haunt the next run
     const queryId = crypto.randomUUID()
     startRun(tab.id, queryId)
     runQuery
-      .mutateAsync({ connectionId: tab.connectionId, query: tab.text, queryId })
+      .mutateAsync({ connectionId: tab.connectionId, query: text, queryId })
       .then((result) => finishRun(tab.id, { result }))
       .catch((e) => finishRun(tab.id, { error: e instanceof Error ? e.message : String(e) }))
   }
@@ -78,8 +98,9 @@ export default function QueryTab({ tab }: Props): JSX.Element {
         <button
           className="btn primary"
           disabled={tab.running || !tab.text.trim()}
-          onClick={run}
-          title={`Run (${mod}↵)`}
+          // Not onClick={run}: the MouseEvent would land in textOverride.
+          onClick={() => run()}
+          title={`Run (${mod}↵ — a selection runs by itself)`}
         >
           ▶ Run
         </button>
@@ -114,6 +135,7 @@ export default function QueryTab({ tab }: Props): JSX.Element {
         language={langFor(connection?.type)}
         onChange={(t) => setTabText(tab.id, t)}
         onRun={run}
+        completions={completions}
       />
       <ResultsPanel tab={tab} />
     </div>
