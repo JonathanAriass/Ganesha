@@ -40,10 +40,11 @@ export function withAuthSourceHint(e: unknown, p: ConnectParams): Error {
   if (/authentication failed/i.test(msg) && !p.authSource && p.database) {
     return new Error(
       `${msg} Without an Auth source, authentication runs against '${p.database}' — ` +
-      `if the user is defined elsewhere, set Auth source (commonly 'admin').`
+      `if the user is defined elsewhere, set Auth source (commonly 'admin').`,
+      { cause: e }
     )
   }
-  return e instanceof Error ? e : new Error(msg)
+  return e instanceof Error ? e : new Error(msg, { cause: e })
 }
 
 /** True for mongo authorization failures (code 13 Unauthorized / auth-required messages). */
@@ -113,7 +114,8 @@ export class MongoDriver implements DatabaseDriver {
     if (!database && !cmd.database) {
       throw new Error(
         `This connection has no default database — target one explicitly, ` +
-        `e.g. db.getSiblingDB("mydb").${cmd.collection}.${cmd.op}(...)`
+        `e.g. db.getSiblingDB("mydb").${cmd.collection}.${cmd.op}(...) ` +
+        `(or add "database": "mydb" in raw JSON mode)`
       )
     }
     const coll = client.db(cmd.database).collection(cmd.collection)
