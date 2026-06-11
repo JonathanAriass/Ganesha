@@ -189,7 +189,7 @@ export class MongoDriver implements DatabaseDriver {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       throw new Error(
-        `Could not cancel: ${msg}. The server refused $currentOp/killOp — reads still stop at their 30s time limit.`,
+        `Could not cancel: ${msg}. The server refused $currentOp/killOp (or the request failed) — reads still stop at their 30s time limit.`,
         { cause: e }
       )
     }
