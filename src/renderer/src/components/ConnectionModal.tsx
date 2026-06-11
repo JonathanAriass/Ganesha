@@ -115,9 +115,11 @@ export default function ConnectionModal(): JSX.Element {
 
   function handleTest() {
     setTestStatus({ kind: 'pending' })
+    // Blank password on edit means "keep current" — send the id so main can
+    // test with the stored secret (it never comes back to the renderer).
     const pwd = password || null
     test.mutate(
-      { input: form, password: pwd },
+      { input: form, password: pwd, id: editId },
       {
         onSuccess: () => setTestStatus({ kind: 'ok' }),
         onError: (e) =>

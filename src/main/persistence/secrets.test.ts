@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import Database from 'better-sqlite3'
 import { migrate, type DB } from './db'
 import { createConnection } from './connections'
-import { makeSecretStore, type Encryptor } from './secrets'
+import { makeSecretStore, resolveTestPassword, type Encryptor } from './secrets'
 import type { ConnectionInput } from '../../shared/domain'
 
 // Reversible fake encryptor: prove the store round-trips without relying on the OS.
@@ -47,5 +47,34 @@ describe('secret store', () => {
     const c = createConnection(db, input, 1)
     store.setPassword(c.id, 'x'); store.deletePassword(c.id)
     expect(store.getPassword(c.id)).toBeNull()
+  })
+})
+
+describe('resolveTestPassword', () => {
+  it('a typed password wins, even over a stored one', () => {
+    const c = createConnection(db, input, 1)
+    store.setPassword(c.id, 'stored')
+    expect(resolveTestPassword('typed', c.id, store)).toBe('typed')
+  })
+
+  it('an explicit empty string is a value, not absence (?? not ||)', () => {
+    const c = createConnection(db, input, 1)
+    store.setPassword(c.id, 'stored')
+    expect(resolveTestPassword('', c.id, store)).toBe('')
+  })
+
+  it('blank on edit falls back to the stored secret', () => {
+    const c = createConnection(db, input, 1)
+    store.setPassword(c.id, 'stored')
+    expect(resolveTestPassword(null, c.id, store)).toBe('stored')
+  })
+
+  it('blank on edit with no stored secret tests with no password', () => {
+    const c = createConnection(db, input, 1)
+    expect(resolveTestPassword(null, c.id, store)).toBeNull()
+  })
+
+  it('blank on create (no id) tests with no password', () => {
+    expect(resolveTestPassword(null, undefined, store)).toBeNull()
   })
 })

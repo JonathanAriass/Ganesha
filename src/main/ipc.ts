@@ -2,7 +2,7 @@ import { ipcMain, clipboard, dialog, BrowserWindow } from 'electron'
 import type { ChannelName, Req, Res } from '../shared/ipc'
 import { ok, err, type Result } from '../shared/result'
 import { openDb } from './persistence/db'
-import { safeStorageEncryptor, makeSecretStore } from './persistence/secrets'
+import { safeStorageEncryptor, makeSecretStore, resolveTestPassword } from './persistence/secrets'
 import * as conns from './persistence/connections'
 import * as hist from './persistence/history'
 import * as settings from './persistence/settings'
@@ -95,11 +95,14 @@ export function registerIpcHandlers(): void {
   handle('settings.dataDir.get', () => ok(settings.getCurrentDataDir()))
   handle('settings.dataDir.set', (dir) => { settings.relocateDataDir(dir); void openDb(); return ok(dir) })
 
-  handle('connections.test', async ({ input, password }) => {
+  handle('connections.test', async ({ input, password, id }) => {
+    // Edit-mode Test with a blank password means "test with the saved password" —
+    // resolve the stored secret here in main; it never crosses to the renderer.
+    const pwd = resolveTestPassword(password, id, store().secrets)
     const driver = drivers.get(input.type)
     await driver.testConnection({
       id: 'test', type: input.type, host: input.host, port: input.port,
-      username: input.username, password, database: input.database, ssl: input.ssl,
+      username: input.username, password: pwd, database: input.database, ssl: input.ssl,
       authSource: input.authSource, replicaSet: input.replicaSet
     })
     return ok(null)

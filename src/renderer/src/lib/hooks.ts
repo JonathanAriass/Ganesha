@@ -97,10 +97,12 @@ export function useTestConnection() {
     mutationFn: ({
       input,
       password,
+      id,
     }: {
       input: ConnectionInput
       password: string | null
-    }) => window.api.connections.test(input, password).then(unwrap),
+      id?: string
+    }) => window.api.connections.test(input, password, id).then(unwrap),
   })
 }
 

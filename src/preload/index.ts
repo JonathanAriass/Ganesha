@@ -14,7 +14,7 @@ const api: DbClientApi = {
     create: (input, password) => invoke('connections.create', { input, password }),
     update: (id, patch, password) => invoke('connections.update', { id, patch, password }),
     delete: (id) => invoke('connections.delete', id),
-    test: (input, password) => invoke('connections.test', { input, password }),
+    test: (input, password, id) => invoke('connections.test', { input, password, id }),
     disconnect: (id) => invoke('connections.disconnect', id)
   },
   history: {

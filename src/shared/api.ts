@@ -10,7 +10,7 @@ export interface DbClientApi {
     create(input: ConnectionInput, password: string | null): Promise<IpcResult<'connections.create'>>
     update(id: string, patch: Partial<ConnectionInput>, password?: string | null): Promise<IpcResult<'connections.update'>>
     delete(id: string): Promise<IpcResult<'connections.delete'>>
-    test(input: ConnectionInput, password: string | null): Promise<IpcResult<'connections.test'>>
+    test(input: ConnectionInput, password: string | null, id?: string): Promise<IpcResult<'connections.test'>>
     disconnect(id: string): Promise<IpcResult<'connections.disconnect'>>
   }
   history: {

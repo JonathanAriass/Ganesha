@@ -16,6 +16,21 @@ export function safeStorageEncryptor(): Encryptor {
   }
 }
 
+/**
+ * Password to use for a connection test. A typed password (non-null) wins;
+ * otherwise fall back to the stored secret when testing a SAVED connection
+ * (edit mode sends its id) — blank-on-edit means "keep current", so Test must
+ * exercise the same credentials connect would use. Unsaved connections
+ * (no id) test with no password.
+ */
+export function resolveTestPassword(
+  password: string | null,
+  id: string | undefined,
+  secrets: { getPassword(connectionId: string): string | null }
+): string | null {
+  return password ?? (id ? secrets.getPassword(id) : null)
+}
+
 export function makeSecretStore(db: DB, enc: Encryptor) {
   return {
     setPassword(connectionId: string, password: string): void {
