@@ -2,7 +2,8 @@ import { useState } from 'react'
 import type { QueryTabData } from '../state/store'
 import ResultsGrid from './ResultsGrid'
 import DocumentView from './DocumentView'
-import { toCsv, toJsonText, download } from '../lib/export'
+import { toCsv, toJsonText, toJsonObjects, download } from '../lib/export'
+import { rowMatchesFilter } from '../lib/grid-text'
 import { mod } from '../lib/platform'
 
 interface Props {
@@ -47,6 +48,12 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
   }
 
   const result = tab.result
+  const filtering = view === 'table' && filter !== ''
+
+  // Export what the grid shows: the filtered subset when a table filter is active.
+  function exportRows(): unknown[][] {
+    return filtering ? result.rows.filter((r) => rowMatchesFilter(r, filter)) : result.rows
+  }
 
   if (result.columns.length === 0) {
     return (
@@ -91,15 +98,23 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
           )}
           <button
             className="btn"
-            title="Exports all rows (ignores the filter)"
-            onClick={() => download('result.csv', toCsv(result.columns, result.rows), 'text/csv')}
+            title={filtering ? 'Exports the filtered rows' : 'Exports all rows'}
+            onClick={() => download('result.csv', toCsv(result.columns, exportRows()), 'text/csv')}
           >
             CSV
           </button>
           <button
             className="btn"
-            title="Exports all rows (ignores the filter)"
-            onClick={() => download('result.json', toJsonText(result), 'application/json')}
+            title={filtering ? 'Exports the filtered rows' : 'Exports all rows'}
+            onClick={() =>
+              download(
+                'result.json',
+                // Filtered exports use the flat row shape — the filter operates on the
+                // table projection, so a documents export couldn't honor it.
+                filtering ? toJsonObjects(result.columns, exportRows()) : toJsonText(result),
+                'application/json'
+              )
+            }
           >
             JSON
           </button>

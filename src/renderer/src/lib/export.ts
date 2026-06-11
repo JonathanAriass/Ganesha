@@ -10,10 +10,15 @@ export function toCsv(columns: ColumnMeta[], rows: unknown[][]): string {
   return [columns.map((c) => csvEscape(c.name)).join(','), ...rows.map((r) => r.map(csvEscape).join(','))].join('\n')
 }
 
+/** Rows as an array of {column: value} objects — the JSON shape for tabular exports. */
+export function toJsonObjects(columns: ColumnMeta[], rows: unknown[][]): string {
+  const objects = rows.map((r) => Object.fromEntries(columns.map((c, i) => [c.name, r[i]])))
+  return JSON.stringify(objects, null, 2)
+}
+
 export function toJsonText(result: QueryResult): string {
   if (result.documents) return JSON.stringify(result.documents, null, 2)
-  const objects = result.rows.map((r) => Object.fromEntries(result.columns.map((c, i) => [c.name, r[i]])))
-  return JSON.stringify(objects, null, 2)
+  return toJsonObjects(result.columns, result.rows)
 }
 
 export function download(filename: string, text: string, mime: string): void {

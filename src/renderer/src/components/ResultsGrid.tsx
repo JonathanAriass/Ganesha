@@ -10,17 +10,12 @@ import {
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useState } from 'react'
 import type { ColumnMeta } from '@shared/query'
+import { cellText, cellMatchesFilter } from '../lib/grid-text'
 
 interface Props {
   columns: ColumnMeta[]
   rows: unknown[][]
   globalFilter: string
-}
-
-function cellText(v: unknown): string {
-  if (v === null || v === undefined) return ''
-  if (typeof v === 'object') return JSON.stringify(v)
-  return String(v)
 }
 
 export default function ResultsGrid({ columns, rows, globalFilter }: Props): JSX.Element {
@@ -45,8 +40,9 @@ export default function ResultsGrid({ columns, rows, globalFilter }: Props): JSX
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     // Filter on the same projection the cells render (objects stringify, not [object Object]).
+    // Shared with the export path (rowMatchesFilter) so "export filtered" can't drift.
     globalFilterFn: (row, columnId, filterValue) =>
-      cellText(row.getValue(columnId)).toLowerCase().includes(String(filterValue).toLowerCase()),
+      cellMatchesFilter(row.getValue(columnId), String(filterValue)),
     // Default eligibility samples row 0 (string|number only) — would skip object-first
     // and sparse null-first columns, the norm for Mongo key-union results.
     getColumnCanGlobalFilter: () => true,
