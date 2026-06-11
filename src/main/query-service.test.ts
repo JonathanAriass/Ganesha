@@ -11,7 +11,8 @@ import type { ConnectionInput } from '../shared/domain'
 const enc: Encryptor = { encrypt: (s) => Buffer.from(s), decrypt: (b) => b.toString() }
 const input: ConnectionInput = {
   type: 'postgres', name: 'p', color: '#000', host: 'h', port: 5432,
-  username: 'u', database: 'd', ssl: false, readOnly: true
+  username: 'u', database: 'd', ssl: false, readOnly: true,
+  authSource: '', replicaSet: ''
 }
 const fakeResult: QueryResult = {
   columns: [{ name: 'n', dataType: '23' }], rows: [[1]], rowCount: 1, durationMs: 3, truncated: false, documents: null

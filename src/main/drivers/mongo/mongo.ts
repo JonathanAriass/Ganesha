@@ -1,23 +1,44 @@
 import { MongoClient } from 'mongodb'
 import type { Document, Filter, Sort, UpdateFilter } from 'mongodb'
 import type { DatabaseDriver, ConnectParams, RunOptions, QueryRequest, QueryResult, DbObject, ObjectRef, ColumnInfo } from '../types'
+import type { MongoCommand } from './command'
+import { isMongoCommandWrite } from './command'
 import { normalizeFind, normalizeScalar, normalizeValues, normalizeWriteResult } from './normalize'
 import { inferFieldTypes } from './infer'
+
+/** Cap a user-supplied find limit at maxRows+1 — the +1 lets normalizeFind detect
+ *  truncation. Mongo treats limit 0 as "no limit", so 0/undefined fall to the cap. */
+export function boundedFindLimit(userLimit: number | undefined, maxRows: number): number {
+  return userLimit ? Math.min(userLimit, maxRows + 1) : maxRows + 1
+}
+
+/** Bound an aggregate's fetch with a terminal $limit, like find — except $out/$merge
+ *  pipelines: those stages must stay terminal, and they emit no row output anyway. */
+export function boundedPipeline(cmd: MongoCommand, maxRows: number): Record<string, unknown>[] {
+  const pipeline = cmd.pipeline ?? []
+  return isMongoCommandWrite(cmd) ? pipeline : [...pipeline, { $limit: maxRows + 1 }]
+}
+
+/** Build a mongodb:// connection string. Exported for unit tests. */
+export function buildMongoUri(p: ConnectParams): string {
+  const auth = p.username ? `${encodeURIComponent(p.username)}:${encodeURIComponent(p.password ?? '')}@` : ''
+  const opts = new URLSearchParams()
+  if (p.ssl) opts.set('tls', 'true')
+  if (p.authSource) opts.set('authSource', p.authSource)
+  if (p.replicaSet) opts.set('replicaSet', p.replicaSet)
+  const qs = opts.toString()
+  // The connection-string grammar requires the `/` before `?options` even without a db.
+  const path = p.database ? `/${encodeURIComponent(p.database)}` : qs ? '/' : ''
+  return `mongodb://${auth}${p.host}:${p.port}${path}${qs ? `?${qs}` : ''}`
+}
 
 /** MongoDB driver. Read-only is enforced upstream by the command guard (no SQL-style RO txn). */
 export class MongoDriver implements DatabaseDriver {
   readonly type = 'mongodb' as const
   private clients = new Map<string, MongoClient>()
 
-  private uri(p: ConnectParams): string {
-    const auth = p.username ? `${encodeURIComponent(p.username)}:${encodeURIComponent(p.password ?? '')}@` : ''
-    const db = p.database ? `/${encodeURIComponent(p.database)}` : ''
-    const tls = p.ssl ? '?tls=true' : ''
-    return `mongodb://${auth}${p.host}:${p.port}${db}${tls}`
-  }
-
   private newClient(p: ConnectParams): MongoClient {
-    return new MongoClient(this.uri(p), { serverSelectionTimeoutMS: 10_000 })
+    return new MongoClient(buildMongoUri(p), { serverSelectionTimeoutMS: 10_000 })
   }
 
   async testConnection(p: ConnectParams): Promise<void> {
@@ -60,7 +81,9 @@ export class MongoDriver implements DatabaseDriver {
           projection: cmd.projection,
           sort: cmd.sort as Sort | undefined,
           skip: cmd.skip,
-          limit: cmd.limit ?? opts.maxRows + 1,
+          // A user limit above maxRows would fetch it all before normalize caps the
+          // display — bound the cursor itself.
+          limit: boundedFindLimit(cmd.limit, opts.maxRows),
           maxTimeMS: 30_000
         })
         return normalizeFind(await cursor.toArray(), opts.maxRows, ms())
@@ -70,7 +93,7 @@ export class MongoDriver implements DatabaseDriver {
         return normalizeFind(doc ? [doc] : [], opts.maxRows, ms())
       }
       case 'aggregate':
-        return normalizeFind(await coll.aggregate(cmd.pipeline ?? [], { maxTimeMS: 30_000 }).toArray(), opts.maxRows, ms())
+        return normalizeFind(await coll.aggregate(boundedPipeline(cmd, opts.maxRows), { maxTimeMS: 30_000 }).toArray(), opts.maxRows, ms())
       case 'count':
       case 'countDocuments':
         return normalizeScalar('count', await coll.countDocuments(cmd.filter as Filter<Document> ?? {}), ms())

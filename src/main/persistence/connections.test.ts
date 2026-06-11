@@ -6,7 +6,8 @@ import type { ConnectionInput } from '../../shared/domain'
 
 const input: ConnectionInput = {
   type: 'postgres', name: 'prod', color: '#6366f1', host: 'localhost',
-  port: 5432, username: 'admin', database: 'app', ssl: true, readOnly: false
+  port: 5432, username: 'admin', database: 'app', ssl: true, readOnly: false,
+  authSource: '', replicaSet: ''
 }
 
 let db: DB
@@ -40,5 +41,48 @@ describe('connections service', () => {
     const c = createConnection(db, input, 1000)
     deleteConnection(db, c.id)
     expect(getConnection(db, c.id)).toBeNull()
+  })
+
+  it('round-trips mongo authSource and replicaSet', () => {
+    const c = createConnection(
+      db,
+      { ...input, type: 'mongodb', authSource: 'admin', replicaSet: 'rs0' },
+      1000
+    )
+    expect(getConnection(db, c.id)).toMatchObject({ authSource: 'admin', replicaSet: 'rs0' })
+    const updated = updateConnection(db, c.id, { replicaSet: 'rs1' }, 2000)
+    expect(updated).toMatchObject({ authSource: 'admin', replicaSet: 'rs1' })
+  })
+
+  it('migrates a pre-authSource database by adding the new columns', () => {
+    const legacy: DB = new Database(':memory:')
+    // The connections schema as it shipped before auth_source/replica_set existed.
+    legacy.exec(`
+      CREATE TABLE connections (
+        id          TEXT PRIMARY KEY,
+        type        TEXT NOT NULL,
+        name        TEXT NOT NULL,
+        color       TEXT NOT NULL DEFAULT '#6366f1',
+        host        TEXT NOT NULL,
+        port        INTEGER NOT NULL,
+        username    TEXT NOT NULL DEFAULT '',
+        db_name     TEXT NOT NULL DEFAULT '',
+        ssl         INTEGER NOT NULL DEFAULT 0,
+        read_only   INTEGER NOT NULL DEFAULT 0,
+        created_at  INTEGER NOT NULL,
+        updated_at  INTEGER NOT NULL
+      );
+    `)
+    legacy.prepare(`INSERT INTO connections (id,type,name,host,port,created_at,updated_at)
+      VALUES ('old','postgres','legacy','localhost',5432,1,1)`).run()
+
+    migrate(legacy) // must add the columns without touching existing rows
+    migrate(legacy) // and stay idempotent
+
+    expect(getConnection(legacy, 'old')).toMatchObject({
+      name: 'legacy',
+      authSource: '',
+      replicaSet: ''
+    })
   })
 })

@@ -3,7 +3,14 @@ import { getDbPath } from './paths'
 
 export type DB = Database.Database
 
-/** Create all tables if absent. Idempotent. */
+/** ALTER TABLE ADD COLUMN, skipped if the column already exists. Keeps migrate() idempotent
+ *  for databases created before the column was added to CREATE TABLE. */
+function addColumnIfMissing(db: DB, table: string, column: string, ddl: string): void {
+  const cols = db.prepare(`SELECT name FROM pragma_table_info(?)`).all(table) as { name: string }[]
+  if (!cols.some((c) => c.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`)
+}
+
+/** Create all tables if absent, then patch older schemas up to date. Idempotent. */
 export function migrate(db: DB): void {
   db.pragma('journal_mode = WAL')
   db.pragma('foreign_keys = ON')
@@ -19,6 +26,8 @@ export function migrate(db: DB): void {
       db_name     TEXT NOT NULL DEFAULT '',
       ssl         INTEGER NOT NULL DEFAULT 0,
       read_only   INTEGER NOT NULL DEFAULT 0,
+      auth_source TEXT NOT NULL DEFAULT '',
+      replica_set TEXT NOT NULL DEFAULT '',
       created_at  INTEGER NOT NULL,
       updated_at  INTEGER NOT NULL
     );
@@ -40,6 +49,9 @@ export function migrate(db: DB): void {
       value TEXT NOT NULL
     );
   `)
+  // Mongo Atlas / replica-set connectivity (added after first release of the schema).
+  addColumnIfMissing(db, 'connections', 'auth_source', "auth_source TEXT NOT NULL DEFAULT ''")
+  addColumnIfMissing(db, 'connections', 'replica_set', "replica_set TEXT NOT NULL DEFAULT ''")
 }
 
 let singleton: DB | null = null

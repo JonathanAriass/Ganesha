@@ -11,6 +11,10 @@ export interface ConnectionInput {
   database: string
   ssl: boolean
   readOnly: boolean
+  /** Mongo only: authentication database; '' = driver default (the connection db / admin). */
+  authSource: string
+  /** Mongo only: replica set name; '' = direct connection. */
+  replicaSet: string
 }
 
 /** A stored connection (input + identity + timestamps), password excluded. */

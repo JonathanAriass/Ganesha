@@ -36,6 +36,8 @@ const DEFAULT_INPUT: ConnectionInput = {
   database: '',
   ssl: false,
   readOnly: false,
+  authSource: '',
+  replicaSet: '',
 }
 
 // ── Test status ──────────────────────────────────────────────────────────────
@@ -78,6 +80,8 @@ export default function ConnectionModal(): JSX.Element {
         database: existingConn.database,
         ssl: existingConn.ssl,
         readOnly: existingConn.readOnly,
+        authSource: existingConn.authSource,
+        replicaSet: existingConn.replicaSet,
       })
       setPassword('') // blank = keep current on edit
     } else if (!isEdit) {
@@ -254,6 +258,32 @@ export default function ConnectionModal(): JSX.Element {
                 />
               </div>
             </div>
+
+            {/* Mongo-only: auth source + replica set */}
+            {form.type === 'mongodb' && (
+              <div className="form-row-2">
+                <div className="form-row">
+                  <label htmlFor="conn-authsource">Auth source</label>
+                  <input
+                    id="conn-authsource"
+                    type="text"
+                    value={form.authSource}
+                    onChange={(e) => setField('authSource', e.target.value)}
+                    placeholder="admin"
+                  />
+                </div>
+                <div className="form-row">
+                  <label htmlFor="conn-replicaset">Replica set</label>
+                  <input
+                    id="conn-replicaset"
+                    type="text"
+                    value={form.replicaSet}
+                    onChange={(e) => setField('replicaSet', e.target.value)}
+                    placeholder="rs0"
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Password */}
             <div className="form-row">

@@ -15,6 +15,10 @@ export interface ConnectParams {
   password: string | null
   database: string
   ssl: boolean
+  /** Mongo only: authentication database ('' / absent = driver default). */
+  authSource?: string
+  /** Mongo only: replica set name ('' / absent = direct connection). */
+  replicaSet?: string
 }
 
 export interface RunOptions {

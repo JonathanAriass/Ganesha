@@ -99,7 +99,8 @@ export function registerIpcHandlers(): void {
     const driver = drivers.get(input.type)
     await driver.testConnection({
       id: 'test', type: input.type, host: input.host, port: input.port,
-      username: input.username, password, database: input.database, ssl: input.ssl
+      username: input.username, password, database: input.database, ssl: input.ssl,
+      authSource: input.authSource, replicaSet: input.replicaSet
     })
     return ok(null)
   })
