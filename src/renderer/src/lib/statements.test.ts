@@ -486,6 +486,7 @@ describe('isTransactionControl', () => {
       'SAVEPOINT sp1;',
       'release savepoint sp1;',
       'ABORT;', // pg ROLLBACK alias
+      "XA START 'x1';", // mysql two-phase: leaves the session in ACTIVE XA state
       'SET TRANSACTION ISOLATION LEVEL READ COMMITTED;',
       'set session transaction read only;',
       'SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY;', // persists on the pooled session

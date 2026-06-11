@@ -41,6 +41,7 @@ export default function QueryTab({ tab }: Props): JSX.Element {
   const finishRun = useAppStore((s) => s.finishRun)
   const openSaveQueryModal = useAppStore((s) => s.openSaveQueryModal)
   const startScript = useAppStore((s) => s.startScript)
+  const requestScriptStop = useAppStore((s) => s.requestScriptStop)
   const scriptStatementStart = useAppStore((s) => s.scriptStatementStart)
   const scriptStatementDone = useAppStore((s) => s.scriptStatementDone)
   const finishScript = useAppStore((s) => s.finishScript)
@@ -65,12 +66,6 @@ export default function QueryTab({ tab }: Props): JSX.Element {
   }
 
   const editorRef = useRef<MonacoEditorHandle>(null)
-  // Set by Cancel while a script runs: the cancel IPC itself can miss — the
-  // targeted statement may finish (driver no-ops on an unknown queryId) just as
-  // the user clicks — so runAll also checks this at every statement boundary.
-  // A ref, not state: the loop must see the click mid-flight, and render
-  // closures would be stale.
-  const scriptStopRef = useRef(false)
 
   /** The tab's text split with this connection's dialect rules. */
   function tabStatements(): Statement[] {
@@ -132,15 +127,17 @@ export default function QueryTab({ tab }: Props): JSX.Element {
       }
     }
     cancelQuery.reset()
-    scriptStopRef.current = false
     startScript(tab.id, statements.length, crypto.randomUUID())
     let failed = false
     for (const st of statements) {
-      // The tab can close mid-script (⌘W): the store appends would no-op, but
-      // the IPC calls would keep executing statements with Cancel gone from the
-      // UI. Fresh getState() — this closure's tab list predates the close.
-      if (!useAppStore.getState().tabs.some((t) => t.id === tab.id)) return
-      if (failed || scriptStopRef.current) {
+      // Fresh getState() each boundary — this closure's snapshot predates any
+      // close or cancel. A closed tab (⌘W) must stop the script: the store
+      // appends would no-op, but the IPC calls would keep executing statements
+      // with Cancel gone from the UI. The stop flag lives on the tab's
+      // scriptRun (not on this component — it remounts on tab switches).
+      const live = useAppStore.getState().tabs.find((t) => t.id === tab.id)
+      if (!live) return
+      if (failed || live.scriptRun?.stopRequested) {
         scriptStatementDone(tab.id, { text: st.text, result: null, error: null, skipped: true })
         continue
       }
@@ -253,10 +250,10 @@ export default function QueryTab({ tab }: Props): JSX.Element {
           <button
             className="btn ghost"
             onClick={() => {
-              // For scripts, also stop at the next boundary — this render's
+              // For scripts, also request a boundary stop — this render's
               // queryId may belong to a statement that just finished, and the
               // drivers no-op (successfully) on ids they no longer know.
-              if (tab.scriptRun) scriptStopRef.current = true
+              if (tab.scriptRun) requestScriptStop(tab.id)
               cancelQuery.mutate({ connectionId: tab.connectionId, queryId: tab.queryId! })
             }}
           >

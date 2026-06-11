@@ -106,8 +106,22 @@ describe('script run lifecycle', () => {
       error: null,
       result: null,
       queryId: null,
-      scriptRun: { runId: 'run-1', total: 2, entries: [] }
+      scriptRun: { runId: 'run-1', total: 2, entries: [], stopRequested: false }
     })
+  })
+
+  it('requestScriptStop flags the script; the next startScript re-arms clean', () => {
+    useAppStore.getState().startScript(tab().id, 2, 'run-1')
+    useAppStore.getState().requestScriptStop(tab().id)
+    expect(tab().scriptRun?.stopRequested).toBe(true)
+    // Cancel → immediate re-run: the new script must not inherit the stop.
+    useAppStore.getState().startScript(tab().id, 3, 'run-2')
+    expect(tab().scriptRun?.stopRequested).toBe(false)
+  })
+
+  it('requestScriptStop without an armed script is a no-op', () => {
+    useAppStore.getState().requestScriptStop(tab().id)
+    expect(tab().scriptRun).toBeNull()
   })
 
   it('scriptStatementStart points queryId at the in-flight statement (Cancel target)', () => {

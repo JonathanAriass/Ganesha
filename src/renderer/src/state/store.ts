@@ -26,6 +26,10 @@ export interface ScriptRun {
   /** Unique per Run-all — keys the results view so a new run remounts every
    *  section (fresh open/closed defaults) instead of reusing the old ones. */
   runId: string
+  /** Set by Cancel; the script loop checks it at every statement boundary.
+   *  Store state, not component state: QueryTab remounts on tab switches
+   *  while the script keeps running, so a ref on the instance would go dead. */
+  stopRequested: boolean
   total: number
   entries: ScriptStatementResult[]
 }
@@ -81,6 +85,9 @@ interface AppState {
 
   // ── Run all (script execution) ────────────────────────────────────────────
   startScript: (id: string, total: number, runId: string) => void
+  /** Ask the running script to stop at the next statement boundary — the cancel
+   *  IPC alone can miss (drivers no-op on a queryId that just finished). */
+  requestScriptStop: (id: string) => void
   /** Point the tab's queryId at the in-flight statement so Cancel targets it. */
   scriptStatementStart: (id: string, queryId: string) => void
   scriptStatementDone: (id: string, entry: ScriptStatementResult) => void
@@ -197,8 +204,17 @@ export const useAppStore = create<AppState>((set, get) => ({
               result: null,
               queryId: null,
               runOnOpen: false,
-              scriptRun: { runId, total, entries: [] },
+              scriptRun: { runId, total, entries: [], stopRequested: false },
             }
+          : t
+      ),
+    })),
+
+  requestScriptStop: (id) =>
+    set((s) => ({
+      tabs: s.tabs.map((t) =>
+        t.id === id && t.scriptRun
+          ? { ...t, scriptRun: { ...t.scriptRun, stopRequested: true } }
           : t
       ),
     })),

@@ -378,11 +378,12 @@ function startsNewCommand(source: string, from: number): boolean {
  *  keyword or the @@[session.|global.] system-variable forms (autocommit off on
  *  a pooled session leaks an implicit open transaction back to the pool).
  *  START matches only START TRANSACTION — START REPLICA/SLAVE are admin
- *  statements, not transaction control. BEGIN ATOMIC never reaches a statement
- *  head — routine bodies stay inside their CREATE statement (see
- *  splitSqlStatements). */
+ *  statements, not transaction control. XA heads (mysql two-phase commit)
+ *  leave the session in an ACTIVE XA state — the same acute class as a lone
+ *  BEGIN. BEGIN ATOMIC never reaches a statement head — routine bodies stay
+ *  inside their CREATE statement (see splitSqlStatements). */
 const TXN_HEAD =
-  /^(begin|commit|rollback|abort|end|savepoint|release)\b|^start\s+transaction\b|^set\s+(((session|global)\s+)|@@((session|global)\.)?)?(characteristics\s+as\s+)?(transaction|autocommit)\b/i
+  /^(begin|commit|rollback|abort|end|savepoint|release)\b|^start\s+transaction\b|^xa\b|^set\s+(((session|global)\s+)|@@((session|global)\.)?)?(characteristics\s+as\s+)?(transaction|autocommit)\b/i
 
 /** Leading whitespace or one comment of either dialect (over-matching `#` on pg
  *  is fine — the only caller refuses conservatively). */
