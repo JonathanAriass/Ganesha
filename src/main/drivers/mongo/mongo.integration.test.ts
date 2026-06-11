@@ -53,6 +53,26 @@ describe('MongoDriver (integration, requires Docker)', () => {
     expect(names).toContain('name')
   })
 
+  it('cancel kills the comment-tagged op; the connection stays usable', async () => {
+    await driver.runQuery(id, { kind: 'mongo', command: { op: 'insertMany', collection: 'slow', documents: Array.from({ length: 300 }, (_, i) => ({ i })) } }, { maxRows: 1000, queryId: 's2', readOnly: false })
+
+    // ~100ms of server-side JS per doc ≈ 30s nominal — killed long before that.
+    // (If cancel were broken, maxTimeMS would end it with a DIFFERENT error.)
+    const queryId = 'kill-me'
+    const slow = driver.runQuery(
+      id,
+      { kind: 'mongo', command: { op: 'find', collection: 'slow', filter: { $where: 'sleep(100) || true' } } },
+      { maxRows: 1000, queryId, readOnly: false }
+    )
+    slow.catch(() => {}) // assertion comes later; don't trip the unhandled-rejection watchdog
+    await new Promise((r) => setTimeout(r, 500)) // let the op register server-side
+    await driver.cancel(id, queryId)
+    await expect(slow).rejects.toThrow(/interrupt/i)
+
+    const after = await driver.runQuery(id, { kind: 'mongo', command: { op: 'countDocuments', collection: 'users' } }, { maxRows: 1000, queryId: 'q5', readOnly: false })
+    expect(after.rows).toEqual([[2]])
+  }, 40_000)
+
   it('no database → browse-all: cross-db commands route, listObjects groups by db, describeObject follows schema', async () => {
     await driver.connect({
       id: idAll, type: 'mongodb', host: container.getHost(), port: container.getMappedPort(27017),

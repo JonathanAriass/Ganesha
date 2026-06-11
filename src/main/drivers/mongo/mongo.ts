@@ -121,6 +121,9 @@ export class MongoDriver implements DatabaseDriver {
     const coll = client.db(cmd.database).collection(cmd.collection)
     const start = Date.now()
     const ms = (): number => Date.now() - start
+    // Tag every server op with the queryId so cancel() can find it via $currentOp.
+    // Comments propagate to getMore, so long cursor reads stay killable too.
+    const comment = opts.queryId
 
     switch (cmd.op) {
       case 'find': {
@@ -131,40 +134,50 @@ export class MongoDriver implements DatabaseDriver {
           // A user limit above maxRows would fetch it all before normalize caps the
           // display — bound the cursor itself.
           limit: boundedFindLimit(cmd.limit, opts.maxRows),
-          maxTimeMS: 30_000
+          maxTimeMS: 30_000,
+          comment
         })
         return normalizeFind(await cursor.toArray(), opts.maxRows, ms())
       }
       case 'findOne': {
-        const doc = await coll.findOne(cmd.filter as Filter<Document> ?? {}, { projection: cmd.projection })
+        const doc = await coll.findOne(cmd.filter as Filter<Document> ?? {}, { projection: cmd.projection, comment })
         return normalizeFind(doc ? [doc] : [], opts.maxRows, ms())
       }
       case 'aggregate':
-        return normalizeFind(await coll.aggregate(boundedPipeline(cmd, opts.maxRows), { maxTimeMS: 30_000 }).toArray(), opts.maxRows, ms())
+        return normalizeFind(await coll.aggregate(boundedPipeline(cmd, opts.maxRows), { maxTimeMS: 30_000, comment }).toArray(), opts.maxRows, ms())
       case 'count':
       case 'countDocuments':
-        return normalizeScalar('count', await coll.countDocuments(cmd.filter as Filter<Document> ?? {}), ms())
+        return normalizeScalar('count', await coll.countDocuments(cmd.filter as Filter<Document> ?? {}, { maxTimeMS: 30_000, comment }), ms())
       case 'distinct':
-        return normalizeValues('value', await coll.distinct(cmd.field ?? '_id', cmd.filter as Filter<Document> ?? {}), opts.maxRows, ms())
+        return normalizeValues('value', await coll.distinct(cmd.field ?? '_id', cmd.filter as Filter<Document> ?? {}, { comment }), opts.maxRows, ms())
       case 'insertOne':
-        return normalizeWriteResult(await coll.insertOne(cmd.document as Document ?? {}), ms())
+        return normalizeWriteResult(await coll.insertOne(cmd.document as Document ?? {}, { comment }), ms())
       case 'insertMany':
-        return normalizeWriteResult(await coll.insertMany((cmd.documents ?? []) as Document[]), ms())
+        return normalizeWriteResult(await coll.insertMany((cmd.documents ?? []) as Document[], { comment }), ms())
       case 'updateOne':
-        return normalizeWriteResult(await coll.updateOne(cmd.filter as Filter<Document> ?? {}, cmd.update as UpdateFilter<Document> ?? {}), ms())
+        return normalizeWriteResult(await coll.updateOne(cmd.filter as Filter<Document> ?? {}, cmd.update as UpdateFilter<Document> ?? {}, { comment }), ms())
       case 'updateMany':
-        return normalizeWriteResult(await coll.updateMany(cmd.filter as Filter<Document> ?? {}, cmd.update as UpdateFilter<Document> ?? {}), ms())
+        return normalizeWriteResult(await coll.updateMany(cmd.filter as Filter<Document> ?? {}, cmd.update as UpdateFilter<Document> ?? {}, { comment }), ms())
       case 'replaceOne':
-        return normalizeWriteResult(await coll.replaceOne(cmd.filter as Filter<Document> ?? {}, cmd.replacement as Document ?? {}), ms())
+        return normalizeWriteResult(await coll.replaceOne(cmd.filter as Filter<Document> ?? {}, cmd.replacement as Document ?? {}, { comment }), ms())
       case 'deleteOne':
-        return normalizeWriteResult(await coll.deleteOne(cmd.filter as Filter<Document> ?? {}), ms())
+        return normalizeWriteResult(await coll.deleteOne(cmd.filter as Filter<Document> ?? {}, { comment }), ms())
       case 'deleteMany':
-        return normalizeWriteResult(await coll.deleteMany(cmd.filter as Filter<Document> ?? {}), ms())
+        return normalizeWriteResult(await coll.deleteMany(cmd.filter as Filter<Document> ?? {}, { comment }), ms())
     }
   }
 
-  async cancel(_id: string, _queryId: string): Promise<void> {
-    // v1: MongoDB has no simple per-query cancel; ops carry maxTimeMS. killOp is a future enhancement.
+  async cancel(id: string, queryId: string): Promise<void> {
+    const conn = this.conns.get(id)
+    if (!conn) return
+    const admin = conn.client.db('admin')
+    // runQuery comment-tags ops with their queryId. $currentOp's default
+    // allUsers:false sees the user's own ops, and killOp may always kill one's
+    // own ops — no inprog/killop privilege needed. Best-effort, like pg/mysql.
+    const ops = await admin
+      .aggregate([{ $currentOp: {} }, { $match: { 'command.comment': queryId } }])
+      .toArray()
+    await Promise.all(ops.map((op) => admin.command({ killOp: 1, op: op.opid })))
   }
 
   private require(id: string): OpenConnection {

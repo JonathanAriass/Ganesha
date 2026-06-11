@@ -26,7 +26,9 @@ export function normalizeFind(docs: unknown[], maxRows: number, durationMs: numb
   }
   const columns: ColumnMeta[] = keys.map((name) => ({ name, dataType: null }))
   const rows = capped.map((d) => keys.map((k) => (k in d ? d[k] : null)))
-  return { columns, rows, rowCount: total, durationMs, truncated, documents: capped }
+  // The fetch is bounded at maxRows+1, so when truncated the true total is unknown —
+  // `total` would just be the probe size. Report the shown count; `truncated` says "more".
+  return { columns, rows, rowCount: capped.length, durationMs, truncated, documents: capped }
 }
 
 /** count / countDocuments → single scalar cell. */

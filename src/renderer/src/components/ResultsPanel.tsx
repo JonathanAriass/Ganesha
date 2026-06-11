@@ -5,6 +5,7 @@ import DocumentView from './DocumentView'
 import { toCsv, toJsonText, toJsonObjects, download } from '../lib/export'
 import { rowMatchesFilter } from '../lib/grid-text'
 import { mod } from '../lib/platform'
+import { truncationLabel } from '../lib/result-label'
 
 interface Props {
   tab: QueryTabData
@@ -91,11 +92,7 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
           />
         )}
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
-          {result.truncated && (
-            <span className="chip-warn">
-              showing first {result.rows.length} of {result.rowCount}
-            </span>
-          )}
+          {result.truncated && <span className="chip-warn">{truncationLabel(result)}</span>}
           <button
             className="btn"
             title={filtering ? 'Exports the filtered rows' : 'Exports all rows'}

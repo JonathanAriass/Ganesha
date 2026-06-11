@@ -17,8 +17,17 @@ describe('mongo normalize', () => {
     expect(res.durationMs).toBe(5)
   })
 
-  it('normalizeFind truncates beyond maxRows', () => {
+  it('normalizeFind truncates beyond maxRows and reports the shown count, not the probe size', () => {
+    // The driver fetches at most maxRows+1 docs, so the input length is never the
+    // true total — rowCount must say what is shown and truncated must say "more".
     const res = normalizeFind([{ a: 1 }, { a: 2 }, { a: 3 }], 2, 0)
+    expect(res.rows).toHaveLength(2)
+    expect(res.truncated).toBe(true)
+    expect(res.rowCount).toBe(2)
+  })
+
+  it('normalizeValues keeps the exact total when truncating — distinct fetches the full array', () => {
+    const res = normalizeValues('value', ['a', 'b', 'c'], 2, 0)
     expect(res.rows).toHaveLength(2)
     expect(res.truncated).toBe(true)
     expect(res.rowCount).toBe(3)

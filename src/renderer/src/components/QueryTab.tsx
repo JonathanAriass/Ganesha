@@ -6,6 +6,7 @@ import MonacoEditor from './MonacoEditor'
 import ResultsPanel from './ResultsPanel'
 import type { ConnectionType } from '@shared/domain'
 import { mod } from '../lib/platform'
+import { rowCountLabel } from '../lib/result-label'
 
 function langFor(type: ConnectionType | undefined): string {
   return type === 'mongodb' ? 'javascript' : 'sql'
@@ -52,7 +53,7 @@ export default function QueryTab({ tab }: Props): JSX.Element {
   } else if (tab.result) {
     statusEl = (
       <span className="qt-status">
-        {tab.result.rowCount} rows · {tab.result.durationMs} ms
+        {rowCountLabel(tab.result)} · {tab.result.durationMs} ms
       </span>
     )
   } else if (tab.error) {
@@ -70,10 +71,9 @@ export default function QueryTab({ tab }: Props): JSX.Element {
         >
           ▶ Run
         </button>
-        {/* Mongo ops can't be killed mid-flight (driver cancel is a no-op; they
-            bound themselves via maxTimeMS) — a Cancel that silently does nothing
-            is worse than no button. */}
-        {tab.running && tab.queryId && connection?.type !== 'mongodb' && (
+        {/* All drivers cancel for real now: pg_cancel_backend / KILL QUERY /
+            mongo killOp on the comment-tagged op. */}
+        {tab.running && tab.queryId && (
           <button
             className="btn ghost"
             onClick={() =>
