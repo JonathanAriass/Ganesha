@@ -3,23 +3,11 @@ import { useHistory } from '../lib/hooks'
 
 export default function HistorySection(): JSX.Element | null {
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
-  const activeTabId = useAppStore((s) => s.activeTabId)
-  const tabs = useAppStore((s) => s.tabs)
-  const loadQueryText = useAppStore((s) => s.loadQueryText)
-  const openQueryTab = useAppStore((s) => s.openQueryTab)
+  const openOrLoadQuery = useAppStore((s) => s.openOrLoadQuery)
 
   const { data: entries, isLoading } = useHistory(activeConnectionId)
 
   if (!activeConnectionId) return null
-
-  function handleClick(query: string) {
-    const activeTab = tabs.find((t) => t.id === activeTabId)
-    if (activeTab && activeTab.connectionId === activeConnectionId) {
-      loadQueryText(activeTabId!, query)
-    } else {
-      openQueryTab({ connectionId: activeConnectionId!, title: 'History', text: query })
-    }
-  }
 
   return (
     <details className="history">
@@ -36,7 +24,17 @@ export default function HistorySection(): JSX.Element | null {
           const snippet = entry.query.slice(0, 60)
 
           return (
-            <button key={entry.id} className="history-item" onClick={() => handleClick(entry.query)}>
+            <button
+              key={entry.id}
+              className="history-item"
+              onClick={() =>
+                openOrLoadQuery({
+                  connectionId: activeConnectionId,
+                  title: 'History',
+                  text: entry.query
+                })
+              }
+            >
               <span className={`h-dot${isFail ? ' fail' : ' ok'}`} />
               <span className="h-text" title={entry.query}>
                 {snippet}

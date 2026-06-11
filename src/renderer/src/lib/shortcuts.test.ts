@@ -15,6 +15,11 @@ describe('resolveShortcut', () => {
     expect(resolveShortcut({ ...base, key: ',', ctrlKey: true })).toBe('settings')
   })
 
+  it('maps mod+s to save-query', () => {
+    expect(resolveShortcut({ ...base, key: 's', metaKey: true })).toBe('save-query')
+    expect(resolveShortcut({ ...base, key: 's', ctrlKey: true })).toBe('save-query')
+  })
+
   it('is case-insensitive on the key', () => {
     expect(resolveShortcut({ ...base, key: 'W', metaKey: true })).toBe('close-tab')
   })

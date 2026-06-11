@@ -1,6 +1,7 @@
 import type { Result } from './result'
 import type {
-  ConnectionConfig, ConnectionInput, HistoryEntry, HistoryEntryInput, AppSettings
+  ConnectionConfig, ConnectionInput, HistoryEntry, HistoryEntryInput, AppSettings,
+  SavedQuery, SavedQueryInput, SavedQueryPatch
 } from './domain'
 import type { QueryResult } from './query'
 import type { DbObject, ObjectRef, ColumnInfo } from './schema'
@@ -22,6 +23,10 @@ export interface IpcChannels {
   'connections.delete': { req: string; res: null }
   'history.add': { req: HistoryEntryInput; res: HistoryEntry }
   'history.list': { req: { connectionId: string; limit?: number }; res: HistoryEntry[] }
+  'savedQueries.list': { req: string; res: SavedQuery[] }
+  'savedQueries.create': { req: SavedQueryInput; res: SavedQuery }
+  'savedQueries.update': { req: { id: string; patch: SavedQueryPatch }; res: SavedQuery }
+  'savedQueries.delete': { req: string; res: null }
   'settings.get': { req: void; res: AppSettings }
   'settings.set': { req: { key: string; value: string }; res: AppSettings }
   'settings.dataDir.get': { req: void; res: string }

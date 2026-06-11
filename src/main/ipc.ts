@@ -5,6 +5,7 @@ import { openDb } from './persistence/db'
 import { safeStorageEncryptor, makeSecretStore, resolveTestPassword } from './persistence/secrets'
 import * as conns from './persistence/connections'
 import * as hist from './persistence/history'
+import * as saved from './persistence/saved-queries'
 import * as settings from './persistence/settings'
 import { DriverManager } from './drivers/registry'
 import { PostgresDriver } from './drivers/sql/postgres'
@@ -85,6 +86,11 @@ export function registerIpcHandlers(): void {
 
   handle('history.add', (entry) => ok(hist.addHistory(store().db, entry)))
   handle('history.list', ({ connectionId, limit }) => ok(hist.listHistory(store().db, connectionId, limit)))
+
+  handle('savedQueries.list', (connectionId) => ok(saved.listSavedQueries(store().db, connectionId)))
+  handle('savedQueries.create', (input) => ok(saved.createSavedQuery(store().db, input, now())))
+  handle('savedQueries.update', ({ id, patch }) => ok(saved.updateSavedQuery(store().db, id, patch, now())))
+  handle('savedQueries.delete', (id) => { saved.deleteSavedQuery(store().db, id); return ok(null) })
 
   handle('settings.get', () => ok(settings.getSettings(store().db)))
   handle('settings.set', ({ key, value }) => {

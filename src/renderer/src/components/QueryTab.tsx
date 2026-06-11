@@ -32,6 +32,7 @@ export default function QueryTab({ tab }: Props): JSX.Element {
   const setTabText = useAppStore((s) => s.setTabText)
   const startRun = useAppStore((s) => s.startRun)
   const finishRun = useAppStore((s) => s.finishRun)
+  const openSaveQueryModal = useAppStore((s) => s.openSaveQueryModal)
 
   const runQuery = useRunQuery()
   const cancelQuery = useCancelQuery()
@@ -127,6 +128,16 @@ export default function QueryTab({ tab }: Props): JSX.Element {
           title={`Run (${mod}↵) — runs the selection, else the statement at the cursor`}
         >
           ▶ Run
+        </button>
+        <button
+          className="btn ghost"
+          disabled={!tab.text.trim()}
+          onClick={() =>
+            openSaveQueryModal({ mode: 'create', connectionId: tab.connectionId, query: tab.text })
+          }
+          title={`Save query (${mod}S)`}
+        >
+          ☆ Save
         </button>
         {/* All drivers cancel for real now: pg_cancel_backend / KILL QUERY /
             mongo killOp on the comment-tagged op. */}

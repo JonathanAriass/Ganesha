@@ -1,6 +1,6 @@
 import { Command } from 'cmdk'
 import { useAppStore } from '../state/store'
-import { useConnections, useObjects, useSettings, useSetSetting } from '../lib/hooks'
+import { useConnections, useObjects, useSavedQueries, useSettings, useSetSetting } from '../lib/hooks'
 import { defaultTableQuery } from '../lib/tabquery'
 import { mod } from '../lib/platform'
 import { useRestoreFocus } from '../lib/use-restore-focus'
@@ -10,11 +10,13 @@ export default function CommandPalette(): JSX.Element {
   const setPaletteOpen = useAppStore((s) => s.setPaletteOpen)
   const openSettings = useAppStore((s) => s.openSettings)
   const openQueryTab = useAppStore((s) => s.openQueryTab)
+  const openOrLoadQuery = useAppStore((s) => s.openOrLoadQuery)
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
   const setActiveConnection = useAppStore((s) => s.setActiveConnection)
 
   const { data: connections = [] } = useConnections()
   const { data: objects = [] } = useObjects(activeConnectionId)
+  const { data: snippets = [] } = useSavedQueries(activeConnectionId)
   const { data: settings } = useSettings()
   const setSetting = useSetSetting()
 
@@ -65,6 +67,27 @@ export default function CommandPalette(): JSX.Element {
                 <span className="kbd">{mod},</span>
               </Command.Item>
             </Command.Group>
+
+            {activeConn && snippets.length > 0 && (
+              <Command.Group heading={`Saved — ${activeConn.name}`}>
+                {snippets.map((q) => (
+                  <Command.Item
+                    key={q.id}
+                    // id keeps the value unique when two snippets share a name
+                    value={`saved ${q.name} ${q.id}`}
+                    onSelect={() => {
+                      openOrLoadQuery({ connectionId: activeConn.id, title: q.name, text: q.query })
+                      close()
+                    }}
+                  >
+                    <span className="obj-icon saved" aria-hidden="true">
+                      ★
+                    </span>
+                    {q.name}
+                  </Command.Item>
+                ))}
+              </Command.Group>
+            )}
 
             {connections.length > 0 && (
               <Command.Group heading="Connections">

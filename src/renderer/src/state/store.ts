@@ -5,6 +5,10 @@ type ConnectionModalState =
   | { mode: 'create' }
   | { mode: 'edit'; id: string }
 
+export type SaveQueryModalState =
+  | { mode: 'create'; connectionId: string; query: string }
+  | { mode: 'rename'; id: string; name: string }
+
 export interface QueryTabData {
   id: string
   connectionId: string
@@ -24,6 +28,7 @@ interface AppState {
   connectionModal: ConnectionModalState | null
   settingsOpen: boolean
   paletteOpen: boolean
+  saveQueryModal: SaveQueryModalState | null
 
   // ── Tabs ──────────────────────────────────────────────────────────────────
   tabs: QueryTabData[]
@@ -37,6 +42,8 @@ interface AppState {
   openSettings: () => void
   closeSettings: () => void
   setPaletteOpen: (open: boolean) => void
+  openSaveQueryModal: (state: SaveQueryModalState) => void
+  closeSaveQueryModal: () => void
 
   openQueryTab: (args: { connectionId: string; title?: string; text?: string; runOnOpen?: boolean }) => void
   closeTab: (id: string) => void
@@ -44,15 +51,18 @@ interface AppState {
   setActiveTab: (id: string) => void
   setTabText: (id: string, text: string) => void
   loadQueryText: (id: string, text: string) => void
+  /** Load text into the active tab when it belongs to `connectionId`, else open a new tab. */
+  openOrLoadQuery: (args: { connectionId: string; title: string; text: string }) => void
   startRun: (id: string, queryId: string) => void
   finishRun: (id: string, payload: { result: QueryResult } | { error: string }) => void
 }
 
-export const useAppStore = create<AppState>((set) => ({
+export const useAppStore = create<AppState>((set, get) => ({
   activeConnectionId: null,
   connectionModal: null,
   settingsOpen: false,
   paletteOpen: false,
+  saveQueryModal: null,
   tabs: [],
   activeTabId: null,
   _queryCounter: 0,
@@ -64,6 +74,9 @@ export const useAppStore = create<AppState>((set) => ({
   openSettings: () => set({ settingsOpen: true, paletteOpen: false }),
   closeSettings: () => set({ settingsOpen: false }),
   setPaletteOpen: (open) => set({ paletteOpen: open }),
+  // Like openSettings: an overlay opening from the palette must replace it.
+  openSaveQueryModal: (state) => set({ saveQueryModal: state, paletteOpen: false }),
+  closeSaveQueryModal: () => set({ saveQueryModal: null }),
 
   openQueryTab: ({ connectionId, title, text, runOnOpen }) =>
     set((s) => {
@@ -116,6 +129,13 @@ export const useAppStore = create<AppState>((set) => ({
     set((s) => ({
       tabs: s.tabs.map((t) => (t.id === id ? { ...t, text, epoch: t.epoch + 1 } : t)),
     })),
+
+  openOrLoadQuery: ({ connectionId, title, text }) => {
+    const s = get()
+    const activeTab = s.tabs.find((t) => t.id === s.activeTabId)
+    if (activeTab && activeTab.connectionId === connectionId) s.loadQueryText(activeTab.id, text)
+    else s.openQueryTab({ connectionId, title, text })
+  },
 
   startRun: (id, queryId) =>
     set((s) => ({

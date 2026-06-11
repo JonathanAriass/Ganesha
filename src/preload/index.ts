@@ -21,6 +21,12 @@ const api: DbClientApi = {
     add: (entry) => invoke('history.add', entry),
     list: (connectionId, limit) => invoke('history.list', { connectionId, limit })
   },
+  savedQueries: {
+    list: (connectionId) => invoke('savedQueries.list', connectionId),
+    create: (input) => invoke('savedQueries.create', input),
+    update: (id, patch) => invoke('savedQueries.update', { id, patch }),
+    delete: (id) => invoke('savedQueries.delete', id)
+  },
   settings: {
     get: () => invoke('settings.get', undefined),
     set: (key, value) => invoke('settings.set', { key, value }),

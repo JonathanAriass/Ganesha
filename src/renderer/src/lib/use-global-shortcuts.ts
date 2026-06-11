@@ -15,7 +15,10 @@ export function useGlobalShortcuts(): void {
 
       if (e.key === 'Escape') {
         // Only intercept when an overlay is up — Monaco needs Escape otherwise.
-        if (s.paletteOpen) {
+        if (s.saveQueryModal) {
+          e.preventDefault()
+          s.closeSaveQueryModal()
+        } else if (s.paletteOpen) {
           e.preventDefault()
           s.setPaletteOpen(false)
         } else if (s.settingsOpen) {
@@ -30,7 +33,7 @@ export function useGlobalShortcuts(): void {
 
       // While an overlay is up, only its own toggle applies — ⌘W must not
       // close a tab hidden behind the settings modal.
-      if (s.connectionModal) return // form owns the keyboard; no chord applies
+      if (s.connectionModal || s.saveQueryModal) return // form owns the keyboard; no chord applies
       if (s.settingsOpen && action !== 'settings') return
       if (s.paletteOpen && action !== 'palette') return
 
@@ -50,6 +53,14 @@ export function useGlobalShortcuts(): void {
         case 'close-tab':
           if (s.activeTabId) s.closeTab(s.activeTabId)
           break
+        case 'save-query': {
+          // Swallowed when there's nothing to save — like ⌘T with no connection.
+          const tab = s.tabs.find((t) => t.id === s.activeTabId)
+          if (tab && tab.text.trim()) {
+            s.openSaveQueryModal({ mode: 'create', connectionId: tab.connectionId, query: tab.text })
+          }
+          break
+        }
       }
     }
 

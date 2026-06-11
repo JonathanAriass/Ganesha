@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { ConnectionInput } from '@shared/domain'
+import type { ConnectionInput, SavedQueryInput, SavedQueryPatch } from '@shared/domain'
 import type { ObjectRef } from '@shared/schema'
 import { unwrap } from './result'
 import type { QueryResult } from '@shared/query'
@@ -130,6 +130,46 @@ export function useHistory(connectionId: string | null) {
     queryFn: () => window.api.history.list(connectionId!, 50).then(unwrap),
     enabled: connectionId != null,
     retry: false,
+  })
+}
+
+// ── Saved queries ────────────────────────────────────────────────────────────
+
+export function useSavedQueries(connectionId: string | null) {
+  return useQuery({
+    queryKey: ['savedQueries', connectionId],
+    queryFn: () => window.api.savedQueries.list(connectionId!).then(unwrap),
+    enabled: connectionId != null,
+    retry: false,
+  })
+}
+
+export function useCreateSavedQuery() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: SavedQueryInput) =>
+      window.api.savedQueries.create(input).then(unwrap),
+    onSuccess: (q) =>
+      void qc.invalidateQueries({ queryKey: ['savedQueries', q.connectionId] }),
+  })
+}
+
+export function useUpdateSavedQuery() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: SavedQueryPatch }) =>
+      window.api.savedQueries.update(id, patch).then(unwrap),
+    onSuccess: (q) =>
+      void qc.invalidateQueries({ queryKey: ['savedQueries', q.connectionId] }),
+  })
+}
+
+export function useDeleteSavedQuery() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => window.api.savedQueries.delete(id).then(unwrap),
+    // Only the id is known here — invalidate every connection's list.
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['savedQueries'] }),
   })
 }
 

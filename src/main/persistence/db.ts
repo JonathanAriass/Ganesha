@@ -45,6 +45,15 @@ export function migrate(db: DB): void {
       success       INTEGER
     );
     CREATE INDEX IF NOT EXISTS idx_history_conn ON query_history(connection_id, ran_at DESC);
+    CREATE TABLE IF NOT EXISTS saved_queries (
+      id            TEXT PRIMARY KEY,
+      connection_id TEXT NOT NULL REFERENCES connections(id) ON DELETE CASCADE,
+      name          TEXT NOT NULL,
+      query         TEXT NOT NULL,
+      created_at    INTEGER NOT NULL,
+      updated_at    INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_saved_conn ON saved_queries(connection_id, name COLLATE NOCASE);
     CREATE TABLE IF NOT EXISTS settings (
       key   TEXT PRIMARY KEY,
       value TEXT NOT NULL

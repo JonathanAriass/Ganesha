@@ -36,6 +36,22 @@ export interface HistoryEntry extends HistoryEntryInput {
   id: number
 }
 
+/** Fields the user supplies when saving a query under a name. */
+export interface SavedQueryInput {
+  connectionId: string
+  name: string
+  query: string
+}
+
+/** The editable fields — a saved query never moves between connections. */
+export type SavedQueryPatch = Partial<Pick<SavedQueryInput, 'name' | 'query'>>
+
+export interface SavedQuery extends SavedQueryInput {
+  id: string
+  createdAt: number
+  updatedAt: number
+}
+
 export interface AppSettings {
   theme: 'midnight' | 'light'
 }

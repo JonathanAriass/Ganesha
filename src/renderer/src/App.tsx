@@ -9,7 +9,9 @@ import SettingsModal from './components/SettingsModal'
 import CommandPalette from './components/CommandPalette'
 import TabBar from './components/TabBar'
 import QueryTab from './components/QueryTab'
+import SavedSection from './components/SavedSection'
 import HistorySection from './components/HistorySection'
+import SaveQueryModal from './components/SaveQueryModal'
 import { useSettings } from './lib/hooks'
 import { applyTheme } from './lib/theme'
 import { useGlobalShortcuts } from './lib/use-global-shortcuts'
@@ -25,6 +27,7 @@ function AppShell(): JSX.Element {
   const connectionModal = useAppStore((s) => s.connectionModal)
   const settingsOpen = useAppStore((s) => s.settingsOpen)
   const paletteOpen = useAppStore((s) => s.paletteOpen)
+  const saveQueryModal = useAppStore((s) => s.saveQueryModal)
   const tabs = useAppStore((s) => s.tabs)
   const activeTabId = useAppStore((s) => s.activeTabId)
 
@@ -43,6 +46,7 @@ function AppShell(): JSX.Element {
           <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
             <ObjectTree />
           </div>
+          <SavedSection />
           <HistorySection />
         </aside>
         <main className="main">
@@ -63,6 +67,7 @@ function AppShell(): JSX.Element {
       {connectionModal && <ConnectionModal />}
       {settingsOpen && <SettingsModal />}
       {paletteOpen && <CommandPalette />}
+      {saveQueryModal && <SaveQueryModal />}
     </div>
   )
 }
