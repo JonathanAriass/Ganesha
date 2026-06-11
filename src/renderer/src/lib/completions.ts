@@ -57,21 +57,28 @@ interface TableBinding {
 }
 
 // Words that can follow a table reference but are clauses, not aliases.
-const NOT_ALIAS = new Set([
+const NOT_ALIAS = [
   'where', 'on', 'join', 'inner', 'left', 'right', 'full', 'cross', 'natural', 'using',
   'group', 'order', 'having', 'limit', 'offset', 'union', 'set', 'as', 'when', 'and', 'or', 'not', 'returning'
-])
+]
+
+// The alias group must REJECT clause keywords up front (lookahead), not post-filter:
+// a consumed `join` would make matchAll resume past it and drop the next table
+// (`from users join orders o` would lose orders entirely).
+const BINDING_RE = new RegExp(
+  String.raw`\b(?:from|join)\s+([A-Za-z_][\w$]*(?:\.[A-Za-z_][\w$]*)?)` +
+    String.raw`(?:\s+(?:as\s+)?(?!(?:${NOT_ALIAS.join('|')})\b)([A-Za-z_][\w$]*))?`,
+  'gi'
+)
 
 /** FROM/JOIN bindings in the statement: `from public.users u` →
  *  { ref: { schema: 'public', name: 'users' }, alias: 'u' }. */
 export function sqlTableBindings(fullText: string): TableBinding[] {
   const out: TableBinding[] = []
-  const re = /\b(?:from|join)\s+([A-Za-z_][\w$]*(?:\.[A-Za-z_][\w$]*)?)(?:\s+(?:as\s+)?([A-Za-z_][\w$]*))?/gi
-  for (const m of fullText.matchAll(re)) {
+  for (const m of fullText.matchAll(BINDING_RE)) {
     const parts = m[1].split('.')
     const ref: ObjectRef = parts.length === 2 ? { schema: parts[0], name: parts[1] } : { schema: null, name: parts[0] }
-    const alias = m[2] && !NOT_ALIAS.has(m[2].toLowerCase()) ? m[2] : null
-    out.push({ ref, alias })
+    out.push({ ref, alias: m[2] ?? null })
   }
   return out
 }
@@ -152,11 +159,13 @@ export function mongoCursorContext(textBeforeCursor: string): MongoCursorContext
   return null
 }
 
-/** Collections in the given database (null = default db). Only identifier-safe names —
- *  the shell subset has no getCollection()/bracket access, so `db.my-coll` can't be
- *  expressed anyway. After a plain `db.`, getSiblingDB is offered too; on a browse-all
- *  connection (no default db, every object schema-tagged) it is the only suggestion,
- *  matching the driver's refusal to run plain `db.x` there. */
+/** Collections in the given database (null = default db). Only identifier-safe names:
+ *  accepting a suggestion inserts a bare member name after the typed dot, and
+ *  `db.my-coll` doesn't parse — such collections need the bracket form the shell DOES
+ *  support (db.getSiblingDB("x")["my-coll"]), which completion can't reach from a dot.
+ *  After a plain `db.`, getSiblingDB is offered too; on a browse-all connection (no
+ *  default db, every object schema-tagged) it is the only suggestion, matching the
+ *  driver's refusal to run plain `db.x` there. */
 export function mongoCollectionSuggestions(objects: DbObject[], database: string | null): Suggestion[] {
   const out: Suggestion[] = objects
     .filter((o) => o.schema === database && /^[A-Za-z_$][\w$]*$/.test(o.name))

@@ -75,14 +75,20 @@ function textBefore(model: monaco.editor.ITextModel, position: monaco.Position):
 
 const EMPTY: monaco.languages.CompletionList = { suggestions: [] }
 
-monaco.languages.registerCompletionItemProvider('sql', {
+const sqlProvider = monaco.languages.registerCompletionItemProvider('sql', {
   triggerCharacters: ['.'],
   async provideCompletionItems(model, position) {
     const ctx = ctxByModel.get(model.id)?.()
     if (!ctx) return EMPTY
     const range = wordRange(model, position)
-    const qualifier = sqlDotQualifier(textBefore(model, position))
-    if (qualifier === null) return { suggestions: toItems(sqlPlainSuggestions(ctx.objects), range) }
+    const before = textBefore(model, position)
+    const qualifier = sqlDotQualifier(before)
+    if (qualifier === null) {
+      // Still after a dot, just not a qualifier one (`1.`, `count(*).`) — nothing
+      // applies there; the full keyword/object list would be noise.
+      if (/\.\w*$/.test(before)) return EMPTY
+      return { suggestions: toItems(sqlPlainSuggestions(ctx.objects), range) }
+    }
     const target = resolveSqlQualifier(model.getValue(), qualifier, ctx.objects)
     if (!target) return EMPTY
     if (target.type === 'schemaObjects') {
@@ -96,7 +102,7 @@ monaco.languages.registerCompletionItemProvider('sql', {
 
 // The mongo shell editor runs in 'javascript' mode; these merge with (and outrank,
 // being exact-prefix matches) the TS worker's generic suggestions.
-monaco.languages.registerCompletionItemProvider('javascript', {
+const mongoProvider = monaco.languages.registerCompletionItemProvider('javascript', {
   triggerCharacters: ['.', '"', "'"],
   provideCompletionItems(model, position) {
     const ctx = ctxByModel.get(model.id)?.()
@@ -105,7 +111,9 @@ monaco.languages.registerCompletionItemProvider('javascript', {
     if (!cursor) return EMPTY
     if (cursor.type === 'databases') {
       // Db names may contain '-', which splits Monaco's word — range over the
-      // regex-captured partial instead so accepting replaces all of it.
+      // regex-captured partial instead so accepting replaces all of it. The partial
+      // can't span lines (its charset has no newline and it directly follows the
+      // open quote), so plain column arithmetic on the cursor line is safe.
       const range = new monaco.Range(
         position.lineNumber,
         position.column - cursor.partial.length,
@@ -121,3 +129,12 @@ monaco.languages.registerCompletionItemProvider('javascript', {
     return { suggestions: toItems(mongoOpSuggestions(), range) }
   }
 })
+
+// Vite HMR re-evaluates this module; without disposal the old providers would
+// stack and suggestions would double. Production registers exactly once.
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    sqlProvider.dispose()
+    mongoProvider.dispose()
+  })
+}

@@ -42,7 +42,8 @@ export default function QueryTab({ tab }: Props): JSX.Element {
       queryClient.fetchQuery({
         queryKey: ['columns', tab.connectionId, ref.schema, ref.name],
         queryFn: () => window.api.schema.columns(tab.connectionId, ref).then(unwrap),
-        staleTime: 60_000 // don't re-IPC on every keystroke behind `alias.`
+        staleTime: 60_000, // don't re-IPC on every keystroke behind `alias.`
+        retry: false // like every IPC query here — fail fast to "no suggestions", not 3 backoffs
       })
   }
 

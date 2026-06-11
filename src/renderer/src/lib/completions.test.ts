@@ -59,6 +59,20 @@ describe('sqlTableBindings', () => {
     const b = sqlTableBindings('select * from users where id = 1')
     expect(b).toEqual([{ ref: { schema: null, name: 'users' }, alias: null }])
   })
+
+  it('binds the joined table even when the preceding table has no alias', () => {
+    // Regression: a consumed `join` once made the scan resume past it, dropping orders.
+    const b = sqlTableBindings('select * from users join orders o on o.user_id = users.id')
+    expect(b).toEqual([
+      { ref: { schema: null, name: 'users' }, alias: null },
+      { ref: { schema: null, name: 'orders' }, alias: 'o' }
+    ])
+  })
+
+  it('binds every table in an unaliased join chain', () => {
+    const b = sqlTableBindings('select * from a join b join c')
+    expect(b.map((x) => x.ref.name)).toEqual(['a', 'b', 'c'])
+  })
 })
 
 describe('resolveSqlQualifier', () => {
