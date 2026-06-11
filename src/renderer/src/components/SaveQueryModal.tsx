@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useAppStore } from '../state/store'
-import { useCreateSavedQuery, useUpdateSavedQuery } from '../lib/hooks'
+import { useConnections, useCreateSavedQuery, useUpdateSavedQuery } from '../lib/hooks'
 import { defaultSnippetName } from '../lib/snippet-name'
 import { useRestoreFocus } from '../lib/use-restore-focus'
 
@@ -11,6 +11,7 @@ export default function SaveQueryModal(): JSX.Element | null {
   const close = useAppStore((s) => s.closeSaveQueryModal)
   const create = useCreateSavedQuery()
   const update = useUpdateSavedQuery()
+  const { data: connections = [] } = useConnections()
   const [name, setName] = useState(() =>
     modal === null ? '' : modal.mode === 'rename' ? modal.name : defaultSnippetName(modal.query)
   )
@@ -19,6 +20,8 @@ export default function SaveQueryModal(): JSX.Element | null {
 
   if (!modal) return null
 
+  const conn =
+    modal.mode === 'create' ? connections.find((c) => c.id === modal.connectionId) : undefined
   const mutation = modal.mode === 'create' ? create : update
   const canSave = name.trim().length > 0 && !mutation.isPending
 
@@ -37,13 +40,19 @@ export default function SaveQueryModal(): JSX.Element | null {
   }
 
   return (
-    <div className="modal-overlay" onClick={close}>
+    // mousedown + target guard, not click: a drag-select that starts in the name
+    // input and releases over the backdrop must not throw the form away.
+    <div
+      className="modal-overlay"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) close()
+      }}
+    >
       <div
         className="modal"
         role="dialog"
         aria-modal="true"
         aria-label={modal.mode === 'create' ? 'Save query' : 'Rename saved query'}
-        onClick={(e) => e.stopPropagation()}
       >
         <form onSubmit={submit}>
           <div className="modal-header">
@@ -61,6 +70,11 @@ export default function SaveQueryModal(): JSX.Element | null {
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. Top customers"
                 />
+                {conn && (
+                  <p className="form-hint">
+                    Saves to “{conn.name}” — snippets are per-connection.
+                  </p>
+                )}
               </div>
               {mutation.isError && (
                 <div className="status err" role="alert">

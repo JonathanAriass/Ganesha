@@ -53,7 +53,7 @@ export function migrate(db: DB): void {
       created_at    INTEGER NOT NULL,
       updated_at    INTEGER NOT NULL
     );
-    CREATE INDEX IF NOT EXISTS idx_saved_conn ON saved_queries(connection_id, name COLLATE NOCASE);
+    CREATE INDEX IF NOT EXISTS idx_saved_conn ON saved_queries(connection_id, name COLLATE NOCASE, id);
     CREATE TABLE IF NOT EXISTS settings (
       key   TEXT PRIMARY KEY,
       value TEXT NOT NULL

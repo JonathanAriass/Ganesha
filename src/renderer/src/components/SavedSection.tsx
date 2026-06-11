@@ -7,7 +7,7 @@ export default function SavedSection(): JSX.Element | null {
   const openOrLoadQuery = useAppStore((s) => s.openOrLoadQuery)
   const openSaveQueryModal = useAppStore((s) => s.openSaveQueryModal)
 
-  const { data: snippets, isLoading } = useSavedQueries(activeConnectionId)
+  const { data: snippets, isLoading, isError } = useSavedQueries(activeConnectionId)
   const del = useDeleteSavedQuery()
   // Two-step delete: × arms the row, the second click fires. Hover-out disarms.
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
@@ -17,6 +17,12 @@ export default function SavedSection(): JSX.Element | null {
   return (
     <details className="history">
       <summary>Saved</summary>
+      {isError && <div className="h-empty">Couldn’t load saved queries</div>}
+      {del.isError && (
+        <div className="h-empty" role="alert">
+          Delete failed — {del.error instanceof Error ? del.error.message : String(del.error)}
+        </div>
+      )}
       {!isLoading && snippets && snippets.length === 0 && (
         <div className="h-empty">Nothing saved yet — ☆ Save in the editor toolbar</div>
       )}

@@ -30,14 +30,15 @@ export default function SettingsModal(): JSX.Element {
   }
 
   return (
-    <div className="modal-overlay" onClick={closeSettings}>
-      <div
-        className="modal"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Settings"
-        onClick={(e) => e.stopPropagation()}
-      >
+    // mousedown + target guard, not click: a drag that starts inside the modal
+    // and releases over the backdrop must not dismiss it.
+    <div
+      className="modal-overlay"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) closeSettings()
+      }}
+    >
+      <div className="modal" role="dialog" aria-modal="true" aria-label="Settings">
         <div className="modal-header">
           <h2>Settings</h2>
         </div>

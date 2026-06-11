@@ -8,8 +8,9 @@ export function defaultSnippetName(query: string): string {
   for (const raw of query.split('\n')) {
     const line = raw
       .trim()
-      .replace(/^(--|\/\/|\/\*|#)\s*/, '')
-      .replace(/\s*\*\/$/, '')
+      .replace(/^(--|\/\/|\/\*+|#|\*+)\s*/, '') // `*+` also catches boxed-comment continuation lines
+      .replace(/\s*\/\*.*\*\/$/, '') // balanced trailing comment: `select 1 /* count */`
+      .replace(/\s*\*\/$/, '') // lone closer left by the leading strip: `/* title */`
       .trim()
     if (line) return line.slice(0, 60)
   }

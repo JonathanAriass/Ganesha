@@ -177,7 +177,9 @@ export default function ConnectionModal(): JSX.Element {
       role="dialog"
       aria-modal="true"
       aria-label={isEdit ? 'Edit connection' : 'New connection'}
-      onClick={(e) => { if (e.target === e.currentTarget) closeModal() }}
+      // mousedown, not click: after a drag out of an input, the click retargets
+      // to the overlay (common ancestor) and would dismiss the half-filled form.
+      onMouseDown={(e) => { if (e.target === e.currentTarget) closeModal() }}
     >
       <div className="modal">
         <div className="modal-header">

@@ -19,6 +19,14 @@ describe('defaultSnippetName', () => {
     expect(defaultSnippetName('/* boxed title */\nselect 1')).toBe('boxed title')
   })
 
+  it('uses the title from a multi-line boxed comment continuation', () => {
+    expect(defaultSnippetName('/*\n * Count by region\n */\nselect 1')).toBe('Count by region')
+  })
+
+  it('drops a trailing inline comment', () => {
+    expect(defaultSnippetName('select 1 /* count */')).toBe('select 1')
+  })
+
   it('skips blank lines and bare comment markers', () => {
     expect(defaultSnippetName('\n  \n--\nselect 2')).toBe('select 2')
   })

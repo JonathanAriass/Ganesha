@@ -16,8 +16,9 @@ function toSavedQuery(r: Row): SavedQuery {
 
 export function createSavedQuery(db: DB, input: SavedQueryInput, now: number): SavedQuery {
   const id = randomUUID()
+  // id after the spread: a (future) caller-supplied input.id must not beat the generated one.
   db.prepare(`INSERT INTO saved_queries (id, connection_id, name, query, created_at, updated_at)
-    VALUES (@id, @connectionId, @name, @query, @now, @now)`).run({ id, ...input, now })
+    VALUES (@id, @connectionId, @name, @query, @now, @now)`).run({ ...input, id, now })
   return getSavedQuery(db, id) as SavedQuery
 }
 
