@@ -91,43 +91,53 @@ function readWord(source: string, i: number): string {
   return source.slice(i, j)
 }
 
-/** The next word after whitespace, lowercased ('' when something else follows). */
-function peekWord(source: string, from: number): string {
+/** The next word after whitespace, lowercased ('' when something else follows),
+ *  plus the index just past it. Comments between words defeat the peek
+ *  (`end /* c … followed by if`) — accepted as contrived. */
+function peekWord(source: string, from: number): { word: string; end: number } {
   let j = from
   while (j < source.length && /\s/.test(source[j])) j++
-  if (j >= source.length || !/[A-Za-z_]/.test(source[j])) return ''
-  return readWord(source, j).toLowerCase()
+  if (j >= source.length || !/[A-Za-z_]/.test(source[j])) return { word: '', end: from }
+  const word = readWord(source, j)
+  return { word: word.toLowerCase(), end: j + word.length }
 }
 
-/** mysql CREATE statements whose body is itself made of ;-separated statements.
- *  In the CLI you'd guard these with DELIMITER, but DELIMITER is a CLI construct —
- *  the server takes the whole CREATE as one statement, so the splitter must too. */
-const ROUTINE_HEAD =
+/** CREATE statements whose body is itself made of ;-separated statements. mysql:
+ *  in the CLI you'd guard these with DELIMITER, but DELIMITER is a CLI construct —
+ *  the server takes the whole CREATE as one statement, so the splitter must too.
+ *  pg: only SQL-standard BEGIN ATOMIC bodies (pg 14+) need this — plpgsql bodies
+ *  live inside $$ quotes and never reach the word scanner. A comment inside the
+ *  head (between create and procedure) defeats detection — accepted as contrived. */
+const ROUTINE_HEAD_MYSQL =
   /^create\s+(?:or\s+replace\s+)?(?:definer\s*=\s*\S+\s+)?(?:aggregate\s+)?(?:procedure|function|trigger|event)\b/i
+const ROUTINE_HEAD_PG = /^create\s+(?:or\s+replace\s+)?(?:procedure|function)\b/i
 
-/** END IF/WHILE/LOOP/REPEAT close their own constructs (whose openers we never
- *  count); bare END and END CASE close a counted `begin`/`case`. */
+/** mysql END IF/WHILE/LOOP/REPEAT close constructs whose openers we never count —
+ *  IF/REPEAT are lexically ambiguous with the if()/repeat() functions, which also
+ *  means a no-BEGIN compound body (`for each row if … end if`) stays a known
+ *  mis-split; counting `if` as an opener would break far more common input. */
 const SELF_CLOSING_END = new Set(['if', 'while', 'loop', 'repeat'])
 
 /** Split SQL text on top-level semicolons. Both dialects: '' doubling, "double"
  *  and `backtick` quoting, -- line comments, nested block comments (pg nests
  *  them; plain text never closes early). postgres adds $tag$ dollar quoting and
- *  e'...' escape strings (plain '...' takes \ literally); mysql adds # comments,
- *  \ escapes in strings, and routine-body awareness: inside a CREATE
- *  PROCEDURE/FUNCTION/TRIGGER/EVENT, BEGIN…END-block semicolons separate body
- *  statements, not statements of the tab. */
+ *  e'...' escape strings (plain '...' takes \ literally); mysql adds # comments
+ *  and \ escapes in strings. Both get routine-body awareness — mysql CREATE
+ *  PROCEDURE/FUNCTION/TRIGGER/EVENT BEGIN…END blocks and pg BEGIN ATOMIC bodies —
+ *  so a body's semicolons separate body statements, not statements of the tab. */
 export function splitSqlStatements(source: string, dialect: SqlDialect): Statement[] {
   const ch = new Chunker(source)
   const n = source.length
   const mysql = dialect === 'mysql'
   const dollarTag = /\$([A-Za-z_]\w*)?\$/y
-  // Routine-body state (mysql): bodyDepth counts open begin/case blocks, but only
-  // once the chunk's head proves it a routine — `BEGIN;` opening a transaction
-  // script must keep splitting normally.
+  // Routine-body state: bodyDepth counts open begin/case blocks, but only once
+  // the chunk's head proves it a routine — `BEGIN;` opening a transaction script
+  // must keep splitting normally.
+  const routineHead = mysql ? ROUTINE_HEAD_MYSQL : ROUTINE_HEAD_PG
   let routine: boolean | null = null
   let bodyDepth = 0
   const isRoutineChunk = (upto: number): boolean =>
-    (routine ??= ROUTINE_HEAD.test(source.slice(ch.startOffset, upto)))
+    (routine ??= routineHead.test(source.slice(ch.startOffset, upto)))
   let i = 0
   while (i < n) {
     const c = source[i]
@@ -193,16 +203,30 @@ export function splitSqlStatements(source: string, dialect: SqlDialect): Stateme
       i++
       continue
     }
-    if (mysql && /[A-Za-z_]/.test(c) && !/[\w$]/.test(source[i - 1] ?? '')) {
+    if (/[A-Za-z_]/.test(c) && !/[\w$]/.test(source[i - 1] ?? '')) {
       const word = readWord(source, i)
       ch.content(i)
       const w = word.toLowerCase()
       if (w === 'begin' || w === 'case') {
-        // `case` counts because a CASE *expression* ends with a bare END.
-        if (isRoutineChunk(i)) bodyDepth++
+        // `case` counts because a CASE *expression* ends with a bare END. pg only
+        // counts BEGIN ATOMIC (the SQL-standard body form) — any other pg BEGIN
+        // outside quotes is a transaction statement, never a block.
+        if (
+          isRoutineChunk(i) &&
+          (w === 'case' || mysql || peekWord(source, i + word.length).word === 'atomic')
+        ) {
+          bodyDepth++
+        }
       } else if (w === 'end' && isRoutineChunk(i)) {
-        if (!SELF_CLOSING_END.has(peekWord(source, i + word.length))) {
+        const next = peekWord(source, i + word.length)
+        if (!mysql || !SELF_CLOSING_END.has(next.word)) {
           bodyDepth = Math.max(0, bodyDepth - 1)
+        }
+        if (next.word === 'case') {
+          // END CASE is one closer — consume the case word, or the opener branch
+          // above would re-count it on the next pass and the depth never closes.
+          i = next.end
+          continue
         }
       }
       i += word.length
@@ -321,9 +345,29 @@ export function splitJsCommands(source: string): Statement[] {
   return ch.out
 }
 
+/** Does a new `db.` command start at/after `from`, looking through whitespace AND
+ *  comments? Comments must be looked through, or a titled semicolon-less command —
+ *  `db.x.find()` then a blank line, `// title`, `db.y.find()` — would absorb the
+ *  next command's title into its own text, and a cursor on the title would run
+ *  the wrong command (statementAt assigns gap lines to the following statement). */
 function startsNewCommand(source: string, from: number): boolean {
   let i = from
-  while (i < source.length && /\s/.test(source[i])) i++
+  while (i < source.length) {
+    const c = source[i]
+    if (/\s/.test(c)) {
+      i++
+    } else if (c === '/' && source[i + 1] === '/') {
+      const nl = source.indexOf('\n', i)
+      if (nl === -1) return false
+      i = nl + 1
+    } else if (c === '/' && source[i + 1] === '*') {
+      const close = source.indexOf('*/', i + 2)
+      if (close === -1) return false
+      i = close + 2
+    } else {
+      break
+    }
+  }
   return source.startsWith('db.', i)
 }
 

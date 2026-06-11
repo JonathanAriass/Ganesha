@@ -141,6 +141,40 @@ describe('splitSqlStatements (postgres)', () => {
   it('an unterminated dollar quote swallows the rest', () => {
     expect(texts(pg('select $$oops; select 2'))).toEqual(['select $$oops; select 2'])
   })
+
+  it('keeps a BEGIN ATOMIC body (pg 14+) as one statement', () => {
+    const sql = [
+      'create function add(a int, b int) returns int',
+      'language sql',
+      'begin atomic',
+      '  select a + b;',
+      'end;',
+      'select 99;'
+    ].join('\n')
+    expect(texts(pg(sql))).toEqual([
+      'create function add(a int, b int) returns int\nlanguage sql\nbegin atomic\n  select a + b;\nend;',
+      'select 99;'
+    ])
+  })
+
+  it('CASE expressions inside a BEGIN ATOMIC body stay balanced', () => {
+    const sql =
+      'create procedure flip() language sql begin atomic update t set n = case when n > 0 then 0 else 1 end; end; select 3'
+    const out = texts(pg(sql))
+    expect(out).toHaveLength(2)
+    expect(out[1]).toBe('select 3')
+  })
+
+  it('a RETURN-form SQL function ends at its semicolon', () => {
+    expect(texts(pg('create function one() returns int return 1; select 2'))).toEqual([
+      'create function one() returns int return 1;',
+      'select 2'
+    ])
+  })
+
+  it('BEGIN as a transaction statement still splits normally', () => {
+    expect(texts(pg('begin; select 1; commit;'))).toEqual(['begin;', 'select 1;', 'commit;'])
+  })
 })
 
 describe('splitSqlStatements (mysql)', () => {
@@ -192,6 +226,21 @@ describe('splitSqlStatements (mysql)', () => {
     expect(out).toHaveLength(2)
     expect(out[0].endsWith('end;')).toBe(true)
     expect(out[1]).toBe('select 1;')
+  })
+
+  it('END CASE closes its CASE statement as one closer, not end + case', () => {
+    const sql = [
+      'create procedure p()',
+      'begin',
+      '  case x',
+      '    when 1 then select 1;',
+      '  end case;',
+      'end;',
+      'select 99;'
+    ].join('\n')
+    const out = texts(my(sql))
+    expect(out).toHaveLength(2)
+    expect(out[1]).toBe('select 99;')
   })
 
   it('END IF closes its IF, not the routine BEGIN', () => {
@@ -265,6 +314,19 @@ describe('splitJsCommands', () => {
 
   it('does not split on newline when the next line is not db.', () => {
     expect(texts(splitJsCommands('db.users.find(\n)\n'))).toEqual(['db.users.find(\n)'])
+  })
+
+  it('a title comment between semicolon-less commands stays out of both texts', () => {
+    const src = '// count users\ndb.users.find().count()\n\n// count orders\ndb.orders.find().count()'
+    expect(texts(splitJsCommands(src))).toEqual([
+      'db.users.find().count()',
+      'db.orders.find().count()'
+    ])
+  })
+
+  it('a comment line before a chained continuation does not split', () => {
+    const src = 'db.users.find()\n// just the first page\n  .limit(5)'
+    expect(texts(splitJsCommands(src))).toEqual([src])
   })
 
   it('ignores semicolons inside strings', () => {
@@ -379,6 +441,14 @@ describe('statementAt', () => {
     const src = 'select 1;\n\nselect 2'
     const out = pg(src)
     expect(statementAt(src, out, 10)?.text).toBe('select 2')
+  })
+
+  it("a title comment's line belongs to the command it titles (mongo)", () => {
+    const src = 'db.users.find().count()\n\n// count orders\ndb.orders.find().count()'
+    const out = splitJsCommands(src)
+    expect(statementAt(src, out, src.indexOf('count orders'))?.text).toBe(
+      'db.orders.find().count()'
+    )
   })
 
   it('clamps offsets before the first statement to it', () => {
