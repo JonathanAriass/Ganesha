@@ -6,6 +6,7 @@ import { safeStorageEncryptor, makeSecretStore, resolveTestPassword } from './pe
 import * as conns from './persistence/connections'
 import * as hist from './persistence/history'
 import * as saved from './persistence/saved-queries'
+import * as sess from './persistence/session'
 import * as settings from './persistence/settings'
 import { DriverManager } from './drivers/registry'
 import { PostgresDriver } from './drivers/sql/postgres'
@@ -91,6 +92,9 @@ export function registerIpcHandlers(): void {
   handle('savedQueries.create', (input) => ok(saved.createSavedQuery(store().db, input, now())))
   handle('savedQueries.update', ({ id, patch }) => ok(saved.updateSavedQuery(store().db, id, patch, now())))
   handle('savedQueries.delete', (id) => { saved.deleteSavedQuery(store().db, id); return ok(null) })
+
+  handle('session.tabs', () => ok(sess.listSessionTabs(store().db)))
+  handle('session.saveTabs', (tabs) => { sess.saveSessionTabs(store().db, tabs); return ok(null) })
 
   handle('settings.get', () => ok(settings.getSettings(store().db)))
   handle('settings.set', ({ key, value }) => {

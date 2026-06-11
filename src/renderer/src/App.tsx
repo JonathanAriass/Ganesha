@@ -15,6 +15,7 @@ import SaveQueryModal from './components/SaveQueryModal'
 import { useSettings } from './lib/hooks'
 import { applyTheme } from './lib/theme'
 import { useGlobalShortcuts } from './lib/use-global-shortcuts'
+import { useSessionPersistence } from './lib/use-session-persistence'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -24,6 +25,7 @@ const queryClient = new QueryClient({
 
 function AppShell(): JSX.Element {
   useGlobalShortcuts()
+  useSessionPersistence()
   const connectionModal = useAppStore((s) => s.connectionModal)
   const settingsOpen = useAppStore((s) => s.settingsOpen)
   const paletteOpen = useAppStore((s) => s.paletteOpen)

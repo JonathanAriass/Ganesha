@@ -52,6 +52,19 @@ export interface SavedQuery extends SavedQueryInput {
   updatedAt: number
 }
 
+/** One persisted query tab, mirrored from the renderer's tab strip on every
+ *  change (debounced). Text only — results, errors, and run state never touch
+ *  disk, and a restored tab never auto-runs. Array order is display order. */
+export interface SessionTab {
+  id: string
+  connectionId: string
+  title: string
+  text: string
+  /** The focused tab. At most one should be flagged; readers tolerate zero
+   *  (fall back to the last tab) and extras (the first flagged one wins). */
+  active: boolean
+}
+
 export interface AppSettings {
   theme: 'midnight' | 'light'
 }

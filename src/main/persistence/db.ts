@@ -58,6 +58,14 @@ export function migrate(db: DB): void {
       key   TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS session_tabs (
+      id            TEXT PRIMARY KEY,
+      connection_id TEXT NOT NULL REFERENCES connections(id) ON DELETE CASCADE,
+      title         TEXT NOT NULL,
+      text          TEXT NOT NULL,
+      position      INTEGER NOT NULL,
+      active        INTEGER NOT NULL DEFAULT 0
+    );
   `)
   // Mongo Atlas / replica-set connectivity (added after first release of the schema).
   addColumnIfMissing(db, 'connections', 'auth_source', "TEXT NOT NULL DEFAULT ''")

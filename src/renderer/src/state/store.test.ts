@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
+import type { SessionTab } from '@shared/domain'
 import { useAppStore } from './store'
 
 describe('overlay state invariants', () => {
@@ -167,5 +168,81 @@ describe('script run lifecycle', () => {
       text: 'select 1;', result: null, error: null, skipped: true
     })
     expect(tab().scriptRun).toBeNull()
+  })
+})
+
+describe('hydrateTabs', () => {
+  beforeEach(() => {
+    useAppStore.setState({ tabs: [], activeTabId: null, activeConnectionId: null, _queryCounter: 0 })
+  })
+
+  const session = (over: Partial<SessionTab> & { id: string }): SessionTab => ({
+    connectionId: 'c1', title: 'Query 1', text: 'SELECT 1', active: false, ...over
+  })
+
+  it('restores tabs in order with clean volatile state', () => {
+    useAppStore.getState().hydrateTabs([
+      session({ id: 'a', title: 'Query 1', text: 'SELECT 1' }),
+      session({ id: 'b', title: 'mine', text: '', active: true })
+    ])
+    const s = useAppStore.getState()
+    expect(s.tabs.map((t) => t.id)).toEqual(['a', 'b'])
+    expect(s.tabs[0]).toEqual({
+      id: 'a', connectionId: 'c1', title: 'Query 1', text: 'SELECT 1',
+      epoch: 0, runOnOpen: false, running: false, queryId: null,
+      result: null, error: null, scriptRun: null
+    })
+    expect(s.activeTabId).toBe('b')
+  })
+
+  it('never clobbers tabs the user already opened', () => {
+    useAppStore.getState().openQueryTab({ connectionId: 'c9', text: 'mine' })
+    const userTabId = useAppStore.getState().activeTabId
+    useAppStore.getState().hydrateTabs([session({ id: 'a', active: true })])
+    const s = useAppStore.getState()
+    expect(s.tabs).toHaveLength(1)
+    expect(s.tabs[0].text).toBe('mine')
+    expect(s.activeTabId).toBe(userTabId)
+  })
+
+  it('empty session is a no-op', () => {
+    useAppStore.getState().hydrateTabs([])
+    expect(useAppStore.getState().tabs).toEqual([])
+    expect(useAppStore.getState().activeTabId).toBeNull()
+  })
+
+  it('bumps the query counter past restored "Query N" titles', () => {
+    useAppStore.getState().hydrateTabs([
+      session({ id: 'a', title: 'Query 3' }),
+      session({ id: 'b', title: 'custom name', active: true })
+    ])
+    useAppStore.getState().openQueryTab({ connectionId: 'c1' })
+    expect(useAppStore.getState().tabs[2].title).toBe('Query 4')
+  })
+
+  it('falls back to the last tab when none is flagged active', () => {
+    useAppStore.getState().hydrateTabs([session({ id: 'a' }), session({ id: 'b' })])
+    expect(useAppStore.getState().activeTabId).toBe('b')
+  })
+
+  it('the first flagged tab wins when several claim active', () => {
+    useAppStore.getState().hydrateTabs([
+      session({ id: 'a' }), session({ id: 'b', active: true }), session({ id: 'c', active: true })
+    ])
+    expect(useAppStore.getState().activeTabId).toBe('b')
+  })
+
+  it('points the sidebar at the active tab connection when none is selected', () => {
+    useAppStore.getState().hydrateTabs([
+      session({ id: 'a', connectionId: 'c1' }),
+      session({ id: 'b', connectionId: 'c2', active: true })
+    ])
+    expect(useAppStore.getState().activeConnectionId).toBe('c2')
+  })
+
+  it('keeps an existing sidebar selection', () => {
+    useAppStore.setState({ activeConnectionId: 'chosen' })
+    useAppStore.getState().hydrateTabs([session({ id: 'a', active: true })])
+    expect(useAppStore.getState().activeConnectionId).toBe('chosen')
   })
 })

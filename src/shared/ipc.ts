@@ -1,7 +1,7 @@
 import type { Result } from './result'
 import type {
   ConnectionConfig, ConnectionInput, HistoryEntry, HistoryEntryInput, AppSettings,
-  SavedQuery, SavedQueryInput, SavedQueryPatch
+  SavedQuery, SavedQueryInput, SavedQueryPatch, SessionTab
 } from './domain'
 import type { QueryResult } from './query'
 import type { DbObject, ObjectRef, ColumnInfo } from './schema'
@@ -27,6 +27,8 @@ export interface IpcChannels {
   'savedQueries.create': { req: SavedQueryInput; res: SavedQuery }
   'savedQueries.update': { req: { id: string; patch: SavedQueryPatch }; res: SavedQuery }
   'savedQueries.delete': { req: string; res: null }
+  'session.tabs': { req: void; res: SessionTab[] }
+  'session.saveTabs': { req: SessionTab[]; res: null }
   'settings.get': { req: void; res: AppSettings }
   'settings.set': { req: { key: string; value: string }; res: AppSettings }
   'settings.dataDir.get': { req: void; res: string }

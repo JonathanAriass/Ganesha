@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { SessionTab } from '@shared/domain'
 import type { QueryResult } from '@shared/query'
 
 type ConnectionModalState =
@@ -73,6 +74,9 @@ interface AppState {
   closeSaveQueryModal: () => void
 
   openQueryTab: (args: { connectionId: string; title?: string; text?: string; runOnOpen?: boolean }) => void
+  /** One-shot boot restore of a persisted session. No-ops once any tab exists —
+   *  it must never clobber tabs the user opened before the IPC round-trip landed. */
+  hydrateTabs: (sessionTabs: SessionTab[]) => void
   closeTab: (id: string) => void
   closeTabsForConnection: (connectionId: string) => void
   setActiveTab: (id: string) => void
@@ -132,6 +136,39 @@ export const useAppStore = create<AppState>((set, get) => ({
         scriptRun: null,
       }
       return { tabs: [...s.tabs, tab], activeTabId: tab.id, _queryCounter: n }
+    }),
+
+  hydrateTabs: (sessionTabs) =>
+    set((s) => {
+      if (s.tabs.length > 0 || sessionTabs.length === 0) return s
+      // Volatile state (results, errors, run state) never persists — restored
+      // tabs come back clean, with their persisted ids kept stable.
+      const tabs: QueryTabData[] = sessionTabs.map((t) => ({
+        id: t.id,
+        connectionId: t.connectionId,
+        title: t.title,
+        text: t.text,
+        epoch: 0,
+        runOnOpen: false,
+        running: false,
+        queryId: null,
+        result: null,
+        error: null,
+        scriptRun: null,
+      }))
+      // Bump the counter past restored "Query N" titles so new tabs don't duplicate them.
+      const counter = tabs.reduce((max, t) => {
+        const m = /^Query (\d+)$/.exec(t.title)
+        return m ? Math.max(max, Number(m[1])) : max
+      }, s._queryCounter)
+      const active = tabs.find((t, i) => sessionTabs[i].active) ?? tabs[tabs.length - 1]
+      return {
+        tabs,
+        activeTabId: active.id,
+        _queryCounter: counter,
+        // Point the sidebar at the restored tab's connection (QueryTab auto-connects it anyway).
+        activeConnectionId: s.activeConnectionId ?? active.connectionId,
+      }
     }),
 
   closeTab: (id) =>

@@ -1,5 +1,5 @@
 import type { IpcResult } from './ipc'
-import type { ConnectionInput, HistoryEntryInput, SavedQueryInput, SavedQueryPatch } from './domain'
+import type { ConnectionInput, HistoryEntryInput, SavedQueryInput, SavedQueryPatch, SessionTab } from './domain'
 import type { ObjectRef } from './schema'
 
 export interface DbClientApi {
@@ -22,6 +22,10 @@ export interface DbClientApi {
     create(input: SavedQueryInput): Promise<IpcResult<'savedQueries.create'>>
     update(id: string, patch: SavedQueryPatch): Promise<IpcResult<'savedQueries.update'>>
     delete(id: string): Promise<IpcResult<'savedQueries.delete'>>
+  }
+  session: {
+    tabs(): Promise<IpcResult<'session.tabs'>>
+    saveTabs(tabs: SessionTab[]): Promise<IpcResult<'session.saveTabs'>>
   }
   settings: {
     get(): Promise<IpcResult<'settings.get'>>

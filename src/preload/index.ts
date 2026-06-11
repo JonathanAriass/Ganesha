@@ -27,6 +27,10 @@ const api: DbClientApi = {
     update: (id, patch) => invoke('savedQueries.update', { id, patch }),
     delete: (id) => invoke('savedQueries.delete', id)
   },
+  session: {
+    tabs: () => invoke('session.tabs', undefined),
+    saveTabs: (tabs) => invoke('session.saveTabs', tabs)
+  },
   settings: {
     get: () => invoke('settings.get', undefined),
     set: (key, value) => invoke('settings.set', { key, value }),
