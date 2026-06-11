@@ -4,10 +4,11 @@ import { getDbPath } from './paths'
 export type DB = Database.Database
 
 /** ALTER TABLE ADD COLUMN, skipped if the column already exists. Keeps migrate() idempotent
- *  for databases created before the column was added to CREATE TABLE. */
-function addColumnIfMissing(db: DB, table: string, column: string, ddl: string): void {
+ *  for databases created before the column was added to CREATE TABLE. The DDL is built from
+ *  `column` itself so the existence check can never drift from the column actually added. */
+function addColumnIfMissing(db: DB, table: string, column: string, spec: string): void {
   const cols = db.prepare(`SELECT name FROM pragma_table_info(?)`).all(table) as { name: string }[]
-  if (!cols.some((c) => c.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`)
+  if (!cols.some((c) => c.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${spec}`)
 }
 
 /** Create all tables if absent, then patch older schemas up to date. Idempotent. */
@@ -50,8 +51,8 @@ export function migrate(db: DB): void {
     );
   `)
   // Mongo Atlas / replica-set connectivity (added after first release of the schema).
-  addColumnIfMissing(db, 'connections', 'auth_source', "auth_source TEXT NOT NULL DEFAULT ''")
-  addColumnIfMissing(db, 'connections', 'replica_set', "replica_set TEXT NOT NULL DEFAULT ''")
+  addColumnIfMissing(db, 'connections', 'auth_source', "TEXT NOT NULL DEFAULT ''")
+  addColumnIfMissing(db, 'connections', 'replica_set', "TEXT NOT NULL DEFAULT ''")
 }
 
 let singleton: DB | null = null
