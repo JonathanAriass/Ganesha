@@ -168,16 +168,31 @@ export class MongoDriver implements DatabaseDriver {
   }
 
   async cancel(id: string, queryId: string): Promise<void> {
+    // Defense-in-depth: queryId goes into a $match value — never let a non-string
+    // (e.g. an operator object) widen the match beyond the one tagged op.
+    if (typeof queryId !== 'string' || queryId === '') return
     const conn = this.conns.get(id)
     if (!conn) return
     const admin = conn.client.db('admin')
-    // runQuery comment-tags ops with their queryId. $currentOp's default
-    // allUsers:false sees the user's own ops, and killOp may always kill one's
-    // own ops — no inprog/killop privilege needed. Best-effort, like pg/mysql.
-    const ops = await admin
-      .aggregate([{ $currentOp: {} }, { $match: { 'command.comment': queryId } }])
-      .toArray()
-    await Promise.all(ops.map((op) => admin.command({ killOp: 1, op: op.opid })))
+    // runQuery comment-tags ops with their queryId (4.4+ servers; getMore inherits
+    // the comment). On mongod, users can view/kill their OWN ops without the
+    // inprog/killop privileges — but managed tiers (e.g. Atlas free) refuse
+    // $currentOp outright, and mongos needs real privileges and cannot kill
+    // writes spanning shards. Best-effort like pg/mysql, with one caveat: an op
+    // idle between getMore batches is invisible to $currentOp, so a cancel in
+    // that window finds nothing (the next click retries).
+    try {
+      const ops = await admin
+        .aggregate([{ $currentOp: {} }, { $match: { 'command.comment': queryId } }])
+        .toArray()
+      await Promise.all(ops.map((op) => admin.command({ killOp: 1, op: op.opid })))
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      throw new Error(
+        `Could not cancel: ${msg}. The server refused $currentOp/killOp — reads still stop at their 30s time limit.`,
+        { cause: e }
+      )
+    }
   }
 
   private require(id: string): OpenConnection {

@@ -9,9 +9,11 @@ function exactTotal(r: CountFields): boolean {
   return !r.truncated || r.rowCount > r.rows.length
 }
 
-/** Status line: "42 rows", or "1000+ rows" when the true total is unknown. */
+/** Status line: "1 row" / "42 rows", or "1000+ rows" when the true total is unknown. */
 export function rowCountLabel(r: CountFields): string {
-  return exactTotal(r) ? `${r.rowCount} rows` : `${r.rows.length}+ rows`
+  const exact = exactTotal(r)
+  const n = exact ? r.rowCount : r.rows.length
+  return `${n}${exact ? '' : '+'} ${n === 1 ? 'row' : 'rows'}`
 }
 
 /** Truncation chip: "showing first 1000 of 45231" when the total is known,

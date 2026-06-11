@@ -25,4 +25,8 @@ describe('result labels', () => {
   it('write results (rowCount = affected, no rows) stay exact', () => {
     expect(rowCountLabel({ rows: [[true, 2]], rowCount: 2, truncated: false })).toBe('2 rows')
   })
+
+  it('singular for one row', () => {
+    expect(rowCountLabel({ rows: rows(1), rowCount: 1, truncated: false })).toBe('1 row')
+  })
 })

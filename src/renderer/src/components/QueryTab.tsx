@@ -30,6 +30,7 @@ export default function QueryTab({ tab }: Props): JSX.Element {
   function run() {
     // Re-checks live tab.running each render (run is recreated per render) — keep that if memoizing.
     if (!tab.text.trim() || tab.running) return
+    cancelQuery.reset() // a stale "Cancel failed" must not haunt the next run
     const queryId = crypto.randomUUID()
     startRun(tab.id, queryId)
     runQuery
@@ -49,7 +50,18 @@ export default function QueryTab({ tab }: Props): JSX.Element {
 
   let statusEl: JSX.Element | null = null
   if (tab.running) {
-    statusEl = <span className="qt-status">Running…</span>
+    // A Cancel that silently does nothing is worse than no button — some servers
+    // (e.g. Atlas free tier) refuse $currentOp/killOp, so surface the failure.
+    statusEl = (
+      <>
+        <span className="qt-status">Running…</span>
+        {cancelQuery.isError && (
+          <span className="qt-status err">
+            {cancelQuery.error instanceof Error ? cancelQuery.error.message : String(cancelQuery.error)}
+          </span>
+        )}
+      </>
+    )
   } else if (tab.result) {
     statusEl = (
       <span className="qt-status">
