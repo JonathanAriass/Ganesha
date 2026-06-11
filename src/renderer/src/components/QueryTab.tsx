@@ -65,6 +65,12 @@ export default function QueryTab({ tab }: Props): JSX.Element {
   }
 
   const editorRef = useRef<MonacoEditorHandle>(null)
+  // Set by Cancel while a script runs: the cancel IPC itself can miss — the
+  // targeted statement may finish (driver no-ops on an unknown queryId) just as
+  // the user clicks — so runAll also checks this at every statement boundary.
+  // A ref, not state: the loop must see the click mid-flight, and render
+  // closures would be stale.
+  const scriptStopRef = useRef(false)
 
   /** The tab's text split with this connection's dialect rules. */
   function tabStatements(): Statement[] {
@@ -87,8 +93,8 @@ export default function QueryTab({ tab }: Props): JSX.Element {
     return statementAt(tab.text, statements, editor.cursorOffset())?.text ?? tab.text
   }
 
-  function run() {
-    const text = runnableText()
+  function run(textOverride?: string) {
+    const text = textOverride ?? runnableText()
     // Re-checks live tab.running each render (run is recreated per render) — keep that if memoizing.
     if (!text.trim() || tab.running) return
     cancelQuery.reset() // a stale "Cancel failed" must not haunt the next run
@@ -107,8 +113,9 @@ export default function QueryTab({ tab }: Props): JSX.Element {
   async function runAll(): Promise<void> {
     if (!tab.text.trim() || tab.running) return
     const statements = tabStatements()
-    // 0 or 1 statements: behave exactly like Run.
-    if (statements.length < 2) return run()
+    // 0 or 1 statements: one plain run — of the whole tab, not the selection.
+    // "Run all" means everything even when a selection happens to exist.
+    if (statements.length < 2) return run(tab.text)
     if (langFor(connection?.type) === 'sql') {
       // Statements run as separate pooled sessions: BEGIN/COMMIT can't span them,
       // and a lone BEGIN would return to the pool still open, haunting later runs.
@@ -125,10 +132,15 @@ export default function QueryTab({ tab }: Props): JSX.Element {
       }
     }
     cancelQuery.reset()
-    startScript(tab.id, statements.length)
+    scriptStopRef.current = false
+    startScript(tab.id, statements.length, crypto.randomUUID())
     let failed = false
     for (const st of statements) {
-      if (failed) {
+      // The tab can close mid-script (⌘W): the store appends would no-op, but
+      // the IPC calls would keep executing statements with Cancel gone from the
+      // UI. Fresh getState() — this closure's tab list predates the close.
+      if (!useAppStore.getState().tabs.some((t) => t.id === tab.id)) return
+      if (failed || scriptStopRef.current) {
         scriptStatementDone(tab.id, { text: st.text, result: null, error: null, skipped: true })
         continue
       }
@@ -183,14 +195,18 @@ export default function QueryTab({ tab }: Props): JSX.Element {
   } else if (tab.scriptRun) {
     const { entries, total } = tab.scriptRun
     const failedAt = entries.findIndex((e) => e.error !== null)
+    const ran = entries.filter((e) => !e.skipped).length
     const ms = entries.reduce((acc, e) => acc + (e.result?.durationMs ?? 0), 0)
     statusEl =
-      failedAt === -1 ? (
+      failedAt !== -1 ? (
+        <span className="qt-status err">failed at statement {failedAt + 1} of {total}</span>
+      ) : ran < total ? (
+        // Cancel landed between statements: nothing errored, the rest skipped.
+        <span className="qt-status err">canceled — ran {ran} of {total} statements</span>
+      ) : (
         <span className="qt-status">
           {total} statements · {ms} ms
         </span>
-      ) : (
-        <span className="qt-status err">failed at statement {failedAt + 1} of {total}</span>
       )
   } else if (tab.result) {
     statusEl = (
@@ -208,7 +224,7 @@ export default function QueryTab({ tab }: Props): JSX.Element {
         <button
           className="btn primary"
           disabled={tab.running || !tab.text.trim()}
-          onClick={run}
+          onClick={() => run()}
           title={`Run (${mod}↵) — runs the selection, else the statement at the cursor`}
         >
           ▶ Run
@@ -236,9 +252,13 @@ export default function QueryTab({ tab }: Props): JSX.Element {
         {tab.running && tab.queryId && (
           <button
             className="btn ghost"
-            onClick={() =>
+            onClick={() => {
+              // For scripts, also stop at the next boundary — this render's
+              // queryId may belong to a statement that just finished, and the
+              // drivers no-op (successfully) on ids they no longer know.
+              if (tab.scriptRun) scriptStopRef.current = true
               cancelQuery.mutate({ connectionId: tab.connectionId, queryId: tab.queryId! })
-            }
+            }}
           >
             Cancel
           </button>

@@ -26,7 +26,10 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
   if (tab.scriptRun) {
     return (
       <div className="results">
-        <ScriptResults run={tab.scriptRun} running={tab.running} />
+        {/* Keyed by run: a new Run-all remounts every section structurally, so
+            open/closed defaults reset without relying on an empty-entries render
+            slipping in between consecutive runs. */}
+        <ScriptResults key={tab.scriptRun.runId} run={tab.scriptRun} running={tab.running} />
       </div>
     )
   }

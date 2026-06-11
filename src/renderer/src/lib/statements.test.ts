@@ -485,9 +485,14 @@ describe('isTransactionControl', () => {
       'end;', // pg COMMIT alias
       'SAVEPOINT sp1;',
       'release savepoint sp1;',
+      'ABORT;', // pg ROLLBACK alias
       'SET TRANSACTION ISOLATION LEVEL READ COMMITTED;',
       'set session transaction read only;',
-      'SET autocommit = 0;'
+      'SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY;', // persists on the pooled session
+      'SET autocommit = 0;',
+      'SET @@autocommit = 0;', // mysql system-variable spellings of the same poison
+      'set @@session.autocommit = 0;',
+      'SET @@GLOBAL.autocommit = 1;'
     ]) {
       expect(isTransactionControl(sql), sql).toBe(true)
     }
@@ -506,6 +511,9 @@ describe('isTransactionControl', () => {
       'update t set committed = true;',
       "insert into log values ('rollback requested');",
       'SET search_path TO app;', // plain SET is not transaction control
+      'SET @@max_execution_time = 1000;', // …nor are other @@ system variables
+      'START REPLICA;', // mysql admin statements, not START TRANSACTION
+      'start slave;',
       'create function f() returns int as $$ begin return 1; end $$ language plpgsql;',
       '-- commit notes\nselect 2'
     ]) {

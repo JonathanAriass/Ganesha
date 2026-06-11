@@ -100,18 +100,18 @@ describe('script run lifecycle', () => {
 
   it('startScript resets result/error and arms the script', () => {
     useAppStore.getState().finishRun(tab().id, { error: 'old error' })
-    useAppStore.getState().startScript(tab().id, 2)
+    useAppStore.getState().startScript(tab().id, 2, 'run-1')
     expect(tab()).toMatchObject({
       running: true,
       error: null,
       result: null,
       queryId: null,
-      scriptRun: { total: 2, entries: [] }
+      scriptRun: { runId: 'run-1', total: 2, entries: [] }
     })
   })
 
   it('scriptStatementStart points queryId at the in-flight statement (Cancel target)', () => {
-    useAppStore.getState().startScript(tab().id, 2)
+    useAppStore.getState().startScript(tab().id, 2, 'run-1')
     useAppStore.getState().scriptStatementStart(tab().id, 'q-1')
     expect(tab().queryId).toBe('q-1')
     useAppStore.getState().scriptStatementStart(tab().id, 'q-2')
@@ -119,7 +119,7 @@ describe('script run lifecycle', () => {
   })
 
   it('scriptStatementDone appends entries in order; finishScript keeps them', () => {
-    useAppStore.getState().startScript(tab().id, 2)
+    useAppStore.getState().startScript(tab().id, 2, 'run-1')
     useAppStore.getState().scriptStatementDone(tab().id, {
       text: 'select 1;', result, error: null, skipped: false
     })
@@ -135,7 +135,7 @@ describe('script run lifecycle', () => {
   })
 
   it('a later single run supersedes the script results', () => {
-    useAppStore.getState().startScript(tab().id, 2)
+    useAppStore.getState().startScript(tab().id, 2, 'run-1')
     useAppStore.getState().scriptStatementDone(tab().id, {
       text: 'select 1;', result, error: null, skipped: false
     })

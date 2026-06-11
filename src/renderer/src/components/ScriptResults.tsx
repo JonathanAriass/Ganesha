@@ -3,9 +3,9 @@ import type { ScriptRun, ScriptStatementResult } from '../state/store'
 import ResultsGrid from './ResultsGrid'
 import { rowCountLabel } from '../lib/result-label'
 
-/** The statement's first non-empty line — often its `-- title` comment, which is
- *  exactly what to show. Statements are never empty (the splitter drops
- *  comment/whitespace-only chunks), but slice defensively anyway. */
+/** The statement's first non-empty line. Split statements always start at code —
+ *  the splitter excludes leading comments and whitespace from a statement's
+ *  text — but iterate and slice defensively anyway. */
 function firstLine(text: string): string {
   for (const raw of text.split('\n')) {
     const line = raw.trim()

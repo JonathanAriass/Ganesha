@@ -371,12 +371,18 @@ function startsNewCommand(source: string, from: number): boolean {
   return source.startsWith('db.', i)
 }
 
-/** Heads that manage a session-scoped transaction. END is pg's COMMIT alias;
- *  SET TRANSACTION/autocommit configure the session's transaction behavior.
- *  BEGIN ATOMIC never reaches a statement head — routine bodies stay inside
- *  their CREATE statement (see splitSqlStatements). */
+/** Heads that manage a session-scoped transaction. END is pg's COMMIT alias and
+ *  ABORT its ROLLBACK alias; the SET arm covers every spelling that configures
+ *  the session's transaction behavior — SET [SESSION|GLOBAL] TRANSACTION,
+ *  SET SESSION CHARACTERISTICS AS TRANSACTION, and autocommit as the plain
+ *  keyword or the @@[session.|global.] system-variable forms (autocommit off on
+ *  a pooled session leaks an implicit open transaction back to the pool).
+ *  START matches only START TRANSACTION — START REPLICA/SLAVE are admin
+ *  statements, not transaction control. BEGIN ATOMIC never reaches a statement
+ *  head — routine bodies stay inside their CREATE statement (see
+ *  splitSqlStatements). */
 const TXN_HEAD =
-  /^(begin|start|commit|rollback|end|savepoint|release)\b|^set\s+((session|global)\s+)?(transaction|autocommit)\b/i
+  /^(begin|commit|rollback|abort|end|savepoint|release)\b|^start\s+transaction\b|^set\s+(((session|global)\s+)|@@((session|global)\.)?)?(characteristics\s+as\s+)?(transaction|autocommit)\b/i
 
 /** Leading whitespace or one comment of either dialect (over-matching `#` on pg
  *  is fine — the only caller refuses conservatively). */
