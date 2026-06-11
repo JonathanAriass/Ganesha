@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { boundedFindLimit, boundedPipeline, buildMongoUri } from './mongo'
+import { boundedFindLimit, boundedPipeline, buildMongoUri, withAuthSourceHint } from './mongo'
 import type { MongoCommand } from './command'
 import type { ConnectParams } from '../types'
 
@@ -37,6 +37,28 @@ describe('buildMongoUri', () => {
     expect(buildMongoUri({ ...params, authSource: '', replicaSet: '' })).toBe(
       'mongodb://localhost:27017'
     )
+  })
+})
+
+describe('withAuthSourceHint', () => {
+  const authFail = new Error('Authentication failed.')
+
+  it('appends the Auth source remedy when a database is set without an authSource', () => {
+    const e = withAuthSourceHint(authFail, { ...params, database: 'app' })
+    expect(e.message).toMatch(/Authentication failed\./)
+    expect(e.message).toMatch(/Auth source/)
+    expect(e.message).toMatch(/'app'/)
+  })
+
+  it('leaves the error alone when authSource is set, no database is set, or it is not an auth failure', () => {
+    expect(withAuthSourceHint(authFail, { ...params, database: 'app', authSource: 'admin' })).toBe(authFail)
+    expect(withAuthSourceHint(authFail, params)).toBe(authFail)
+    const other = new Error('connect ECONNREFUSED')
+    expect(withAuthSourceHint(other, { ...params, database: 'app' })).toBe(other)
+  })
+
+  it('wraps non-Error throwables into an Error', () => {
+    expect(withAuthSourceHint('boom', params)).toBeInstanceOf(Error)
   })
 })
 

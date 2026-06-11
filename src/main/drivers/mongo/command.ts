@@ -8,6 +8,8 @@ export type MongoOp = MongoReadOp | MongoWriteOp
 export interface MongoCommand {
   op: MongoOp
   collection: string
+  /** Run against this database instead of the connection's default (shell: db.getSiblingDB("x")). */
+  database?: string
   filter?: Record<string, unknown>
   projection?: Record<string, unknown>
   sort?: Record<string, unknown>

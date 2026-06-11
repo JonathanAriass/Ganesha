@@ -34,6 +34,13 @@ describe('parseMongoJson', () => {
     expect(parseMongoJson(JSON.stringify({ op: 'deleteMany', collection: 'c', filter: { a: 1 } })).filter).toEqual({ a: 1 })
   })
 
+  it('passes an optional database through, rejecting empty/non-string values', () => {
+    expect(parseMongoJson(JSON.stringify({ op: 'find', collection: 'c', database: 'other' })).database).toBe('other')
+    expect(parseMongoJson(JSON.stringify({ op: 'find', collection: 'c' }))).not.toHaveProperty('database')
+    expect(() => parseMongoJson(JSON.stringify({ op: 'find', collection: 'c', database: '' }))).toThrow(/database/i)
+    expect(() => parseMongoJson(JSON.stringify({ op: 'find', collection: 'c', database: 5 }))).toThrow(/database/i)
+  })
+
   it('rejects invalid JSON, unknown op, missing collection, and bad field types', () => {
     expect(() => parseMongoJson('{not json')).toThrow(/invalid json/i)
     expect(() => parseMongoJson(JSON.stringify({ op: 'nope', collection: 'c' }))).toThrow(/op/i)

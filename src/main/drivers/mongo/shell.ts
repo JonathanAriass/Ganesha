@@ -29,7 +29,20 @@ interface Modifier {
   args: unknown[]
 }
 
-/** Parse a mongosh-style command `db.<coll>.<op>(args).<modifier>(...)` into a MongoCommand. */
+/** If node is `db.getSiblingDB(...)`, validate and return the database name; null otherwise. */
+function siblingDbName(node: Expression): string | null {
+  if (node.type !== 'CallExpression') return null
+  const call = node as CallExpression
+  if (call.callee.type !== 'MemberExpression') return null
+  const callee = call.callee as MemberExpression
+  if (callee.object.type !== 'Identifier' || (callee.object as Identifier).name !== 'db') return null
+  if (callee.property.type !== 'Identifier' || (callee.property as Identifier).name !== 'getSiblingDB') return null
+  if (call.arguments.length !== 1) throw new Error(`db.getSiblingDB() takes exactly one string argument`)
+  return asStr(evalArg(call.arguments[0] as Expression), 'getSiblingDB database')
+}
+
+/** Parse a mongosh-style command `db.<coll>.<op>(args).<modifier>(...)` into a MongoCommand.
+ *  The db root may be `db` or `db.getSiblingDB("other")` to target another database. */
 export function parseMongoShell(input: string): MongoCommand {
   let program: Program
   try {
@@ -53,18 +66,29 @@ export function parseMongoShell(input: string): MongoCommand {
     const args = call.arguments.map((a) => evalArg(a as Expression))
     const inner = callee.object
 
-    if (inner.type === 'MemberExpression' && (inner as MemberExpression).object.type === 'Identifier'
-      && ((inner as MemberExpression).object as Identifier).name === 'db') {
+    if (inner.type === 'MemberExpression') {
       const innerMem = inner as MemberExpression
-      const collection =
-        innerMem.property.type === 'Identifier'
-          ? (innerMem.property as Identifier).name
-          : innerMem.property.type === 'Literal'
-            ? String((innerMem.property as Literal).value)
-            : ''
-      if (!collection) throw new Error('Could not determine collection name')
-      if (!isMongoOp(method)) throw new Error(`Unsupported operation 'db.${collection}.${method}()'`)
-      return buildCommand(method, collection, args, modifiers)
+      const root = innerMem.object as Expression
+      const isPlainDb = root.type === 'Identifier' && (root as Identifier).name === 'db'
+      const database = isPlainDb ? null : siblingDbName(root)
+      if (isPlainDb || database !== null) {
+        const collection =
+          innerMem.property.type === 'Identifier'
+            ? (innerMem.property as Identifier).name
+            : innerMem.property.type === 'Literal'
+              ? String((innerMem.property as Literal).value)
+              : ''
+        if (!collection) throw new Error('Could not determine collection name')
+        if (!isMongoOp(method)) throw new Error(`Unsupported operation 'db.${collection}.${method}()'`)
+        const cmd = buildCommand(method, collection, args, modifiers)
+        if (database) cmd.database = database
+        return cmd
+      }
+    }
+
+    // `db.getSiblingDB("x").find()` — an op directly on the sibling db, no collection.
+    if (inner.type === 'CallExpression' && siblingDbName(inner as Expression) !== null) {
+      throw new Error(`Expected a collection after getSiblingDB, e.g. db.getSiblingDB("db").coll.${method}(...)`)
     }
 
     if (!MODIFIERS.has(method)) throw new Error(`Unsupported chained method '.${method}()'`)

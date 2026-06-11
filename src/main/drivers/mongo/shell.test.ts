@@ -33,4 +33,28 @@ describe('parseMongoShell', () => {
     expect(() => parseMongoShell('db.c.find().bogus()')).toThrow(/unsupported chained method/i)
     expect(() => parseMongoShell('not valid (')).toThrow(/could not parse/i)
   })
+
+  describe('getSiblingDB', () => {
+    it('targets another database, with modifiers and bracket collections', () => {
+      const cmd = parseMongoShell('db.getSiblingDB("other").users.find({ a: 1 }).sort({ a: 1 }).limit(5)')
+      expect(cmd).toEqual({
+        op: 'find', collection: 'users', database: 'other',
+        filter: { a: 1 }, sort: { a: 1 }, limit: 5
+      })
+      expect(parseMongoShell('db.getSiblingDB("x")["my coll"].countDocuments({})')).toEqual({
+        op: 'countDocuments', collection: 'my coll', database: 'x', filter: {}
+      })
+    })
+
+    it('plain db commands carry no database field', () => {
+      expect(parseMongoShell('db.users.find({})')).not.toHaveProperty('database')
+    })
+
+    it('rejects bad arguments and a missing collection', () => {
+      expect(() => parseMongoShell('db.getSiblingDB(5).c.find({})')).toThrow(/must be a non-empty string/i)
+      expect(() => parseMongoShell('db.getSiblingDB("a", "b").c.find({})')).toThrow(/exactly one string argument/i)
+      expect(() => parseMongoShell('db.getSiblingDB("a").find({})')).toThrow(/expected a collection after getSiblingDB/i)
+      expect(() => parseMongoShell('db.getSiblingDB("a").c.dropDatabase()')).toThrow(/unsupported operation/i)
+    })
+  })
 })

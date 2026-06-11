@@ -39,6 +39,12 @@ export function parseMongoJson(input: string): MongoCommand {
   }
 
   const cmd: MongoCommand = { op, collection: obj.collection }
+  if (obj.database !== undefined) {
+    if (typeof obj.database !== 'string' || obj.database.length === 0) {
+      throw new Error(`'database' must be a non-empty string`)
+    }
+    cmd.database = obj.database
+  }
 
   switch (op) {
     case 'find':

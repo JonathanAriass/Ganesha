@@ -32,10 +32,30 @@ export function buildMongoUri(p: ConnectParams): string {
   return `mongodb://${auth}${p.host}:${p.port}${path}${qs ? `?${qs}` : ''}`
 }
 
+/** Mongo's bare "Authentication failed." usually means the user is defined in a
+ *  different database — when no Auth source is set, auth runs against the URI's
+ *  database, so surface the remedy instead of the riddle. */
+export function withAuthSourceHint(e: unknown, p: ConnectParams): Error {
+  const msg = e instanceof Error ? e.message : String(e)
+  if (/authentication failed/i.test(msg) && !p.authSource && p.database) {
+    return new Error(
+      `${msg} Without an Auth source, authentication runs against '${p.database}' — ` +
+      `if the user is defined elsewhere, set Auth source (commonly 'admin').`
+    )
+  }
+  return e instanceof Error ? e : new Error(msg)
+}
+
+interface OpenConnection {
+  client: MongoClient
+  /** The connection's configured database ('' = none → browse all databases). */
+  database: string
+}
+
 /** MongoDB driver. Read-only is enforced upstream by the command guard (no SQL-style RO txn). */
 export class MongoDriver implements DatabaseDriver {
   readonly type = 'mongodb' as const
-  private clients = new Map<string, MongoClient>()
+  private conns = new Map<string, OpenConnection>()
 
   private newClient(p: ConnectParams): MongoClient {
     return new MongoClient(buildMongoUri(p), { serverSelectionTimeoutMS: 10_000 })
@@ -46,32 +66,39 @@ export class MongoDriver implements DatabaseDriver {
     try {
       await client.connect()
       await client.db().command({ ping: 1 })
+    } catch (e) {
+      throw withAuthSourceHint(e, p)
     } finally {
       await client.close()
     }
   }
 
   async connect(p: ConnectParams): Promise<void> {
-    if (this.clients.has(p.id)) return
+    if (this.conns.has(p.id)) return
     const client = this.newClient(p)
-    await client.connect()
-    this.clients.set(p.id, client)
+    try {
+      await client.connect()
+    } catch (e) {
+      await client.close().catch(() => {})
+      throw withAuthSourceHint(e, p)
+    }
+    this.conns.set(p.id, { client, database: p.database })
   }
 
   async disconnect(id: string): Promise<void> {
-    const client = this.clients.get(id)
-    if (client) {
-      this.clients.delete(id)
-      await client.close()
+    const conn = this.conns.get(id)
+    if (conn) {
+      this.conns.delete(id)
+      await conn.client.close()
     }
   }
 
   async runQuery(id: string, request: QueryRequest, opts: RunOptions): Promise<QueryResult> {
     if (request.kind !== 'mongo') throw new Error('MongoDriver handles only Mongo requests')
-    const client = this.clients.get(id)
-    if (!client) throw new Error(`Connection '${id}' is not open`)
+    const { client } = this.require(id)
     const cmd = request.command
-    const coll = client.db().collection(cmd.collection)
+    // cmd.database (shell: db.getSiblingDB) overrides the connection default.
+    const coll = client.db(cmd.database).collection(cmd.collection)
     const start = Date.now()
     const ms = (): number => Date.now() - start
 
@@ -120,21 +147,43 @@ export class MongoDriver implements DatabaseDriver {
     // v1: MongoDB has no simple per-query cancel; ops carry maxTimeMS. killOp is a future enhancement.
   }
 
-  private requireClient(id: string): MongoClient {
-    const client = this.clients.get(id)
-    if (!client) throw new Error(`Connection '${id}' is not open`)
-    return client
+  private require(id: string): OpenConnection {
+    const conn = this.conns.get(id)
+    if (!conn) throw new Error(`Connection '${id}' is not open`)
+    return conn
   }
 
   async listObjects(id: string): Promise<DbObject[]> {
-    const cols = await this.requireClient(id).db().listCollections({}, { nameOnly: true }).toArray()
-    return cols
-      .map((c) => ({ schema: null, name: c.name, kind: 'collection' as const }))
-      .sort((a, b) => a.name.localeCompare(b.name))
+    const { client, database } = this.require(id)
+    if (database) {
+      const cols = await client.db().listCollections({}, { nameOnly: true }).toArray()
+      return cols
+        .map((c) => ({ schema: null, name: c.name, kind: 'collection' as const }))
+        .sort((a, b) => a.name.localeCompare(b.name))
+    }
+    // No database configured — browse every database (the driver would otherwise
+    // silently default to 'test'). Databases group in the tree like SQL schemas.
+    let names: string[]
+    try {
+      const { databases } = await client.db('admin').admin().listDatabases({ nameOnly: true })
+      names = databases.map((d) => d.name)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      throw new Error(`Could not list databases (${msg}). Set a Database on the connection to browse one directly.`)
+    }
+    const out: DbObject[] = []
+    for (const name of names) {
+      const cols = await client.db(name).listCollections({}, { nameOnly: true }).toArray()
+      for (const c of cols) out.push({ schema: name, name: c.name, kind: 'collection' as const })
+    }
+    return out.sort((a, b) =>
+      a.schema === b.schema ? a.name.localeCompare(b.name) : (a.schema ?? '').localeCompare(b.schema ?? '')
+    )
   }
 
   async describeObject(id: string, ref: ObjectRef): Promise<ColumnInfo[]> {
-    const sample = await this.requireClient(id).db().collection(ref.name).findOne({})
+    const { client } = this.require(id)
+    const sample = await client.db(ref.schema ?? undefined).collection(ref.name).findOne({})
     return inferFieldTypes(sample as Record<string, unknown> | null)
   }
 }

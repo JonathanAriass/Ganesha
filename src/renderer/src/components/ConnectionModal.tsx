@@ -257,6 +257,7 @@ export default function ConnectionModal(): JSX.Element {
                   type="text"
                   value={form.database}
                   onChange={(e) => setField('database', e.target.value)}
+                  placeholder={form.type === 'mongodb' ? 'blank = browse all databases' : ''}
                 />
               </div>
             </div>
