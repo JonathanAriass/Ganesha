@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import type { QueryTabData } from '../state/store'
 import { useAppStore } from '../state/store'
 import { useConnections, useRunQuery, useCancelQuery, useObjects } from '../lib/hooks'
-import MonacoEditor from './MonacoEditor'
+import MonacoEditor, { type MonacoEditorHandle } from './MonacoEditor'
 import ResultsPanel from './ResultsPanel'
 import type { ConnectionType } from '@shared/domain'
 import type { ObjectRef } from '@shared/schema'
@@ -11,6 +11,7 @@ import { mod } from '../lib/platform'
 import { rowCountLabel } from '../lib/result-label'
 import { unwrap } from '../lib/result'
 import type { CompletionCtx } from '../lib/monaco-completions'
+import { splitSqlStatements, splitJsCommands, statementAt } from '../lib/statements'
 
 function langFor(type: ConnectionType | undefined): string {
   return type === 'mongodb' ? 'javascript' : 'sql'
@@ -47,8 +48,25 @@ export default function QueryTab({ tab }: Props): JSX.Element {
       })
   }
 
-  function run(textOverride?: string) {
-    const text = textOverride ?? tab.text
+  const editorRef = useRef<MonacoEditorHandle>(null)
+
+  /** What ⌘↵/Run executes: the selection if there is one, else the statement
+   *  under the cursor when the tab holds several, else the whole tab. */
+  function runnableText(): string {
+    const editor = editorRef.current
+    if (!editor) return tab.text // runOnOpen can fire before the editor mounts
+    const selection = editor.selectionText()
+    if (selection) return selection
+    const split = langFor(connection?.type) === 'sql' ? splitSqlStatements : splitJsCommands
+    const statements = split(tab.text)
+    // A single statement (or none — all comments) runs as the whole tab, so
+    // single-statement tabs behave exactly as before this feature existed.
+    if (statements.length < 2) return tab.text
+    return statementAt(statements, editor.cursorOffset())?.text ?? tab.text
+  }
+
+  function run() {
+    const text = runnableText()
     // Re-checks live tab.running each render (run is recreated per render) — keep that if memoizing.
     if (!text.trim() || tab.running) return
     cancelQuery.reset() // a stale "Cancel failed" must not haunt the next run
@@ -99,9 +117,8 @@ export default function QueryTab({ tab }: Props): JSX.Element {
         <button
           className="btn primary"
           disabled={tab.running || !tab.text.trim()}
-          // Not onClick={run}: the MouseEvent would land in textOverride.
-          onClick={() => run()}
-          title={`Run (${mod}↵ — a selection runs by itself)`}
+          onClick={run}
+          title={`Run (${mod}↵) — runs the selection, else the statement at the cursor`}
         >
           ▶ Run
         </button>
@@ -132,6 +149,7 @@ export default function QueryTab({ tab }: Props): JSX.Element {
       </div>
       <MonacoEditor
         key={`${tab.id}:${tab.epoch}`}
+        ref={editorRef}
         initialValue={tab.text}
         language={langFor(connection?.type)}
         onChange={(t) => setTabText(tab.id, t)}
