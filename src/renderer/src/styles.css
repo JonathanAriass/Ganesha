@@ -987,6 +987,80 @@ input[type="password"]::placeholder {
   color: var(--text-2);
 }
 
+/* ── Run-all script results ── */
+.h-dot.skip {
+  background: var(--text-2);
+  opacity: 0.5;
+}
+
+.script-stmt {
+  border-bottom: 1px solid var(--border);
+}
+
+.script-stmt > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 12px;
+  /* flex display suppresses the native marker; .ss-caret stands in for it */
+  list-style: none;
+}
+
+.script-stmt > summary::-webkit-details-marker {
+  display: none;
+}
+
+.script-stmt > summary:hover {
+  background: var(--bg-3);
+}
+
+.ss-caret {
+  color: var(--text-2);
+  font-size: 10px;
+  flex-shrink: 0;
+  transition: transform 120ms ease;
+}
+
+.script-stmt[open] > summary .ss-caret {
+  transform: rotate(90deg);
+}
+
+.ss-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: 'SF Mono', 'Fira Mono', 'Consolas', monospace;
+  font-size: 11px;
+}
+
+.ss-meta {
+  color: var(--text-2);
+  font-size: 11px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Fixed cap per section; .grid-wrap (flex: 1) fills and scrolls inside it. */
+.ss-grid {
+  display: flex;
+  flex-direction: column;
+  max-height: 260px;
+  border-top: 1px solid var(--border);
+}
+
+.script-running {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
 /* ── Saved queries ── */
 .saved-item {
   display: flex;

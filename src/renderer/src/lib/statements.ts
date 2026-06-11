@@ -371,6 +371,32 @@ function startsNewCommand(source: string, from: number): boolean {
   return source.startsWith('db.', i)
 }
 
+/** Heads that manage a session-scoped transaction. END is pg's COMMIT alias;
+ *  SET TRANSACTION/autocommit configure the session's transaction behavior.
+ *  BEGIN ATOMIC never reaches a statement head — routine bodies stay inside
+ *  their CREATE statement (see splitSqlStatements). */
+const TXN_HEAD =
+  /^(begin|start|commit|rollback|end|savepoint|release)\b|^set\s+((session|global)\s+)?(transaction|autocommit)\b/i
+
+/** Leading whitespace or one comment of either dialect (over-matching `#` on pg
+ *  is fine — the only caller refuses conservatively). */
+const LEADING_TRIVIA = /^(\s+|--[^\n]*\n?|#[^\n]*\n?|\/\*[\s\S]*?\*\/)/
+
+/** Does this statement begin with transaction control (BEGIN/COMMIT/…)? Run-all
+ *  executes statements as separate pooled runs, so a transaction can't span them —
+ *  worse, a lone BEGIN would go back to the pool still open and leak an
+ *  in-transaction session into later runs. Callers refuse such scripts outright:
+ *  refusing beats silently-broken semantics. */
+export function isTransactionControl(sql: string): boolean {
+  let s = sql
+  for (;;) {
+    const next = s.replace(LEADING_TRIVIA, '')
+    if (next === s) break
+    s = next
+  }
+  return TXN_HEAD.test(s)
+}
+
 /** The statement the cursor is in. Regions tile the text: a statement owns from
  *  its start through the rest of its last line — so a cursor right after a
  *  just-typed `select 1;` runs it — and the next line begins the following

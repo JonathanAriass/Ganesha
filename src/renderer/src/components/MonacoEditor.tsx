@@ -8,6 +8,8 @@ interface Props {
   onChange: (text: string) => void
   /** ⌘/Ctrl-↵. The parent decides what to run by querying the handle. */
   onRun: () => void
+  /** ⌘/Ctrl-⇧-↵: run every statement in the tab. */
+  onRunAll?: () => void
   completions?: CompletionCtx
 }
 
@@ -22,13 +24,15 @@ export interface MonacoEditorHandle {
 
 /** Mount-once Monaco instance; parents remount it (via key) to replace content. */
 const MonacoEditor = forwardRef<MonacoEditorHandle, Props>(function MonacoEditor(
-  { initialValue, language, onChange, onRun, completions },
+  { initialValue, language, onChange, onRun, onRunAll, completions },
   ref
 ) {
   const hostRef = useRef<HTMLDivElement>(null)
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
   const onRunRef = useRef(onRun)
   onRunRef.current = onRun
+  const onRunAllRef = useRef(onRunAll)
+  onRunAllRef.current = onRunAll
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
   const completionsRef = useRef(completions)
@@ -72,6 +76,9 @@ const MonacoEditor = forwardRef<MonacoEditorHandle, Props>(function MonacoEditor
     // Thunk, not value: completion props (objects load async) change across renders.
     if (model) setCompletionCtx(model.id, () => completionsRef.current ?? null)
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => onRunRef.current())
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.Enter, () =>
+      onRunAllRef.current?.()
+    )
     const sub = editor.onDidChangeModelContent(() => onChangeRef.current(editor.getValue()))
     editor.focus()
     return () => {

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { splitSqlStatements, splitJsCommands, statementAt, type Statement } from './statements'
+import {
+  splitSqlStatements,
+  splitJsCommands,
+  statementAt,
+  isTransactionControl,
+  type Statement
+} from './statements'
 
 const texts = (out: Statement[]): string[] => out.map((s) => s.text)
 const pg = (source: string): Statement[] => splitSqlStatements(source, 'postgres')
@@ -465,5 +471,45 @@ describe('statementAt', () => {
 
   it('returns null for no statements', () => {
     expect(statementAt('', [], 0)).toBeNull()
+  })
+})
+
+describe('isTransactionControl', () => {
+  it('matches transaction-control heads, any case', () => {
+    for (const sql of [
+      'BEGIN;',
+      'begin',
+      'start transaction;',
+      'COMMIT;',
+      'rollback',
+      'end;', // pg COMMIT alias
+      'SAVEPOINT sp1;',
+      'release savepoint sp1;',
+      'SET TRANSACTION ISOLATION LEVEL READ COMMITTED;',
+      'set session transaction read only;',
+      'SET autocommit = 0;'
+    ]) {
+      expect(isTransactionControl(sql), sql).toBe(true)
+    }
+  })
+
+  it('looks through leading comments and whitespace', () => {
+    expect(isTransactionControl('-- open the txn\nBEGIN;')).toBe(true)
+    expect(isTransactionControl('/* multi\n line */ commit;')).toBe(true)
+    expect(isTransactionControl('  # mysql comment\n  rollback')).toBe(true)
+  })
+
+  it('does not match ordinary statements', () => {
+    for (const sql of [
+      'select 1;',
+      'select begin_date from t;', // word-boundary: begin_… is not BEGIN
+      'update t set committed = true;',
+      "insert into log values ('rollback requested');",
+      'SET search_path TO app;', // plain SET is not transaction control
+      'create function f() returns int as $$ begin return 1; end $$ language plpgsql;',
+      '-- commit notes\nselect 2'
+    ]) {
+      expect(isTransactionControl(sql), sql).toBe(false)
+    }
   })
 })

@@ -11,7 +11,14 @@ import { mod } from '../lib/platform'
 import { rowCountLabel } from '../lib/result-label'
 import { unwrap } from '../lib/result'
 import type { CompletionCtx } from '../lib/monaco-completions'
-import { splitSqlStatements, splitJsCommands, statementAt, type SqlDialect } from '../lib/statements'
+import {
+  splitSqlStatements,
+  splitJsCommands,
+  statementAt,
+  isTransactionControl,
+  type SqlDialect,
+  type Statement
+} from '../lib/statements'
 
 function langFor(type: ConnectionType | undefined): string {
   return type === 'mongodb' ? 'javascript' : 'sql'
@@ -33,6 +40,10 @@ export default function QueryTab({ tab }: Props): JSX.Element {
   const startRun = useAppStore((s) => s.startRun)
   const finishRun = useAppStore((s) => s.finishRun)
   const openSaveQueryModal = useAppStore((s) => s.openSaveQueryModal)
+  const startScript = useAppStore((s) => s.startScript)
+  const scriptStatementStart = useAppStore((s) => s.scriptStatementStart)
+  const scriptStatementDone = useAppStore((s) => s.scriptStatementDone)
+  const finishScript = useAppStore((s) => s.finishScript)
 
   const runQuery = useRunQuery()
   const cancelQuery = useCancelQuery()
@@ -55,6 +66,13 @@ export default function QueryTab({ tab }: Props): JSX.Element {
 
   const editorRef = useRef<MonacoEditorHandle>(null)
 
+  /** The tab's text split with this connection's dialect rules. */
+  function tabStatements(): Statement[] {
+    return langFor(connection?.type) === 'sql'
+      ? splitSqlStatements(tab.text, sqlDialectFor(connection?.type))
+      : splitJsCommands(tab.text)
+  }
+
   /** What ⌘↵/Run executes: the selection if there is one, else the statement
    *  under the cursor when the tab holds several, else the whole tab. */
   function runnableText(): string {
@@ -62,10 +80,7 @@ export default function QueryTab({ tab }: Props): JSX.Element {
     if (!editor) return tab.text // runOnOpen can fire before the editor mounts
     const selection = editor.selectionText()
     if (selection) return selection
-    const statements =
-      langFor(connection?.type) === 'sql'
-        ? splitSqlStatements(tab.text, sqlDialectFor(connection?.type))
-        : splitJsCommands(tab.text)
+    const statements = tabStatements()
     // A single statement (or none — all comments) runs as the whole tab, so
     // single-statement tabs behave exactly as before this feature existed.
     if (statements.length < 2) return tab.text
@@ -85,6 +100,60 @@ export default function QueryTab({ tab }: Props): JSX.Element {
       .catch((e) => finishRun(tab.id, { error: e instanceof Error ? e.message : String(e) }))
   }
 
+  /** Run every statement in the tab, top to bottom, stopping at the first error
+   *  (later statements report as skipped — scripts assume their predecessors ran).
+   *  Each statement is its own query.run, so the read-only guard, history, and
+   *  Cancel (via the per-statement queryId in tab.queryId) all apply per statement. */
+  async function runAll(): Promise<void> {
+    if (!tab.text.trim() || tab.running) return
+    const statements = tabStatements()
+    // 0 or 1 statements: behave exactly like Run.
+    if (statements.length < 2) return run()
+    if (langFor(connection?.type) === 'sql') {
+      // Statements run as separate pooled sessions: BEGIN/COMMIT can't span them,
+      // and a lone BEGIN would return to the pool still open, haunting later runs.
+      // Refusing beats silently-broken transaction semantics.
+      const txn = statements.find((st) => isTransactionControl(st.text))
+      if (txn) {
+        finishRun(tab.id, {
+          error:
+            'Run all executes statements one at a time on separate pooled sessions, so ' +
+            'transaction control (BEGIN/COMMIT/ROLLBACK/…) can’t span them. Remove the ' +
+            'transaction statements — each statement commits on its own.'
+        })
+        return
+      }
+    }
+    cancelQuery.reset()
+    startScript(tab.id, statements.length)
+    let failed = false
+    for (const st of statements) {
+      if (failed) {
+        scriptStatementDone(tab.id, { text: st.text, result: null, error: null, skipped: true })
+        continue
+      }
+      const queryId = crypto.randomUUID()
+      scriptStatementStart(tab.id, queryId)
+      try {
+        const result = await runQuery.mutateAsync({
+          connectionId: tab.connectionId,
+          query: st.text,
+          queryId
+        })
+        scriptStatementDone(tab.id, { text: st.text, result, error: null, skipped: false })
+      } catch (e) {
+        scriptStatementDone(tab.id, {
+          text: st.text,
+          result: null,
+          error: e instanceof Error ? e.message : String(e),
+          skipped: false
+        })
+        failed = true
+      }
+    }
+    finishScript(tab.id)
+  }
+
   const hasRunRef = useRef(false)
   useEffect(() => {
     if (tab.runOnOpen && !hasRunRef.current) {
@@ -96,11 +165,14 @@ export default function QueryTab({ tab }: Props): JSX.Element {
 
   let statusEl: JSX.Element | null = null
   if (tab.running) {
+    const label = tab.scriptRun
+      ? `Running statement ${Math.min(tab.scriptRun.entries.length + 1, tab.scriptRun.total)} of ${tab.scriptRun.total}…`
+      : 'Running…'
     // A Cancel that silently does nothing is worse than no button — some servers
     // (e.g. Atlas free tier) refuse $currentOp/killOp, so surface the failure.
     statusEl = (
       <>
-        <span className="qt-status">Running…</span>
+        <span className="qt-status">{label}</span>
         {cancelQuery.isError && (
           <span className="qt-status err">
             {cancelQuery.error instanceof Error ? cancelQuery.error.message : String(cancelQuery.error)}
@@ -108,6 +180,18 @@ export default function QueryTab({ tab }: Props): JSX.Element {
         )}
       </>
     )
+  } else if (tab.scriptRun) {
+    const { entries, total } = tab.scriptRun
+    const failedAt = entries.findIndex((e) => e.error !== null)
+    const ms = entries.reduce((acc, e) => acc + (e.result?.durationMs ?? 0), 0)
+    statusEl =
+      failedAt === -1 ? (
+        <span className="qt-status">
+          {total} statements · {ms} ms
+        </span>
+      ) : (
+        <span className="qt-status err">failed at statement {failedAt + 1} of {total}</span>
+      )
   } else if (tab.result) {
     statusEl = (
       <span className="qt-status">
@@ -128,6 +212,14 @@ export default function QueryTab({ tab }: Props): JSX.Element {
           title={`Run (${mod}↵) — runs the selection, else the statement at the cursor`}
         >
           ▶ Run
+        </button>
+        <button
+          className="btn"
+          disabled={tab.running || !tab.text.trim()}
+          onClick={() => void runAll()}
+          title={`Run all statements, top to bottom (${mod}⇧↵) — stops at the first error`}
+        >
+          ▶▶ Run all
         </button>
         <button
           className="btn ghost"
@@ -171,6 +263,7 @@ export default function QueryTab({ tab }: Props): JSX.Element {
         language={langFor(connection?.type)}
         onChange={(t) => setTabText(tab.id, t)}
         onRun={run}
+        onRunAll={() => void runAll()}
         completions={completions}
       />
       <ResultsPanel tab={tab} />

@@ -80,3 +80,78 @@ describe('openOrLoadQuery', () => {
     expect(s.tabs[0]).toMatchObject({ connectionId: 'c1', title: 'Saved', text: 'q' })
   })
 })
+
+describe('script run lifecycle', () => {
+  const result = {
+    columns: [{ name: 'a', dataType: null }],
+    rows: [[1]],
+    rowCount: 1,
+    durationMs: 5,
+    truncated: false,
+    documents: null
+  }
+
+  beforeEach(() => {
+    useAppStore.setState({ tabs: [], activeTabId: null, _queryCounter: 0 })
+    useAppStore.getState().openQueryTab({ connectionId: 'c1', text: 'select 1; select 2' })
+  })
+
+  const tab = () => useAppStore.getState().tabs[0]
+
+  it('startScript resets result/error and arms the script', () => {
+    useAppStore.getState().finishRun(tab().id, { error: 'old error' })
+    useAppStore.getState().startScript(tab().id, 2)
+    expect(tab()).toMatchObject({
+      running: true,
+      error: null,
+      result: null,
+      queryId: null,
+      scriptRun: { total: 2, entries: [] }
+    })
+  })
+
+  it('scriptStatementStart points queryId at the in-flight statement (Cancel target)', () => {
+    useAppStore.getState().startScript(tab().id, 2)
+    useAppStore.getState().scriptStatementStart(tab().id, 'q-1')
+    expect(tab().queryId).toBe('q-1')
+    useAppStore.getState().scriptStatementStart(tab().id, 'q-2')
+    expect(tab().queryId).toBe('q-2')
+  })
+
+  it('scriptStatementDone appends entries in order; finishScript keeps them', () => {
+    useAppStore.getState().startScript(tab().id, 2)
+    useAppStore.getState().scriptStatementDone(tab().id, {
+      text: 'select 1;', result, error: null, skipped: false
+    })
+    useAppStore.getState().scriptStatementDone(tab().id, {
+      text: 'select 2', result: null, error: 'boom', skipped: false
+    })
+    useAppStore.getState().finishScript(tab().id)
+    const t = tab()
+    expect(t.running).toBe(false)
+    expect(t.queryId).toBeNull()
+    expect(t.scriptRun?.entries.map((e) => e.text)).toEqual(['select 1;', 'select 2'])
+    expect(t.scriptRun?.entries[1].error).toBe('boom')
+  })
+
+  it('a later single run supersedes the script results', () => {
+    useAppStore.getState().startScript(tab().id, 2)
+    useAppStore.getState().scriptStatementDone(tab().id, {
+      text: 'select 1;', result, error: null, skipped: false
+    })
+    useAppStore.getState().finishScript(tab().id)
+    useAppStore.getState().startRun(tab().id, 'q-9')
+    expect(tab().scriptRun).toBeNull() // panel must show the spinner, not stale sections
+    useAppStore.getState().finishRun(tab().id, { result })
+    const t = tab()
+    expect(t.scriptRun).toBeNull()
+    expect(t.result).toEqual(result)
+  })
+
+  it('scriptStatementDone on a tab without an armed script is a no-op', () => {
+    useAppStore.getState().scriptStatementDone(tab().id, {
+      text: 'select 1;', result: null, error: null, skipped: true
+    })
+    expect(tab().scriptRun).toBeNull()
+  })
+})

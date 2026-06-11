@@ -9,6 +9,23 @@ export type SaveQueryModalState =
   | { mode: 'create'; connectionId: string; query: string }
   | { mode: 'rename'; id: string; name: string }
 
+/** One statement's outcome within a Run-all script. */
+export interface ScriptStatementResult {
+  /** The statement's source text (snippet display + tooltips). */
+  text: string
+  result: QueryResult | null
+  error: string | null
+  /** True for statements never attempted because an earlier one failed. */
+  skipped: boolean
+}
+
+/** A Run-all execution: entries grow as statements finish; the script is still
+ *  running while the owning tab's `running` is true. */
+export interface ScriptRun {
+  total: number
+  entries: ScriptStatementResult[]
+}
+
 export interface QueryTabData {
   id: string
   connectionId: string
@@ -21,6 +38,8 @@ export interface QueryTabData {
   queryId: string | null
   result: QueryResult | null
   error: string | null
+  /** Exactly one of result/error/scriptRun is current — each run path clears the others. */
+  scriptRun: ScriptRun | null
 }
 
 interface AppState {
@@ -55,6 +74,13 @@ interface AppState {
   openOrLoadQuery: (args: { connectionId: string; title: string; text: string }) => void
   startRun: (id: string, queryId: string) => void
   finishRun: (id: string, payload: { result: QueryResult } | { error: string }) => void
+
+  // ── Run all (script execution) ────────────────────────────────────────────
+  startScript: (id: string, total: number) => void
+  /** Point the tab's queryId at the in-flight statement so Cancel targets it. */
+  scriptStatementStart: (id: string, queryId: string) => void
+  scriptStatementDone: (id: string, entry: ScriptStatementResult) => void
+  finishScript: (id: string) => void
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -92,6 +118,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         queryId: null,
         result: null,
         error: null,
+        scriptRun: null,
       }
       return { tabs: [...s.tabs, tab], activeTabId: tab.id, _queryCounter: n }
     }),
@@ -140,7 +167,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   startRun: (id, queryId) =>
     set((s) => ({
       tabs: s.tabs.map((t) =>
-        t.id === id ? { ...t, running: true, error: null, queryId, runOnOpen: false } : t
+        // scriptRun cleared: a single run supersedes a previous script's results.
+        t.id === id ? { ...t, running: true, error: null, queryId, runOnOpen: false, scriptRun: null } : t
       ),
     })),
 
@@ -148,8 +176,45 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => ({
       tabs: s.tabs.map((t) => {
         if (t.id !== id) return t
-        if ('result' in payload) return { ...t, running: false, queryId: null, result: payload.result, error: null }
-        return { ...t, running: false, queryId: null, error: payload.error, result: null }
+        if ('result' in payload)
+          return { ...t, running: false, queryId: null, result: payload.result, error: null, scriptRun: null }
+        return { ...t, running: false, queryId: null, error: payload.error, result: null, scriptRun: null }
       }),
+    })),
+
+  startScript: (id, total) =>
+    set((s) => ({
+      tabs: s.tabs.map((t) =>
+        t.id === id
+          ? {
+              ...t,
+              running: true,
+              error: null,
+              result: null,
+              queryId: null,
+              runOnOpen: false,
+              scriptRun: { total, entries: [] },
+            }
+          : t
+      ),
+    })),
+
+  scriptStatementStart: (id, queryId) =>
+    set((s) => ({
+      tabs: s.tabs.map((t) => (t.id === id ? { ...t, queryId } : t)),
+    })),
+
+  scriptStatementDone: (id, entry) =>
+    set((s) => ({
+      tabs: s.tabs.map((t) =>
+        t.id === id && t.scriptRun
+          ? { ...t, scriptRun: { ...t.scriptRun, entries: [...t.scriptRun.entries, entry] } }
+          : t
+      ),
+    })),
+
+  finishScript: (id) =>
+    set((s) => ({
+      tabs: s.tabs.map((t) => (t.id === id ? { ...t, running: false, queryId: null } : t)),
     })),
 }))

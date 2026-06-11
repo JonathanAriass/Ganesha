@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { QueryTabData } from '../state/store'
 import ResultsGrid from './ResultsGrid'
+import ScriptResults from './ScriptResults'
 import DocumentView from './DocumentView'
 import { toCsv, toJsonText, toJsonObjects, download } from '../lib/export'
 import { rowMatchesFilter } from '../lib/grid-text'
@@ -20,6 +21,15 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
   const [userView, setUserView] = useState<View | null>(null)
   const [filter, setFilter] = useState('')
   const view: View = userView ?? (hasDocuments ? 'documents' : 'table')
+
+  // Before the running spinner: a script renders progressively while it executes.
+  if (tab.scriptRun) {
+    return (
+      <div className="results">
+        <ScriptResults run={tab.scriptRun} running={tab.running} />
+      </div>
+    )
+  }
 
   if (tab.running) {
     return (
