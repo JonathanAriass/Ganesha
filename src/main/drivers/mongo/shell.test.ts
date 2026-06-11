@@ -52,6 +52,7 @@ describe('parseMongoShell', () => {
 
     it('rejects bad arguments and a missing collection', () => {
       expect(() => parseMongoShell('db.getSiblingDB(5).c.find({})')).toThrow(/must be a non-empty string/i)
+      expect(() => parseMongoShell('db.getSiblingDB(foo()).c.find({})')).toThrow(/unsupported helper 'foo\(\)'/i)
       expect(() => parseMongoShell('db.getSiblingDB("a", "b").c.find({})')).toThrow(/exactly one string argument/i)
       expect(() => parseMongoShell('db.getSiblingDB("a").find({})')).toThrow(/expected a collection after getSiblingDB/i)
       expect(() => parseMongoShell('db.getSiblingDB("a").c.dropDatabase()')).toThrow(/unsupported operation/i)

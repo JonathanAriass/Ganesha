@@ -59,6 +59,11 @@ describe('MongoDriver (integration, requires Docker)', () => {
       username: '', password: null, database: '', ssl: false
     })
 
+    // a plain command (no cmd.database) must NOT silently fall to the 'test' db
+    await expect(
+      driver.runQuery(idAll, { kind: 'mongo', command: { op: 'find', collection: 'users' } }, { maxRows: 1000, queryId: 'x0', readOnly: false })
+    ).rejects.toThrow(/no default database/i)
+
     // cmd.database routes the write to a second database
     await driver.runQuery(idAll, { kind: 'mongo', command: { op: 'insertOne', collection: 'things', database: 'otherdb', document: { x: 1 } } }, { maxRows: 1000, queryId: 'x1', readOnly: false })
 
@@ -68,10 +73,12 @@ describe('MongoDriver (integration, requires Docker)', () => {
     const users = await driver.runQuery(idAll, { kind: 'mongo', command: { op: 'countDocuments', collection: 'users', database: 'testdb' } }, { maxRows: 1000, queryId: 'x3', readOnly: false })
     expect(users.rows).toEqual([[2]])
 
-    // the tree sees both databases, collections tagged with their db as schema
+    // the tree sees both databases, collections tagged with their db as schema —
+    // system databases (admin/config/local) are hidden like SQL system schemas
     const objects = await driver.listObjects(idAll)
     expect(objects).toContainEqual({ schema: 'testdb', name: 'users', kind: 'collection' })
     expect(objects).toContainEqual({ schema: 'otherdb', name: 'things', kind: 'collection' })
+    expect(objects.filter((o) => ['admin', 'config', 'local'].includes(o.schema ?? ''))).toEqual([])
 
     // field inference follows ref.schema
     const columns = await driver.describeObject(idAll, { schema: 'otherdb', name: 'things' })

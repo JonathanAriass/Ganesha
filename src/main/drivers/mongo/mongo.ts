@@ -46,6 +46,17 @@ export function withAuthSourceHint(e: unknown, p: ConnectParams): Error {
   return e instanceof Error ? e : new Error(msg)
 }
 
+/** True for mongo authorization failures (code 13 Unauthorized / auth-required messages). */
+export function isAuthError(e: unknown): boolean {
+  if ((e as { code?: unknown })?.code === 13) return true
+  const msg = e instanceof Error ? e.message : String(e)
+  return /not authorized|unauthorized|requires authentication/i.test(msg)
+}
+
+/** Databases every mongod carries; hidden in browse-all like SQL system schemas.
+ *  Reach them by setting the connection's Database or via db.getSiblingDB("admin"). */
+const MONGO_SYSTEM_DBS = new Set(['admin', 'config', 'local'])
+
 interface OpenConnection {
   client: MongoClient
   /** The connection's configured database ('' = none → browse all databases). */
@@ -95,9 +106,16 @@ export class MongoDriver implements DatabaseDriver {
 
   async runQuery(id: string, request: QueryRequest, opts: RunOptions): Promise<QueryResult> {
     if (request.kind !== 'mongo') throw new Error('MongoDriver handles only Mongo requests')
-    const { client } = this.require(id)
+    const { client, database } = this.require(id)
     const cmd = request.command
-    // cmd.database (shell: db.getSiblingDB) overrides the connection default.
+    // cmd.database (shell: db.getSiblingDB) overrides the connection default. With
+    // neither, the driver would silently target a db literally named 'test' — refuse.
+    if (!database && !cmd.database) {
+      throw new Error(
+        `This connection has no default database — target one explicitly, ` +
+        `e.g. db.getSiblingDB("mydb").${cmd.collection}.${cmd.op}(...)`
+      )
+    }
     const coll = client.db(cmd.database).collection(cmd.collection)
     const start = Date.now()
     const ms = (): number => Date.now() - start
@@ -166,17 +184,21 @@ export class MongoDriver implements DatabaseDriver {
     let names: string[]
     try {
       const { databases } = await client.db('admin').admin().listDatabases({ nameOnly: true })
-      names = databases.map((d) => d.name)
+      names = databases.map((d) => d.name).filter((n) => !MONGO_SYSTEM_DBS.has(n))
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
-      throw new Error(`Could not list databases (${msg}). Set a Database on the connection to browse one directly.`)
+      // Only a privilege problem is fixed by picking a database — other failures
+      // (network, timeout) would hit single-db mode just the same.
+      const hint = isAuthError(e) ? ' Set a Database on the connection to browse one directly.' : ''
+      throw new Error(`Could not list databases (${msg}).${hint}`, { cause: e })
     }
-    const out: DbObject[] = []
-    for (const name of names) {
-      const cols = await client.db(name).listCollections({}, { nameOnly: true }).toArray()
-      for (const c of cols) out.push({ schema: name, name: c.name, kind: 'collection' as const })
-    }
-    return out.sort((a, b) =>
+    const perDb = await Promise.all(
+      names.map(async (name) => {
+        const cols = await client.db(name).listCollections({}, { nameOnly: true }).toArray()
+        return cols.map((c) => ({ schema: name, name: c.name, kind: 'collection' as const }))
+      })
+    )
+    return perDb.flat().sort((a, b) =>
       a.schema === b.schema ? a.name.localeCompare(b.name) : (a.schema ?? '').localeCompare(b.schema ?? '')
     )
   }
