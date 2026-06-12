@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { ObjectId } from 'bson'
+import { ObjectId, Long, Decimal128 } from 'bson'
 import { normalizeFind, normalizeScalar, normalizeValues, normalizeWriteResult } from './normalize'
 
 describe('mongo normalize', () => {
@@ -50,5 +50,33 @@ describe('mongo normalize', () => {
     expect(res.columns.map((c) => c.name)).toEqual(['acknowledged', 'insertedCount'])
     expect(res.rows).toEqual([[true, 2]])
     expect(res.documents).toBeNull()
+  })
+
+  it('Long stays a native number while safe, becomes an exact digit string beyond — the SQL drivers contract', () => {
+    const res = normalizeFind(
+      [{ small: Long.fromNumber(42), big: Long.fromString('9007199254740993'), nested: { deep: [Long.fromString('-9007199254740993')] } }],
+      10, 0
+    )
+    // relaxed EJSON alone would have read big as …992
+    expect(res.rows[0]).toEqual([42, '9007199254740993', { deep: ['-9007199254740993'] }])
+    // rows and the documents tree share one serialization — the tree heals too
+    expect((res.documents as Record<string, unknown>[])[0].big).toBe('9007199254740993')
+  })
+
+  it('Long boundary: 2^53−1 is the last native number; 2^53 itself goes string', () => {
+    const res = normalizeFind([{ a: Long.fromString('9007199254740991'), b: Long.fromString('9007199254740992') }], 10, 0)
+    expect(res.rows[0]).toEqual([9007199254740991, '9007199254740992'])
+  })
+
+  it('unsigned Long max round-trips exactly through normalizeValues', () => {
+    const res = normalizeValues('v', [Long.fromString('18446744073709551615', true)], 10, 0)
+    expect(res.rows).toEqual([['18446744073709551615']])
+  })
+
+  it('Date, ObjectId and Decimal128 still take the EJSON path untouched by the Long walk', () => {
+    const res = normalizeFind([{ d: new Date(0), o: new ObjectId('507f1f77bcf86cd799439011'), m: Decimal128.fromString('0.1') }], 10, 0)
+    expect((res.rows[0][0] as { $date: string }).$date).toContain('1970-01-01')
+    expect((res.rows[0][1] as { $oid: string }).$oid).toBe('507f1f77bcf86cd799439011')
+    expect(res.rows[0][2]).toEqual({ $numberDecimal: '0.1' })
   })
 })

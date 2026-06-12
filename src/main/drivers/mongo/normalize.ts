@@ -1,9 +1,30 @@
-import { EJSON } from 'bson'
+import { EJSON, type Long } from 'bson'
 import type { QueryResult, ColumnMeta } from '../../../shared/query'
+
+/** Exactness first: relaxed EJSON turns Int64 (Long) into a JS double, silently
+ *  corrupting values past 2^53 (…993 reads as …992). Convert Longs ourselves —
+ *  native number while Number-safe, exact digit string beyond — the same
+ *  contract the SQL drivers give (pg int8 strings, mysql2 supportBigNumbers).
+ *  A blanket {relaxed:false} would fix this too but wraps EVERY int in
+ *  {$numberInt:…} noise (deliberately rejected — see roadmap). Recurses only
+ *  into plain objects/arrays; other BSON types stay EJSON.serialize's job. */
+function exactLongs(v: unknown): unknown {
+  if (v === null || typeof v !== 'object') return v
+  if ((v as { _bsontype?: unknown })._bsontype === 'Long') {
+    const n = (v as Long).toNumber()
+    return Number.isSafeInteger(n) ? n : (v as Long).toString()
+  }
+  if (Array.isArray(v)) return v.map(exactLongs)
+  const proto = Object.getPrototypeOf(v)
+  if (proto === Object.prototype || proto === null) {
+    return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, exactLongs(x)]))
+  }
+  return v // Date, ObjectId, Decimal128, Binary, … — not containers, don't walk in
+}
 
 /** Serialize a BSON document/value to plain, IPC-safe EJSON (ObjectId -> {$oid}, Date -> {$date}, ...). */
 function toPlain<T = Record<string, unknown>>(value: unknown): T {
-  return EJSON.serialize(value as object) as T
+  return EJSON.serialize(exactLongs(value) as object) as T
 }
 
 /** find / findOne / aggregate → flat key-union table + raw EJSON documents. */

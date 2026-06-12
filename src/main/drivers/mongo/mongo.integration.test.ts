@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { GenericContainer, type StartedTestContainer } from 'testcontainers'
+import { Long } from 'bson'
 import { MongoDriver } from './mongo'
 
 describe('MongoDriver (integration, requires Docker)', () => {
@@ -51,6 +52,24 @@ describe('MongoDriver (integration, requires Docker)', () => {
     const names = columns.map((c) => c.name)
     expect(names).toContain('_id')
     expect(names).toContain('name')
+  })
+
+  it('int64 fidelity: a safe Long reads back as a number, past 2^53 as an exact digit string', async () => {
+    // Long instances are what parseMongoJson ($numberLong) and the shell parser
+    // (NumberLong) now hand the driver — the server stores true int64s.
+    await driver.runQuery(
+      id,
+      { kind: 'mongo', command: { op: 'insertMany', collection: 'fidelity', documents: [{ k: 'small', n: Long.fromNumber(42) }, { k: 'big', n: Long.fromString('9007199254740993') }] } },
+      { maxRows: 1000, queryId: 'q6', readOnly: false }
+    )
+    const res = await driver.runQuery(
+      id,
+      { kind: 'mongo', command: { op: 'find', collection: 'fidelity' } },
+      { maxRows: 1000, queryId: 'q7', readOnly: false }
+    )
+    const byKey = Object.fromEntries((res.documents as { k: string; n: unknown }[]).map((d) => [d.k, d.n]))
+    expect(byKey.small).toBe(42) // ordinary int64s stay native numbers
+    expect(byKey.big).toBe('9007199254740993') // relaxed EJSON alone would say …992
   })
 
   it('cancel kills the comment-tagged op; the connection stays usable', async () => {

@@ -1,6 +1,23 @@
 import { EJSON } from 'bson'
 import { type MongoCommand, type MongoOp, isMongoOp } from './command'
 
+/** Undo canonical parsing's number wrapping: Int32/Double instances become the
+ *  plain JS numbers relaxed mode would have produced (both are losslessly
+ *  representable), so envelope scalars (limit/skip) and ordinary values behave
+ *  exactly as before. Only Long stays an instance — that's the point: it can't
+ *  survive as a number past 2^53. Recurses plain objects/arrays only. */
+function unwrapNumbers(v: unknown): unknown {
+  if (v === null || typeof v !== 'object') return v
+  const t = (v as { _bsontype?: unknown })._bsontype
+  if (t === 'Int32' || t === 'Double') return (v as { valueOf(): number }).valueOf()
+  if (Array.isArray(v)) return v.map(unwrapNumbers)
+  const proto = Object.getPrototypeOf(v)
+  if (proto === Object.prototype || proto === null) {
+    return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, unwrapNumbers(x)]))
+  }
+  return v // Long, ObjectId, Decimal128, Date ($date has no _bsontype!), … intact
+}
+
 function asObject(v: unknown, field: string): Record<string, unknown> {
   if (v === null || typeof v !== 'object' || Array.isArray(v)) {
     throw new Error(`'${field}' must be an object`)
@@ -21,7 +38,11 @@ export function parseMongoJson(input: string): MongoCommand {
   try {
     // EJSON.parse is a JSON superset: it deserializes type wrappers ({$oid},{$date},
     // {$numberLong}, ...) into BSON instances while leaving query operators ($gt, $set) intact.
-    raw = EJSON.parse(input, { relaxed: true })
+    // Canonical mode, NOT relaxed: relaxed parsing collapses an explicit $numberLong
+    // into a JS double — silently corrupting it past 2^53 before it ever reaches the
+    // server. unwrapNumbers() then restores relaxed behavior for everything except
+    // Long, which the mongodb driver encodes as a true int64.
+    raw = unwrapNumbers(EJSON.parse(input, { relaxed: false }))
   } catch (e) {
     throw new Error(`Invalid JSON: ${(e as Error).message}`)
   }
