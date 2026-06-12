@@ -877,6 +877,121 @@ input[type="password"]::placeholder {
   opacity: 0.7;
 }
 
+/* ── Row inspector ── */
+/* Grid + docked inspector share the results area; .grid-wrap keeps flex: 1. */
+.grid-area {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.grid-row:hover {
+  background: var(--hover-overlay);
+}
+
+/* After .odd in the cascade so selection wins on striped rows. */
+.grid-row.selected {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.row-inspector {
+  width: 340px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border);
+  background: var(--bg-2);
+}
+
+.ri-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.ri-head .ri-title {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ri-body {
+  flex: 1;
+  overflow: auto;
+  padding: 8px 10px;
+}
+
+.ri-field {
+  margin-bottom: 10px;
+}
+
+.ri-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 3px;
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+.ri-name > span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ri-chip {
+  flex-shrink: 0;
+  padding: 0 4px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+}
+
+/* Hover-reveal via opacity, not visibility — stays tabbable (SavedSection idiom). */
+.ri-copy {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 0 4px;
+  border: none;
+  border-radius: 3px;
+  background: none;
+  color: var(--text-2);
+  font-size: 12px;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.ri-field:hover .ri-copy,
+.ri-copy:focus-visible {
+  opacity: 1;
+}
+
+.ri-copy:hover {
+  background: var(--hover-overlay);
+  color: var(--text);
+}
+
+.ri-pre {
+  margin: 0;
+  padding: 5px 7px;
+  max-height: 240px;
+  overflow: auto;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: ui-monospace, 'SF Mono', 'Fira Mono', monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 /* ── Document view ── */
 .doc-view {
   font-family: ui-monospace, 'SF Mono', 'Fira Mono', monospace;
