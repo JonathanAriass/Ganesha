@@ -72,6 +72,17 @@ describe('makeSessionSaver', () => {
     expect(write).toHaveBeenCalledTimes(1)
   })
 
+  it('a skipped save does not poison a later seed — savedOnce counts real writes only', () => {
+    const write = vi.fn()
+    const saver = makeSessionSaver(write)
+    saver.save([]) // boot flush before restore: skipped, must not count as a save
+    saver.seedFromDisk([session({ id: 'a' })]) // restore lands after — seed must still apply
+    saver.save([session({ id: 'a' })]) // hydrate echo: skipped
+    expect(write).not.toHaveBeenCalled()
+    saver.save([session({ id: 'a' }), session({ id: 'b' })]) // real change still writes
+    expect(write).toHaveBeenCalledTimes(1)
+  })
+
   it('a deliberate close-all after restore still clears disk', () => {
     const write = vi.fn()
     const saver = makeSessionSaver(write)
