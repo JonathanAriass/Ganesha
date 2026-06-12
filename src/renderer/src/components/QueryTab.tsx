@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { QueryTabData } from '../state/store'
 import { useAppStore } from '../state/store'
@@ -19,6 +19,15 @@ import {
   type SqlDialect,
   type Statement
 } from '../lib/statements'
+import {
+  clampFraction,
+  dragFraction,
+  loadEditorFraction,
+  saveEditorFraction,
+  DEFAULT_EDITOR_FRACTION,
+  MIN_EDITOR_FRACTION,
+  MAX_EDITOR_FRACTION
+} from '../lib/split'
 
 function langFor(type: ConnectionType | undefined): string {
   return type === 'mongodb' ? 'javascript' : 'sql'
@@ -66,6 +75,55 @@ export default function QueryTab({ tab }: Props): JSX.Element {
   }
 
   const editorRef = useRef<MonacoEditorHandle>(null)
+
+  // ── Editor/results split ──
+  const containerRef = useRef<HTMLDivElement>(null)
+  const editorPaneRef = useRef<HTMLDivElement>(null)
+  // Global preference; a remount (tab switch) picks up the latest saved value.
+  const [editorFraction, setEditorFraction] = useState(() => loadEditorFraction())
+  const dragFracRef = useRef(editorFraction)
+
+  function commitFraction(f: number): void {
+    dragFracRef.current = f
+    setEditorFraction(f)
+    saveEditorFraction(f)
+  }
+
+  function onDividerPointerDown(e: React.PointerEvent<HTMLDivElement>): void {
+    if (e.button !== 0) return
+    e.preventDefault() // keep the drag from starting a text selection in Monaco/grid
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+
+  function onDividerPointerMove(e: React.PointerEvent<HTMLDivElement>): void {
+    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return // hover, not a drag
+    const container = containerRef.current
+    const pane = editorPaneRef.current
+    if (!container || !pane) return
+    const f = dragFraction(
+      e.clientY,
+      pane.getBoundingClientRect().top, // the pane's TOP edge is fixed during a drag
+      container.getBoundingClientRect().height
+    )
+    dragFracRef.current = f
+    // Direct DOM write while dragging — a React re-render per pointermove would
+    // re-render the results grid too, and unmemoized work under useVirtualizer
+    // runs per frame (the row-inspector lesson). React state + localStorage are
+    // committed once, on pointerup; Monaco follows via automaticLayout.
+    pane.style.flexBasis = `${f * 100}%`
+  }
+
+  function onDividerPointerEnd(e: React.PointerEvent<HTMLDivElement>): void {
+    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
+    commitFraction(dragFracRef.current)
+  }
+
+  function onDividerKeyDown(e: React.KeyboardEvent<HTMLDivElement>): void {
+    const step = e.key === 'ArrowUp' ? -0.02 : e.key === 'ArrowDown' ? 0.02 : null
+    if (step === null) return
+    e.preventDefault() // arrows must resize, not scroll the page
+    commitFraction(clampFraction(editorFraction + step))
+  }
 
   /** The tab's text split with this connection's dialect rules. */
   function tabStatements(): Statement[] {
@@ -216,7 +274,7 @@ export default function QueryTab({ tab }: Props): JSX.Element {
   }
 
   return (
-    <div className="querytab">
+    <div className="querytab" ref={containerRef}>
       <div className="qt-toolbar">
         <button
           className="btn primary"
@@ -273,15 +331,38 @@ export default function QueryTab({ tab }: Props): JSX.Element {
         )}
         {statusEl}
       </div>
-      <MonacoEditor
-        key={`${tab.id}:${tab.epoch}`}
-        ref={editorRef}
-        initialValue={tab.text}
-        language={langFor(connection?.type)}
-        onChange={(t) => setTabText(tab.id, t)}
-        onRun={run}
-        onRunAll={() => void runAll()}
-        completions={completions}
+      <div
+        className="qt-editor-pane"
+        ref={editorPaneRef}
+        style={{ flexBasis: `${editorFraction * 100}%` }}
+      >
+        <MonacoEditor
+          key={`${tab.id}:${tab.epoch}`}
+          ref={editorRef}
+          initialValue={tab.text}
+          language={langFor(connection?.type)}
+          onChange={(t) => setTabText(tab.id, t)}
+          onRun={run}
+          onRunAll={() => void runAll()}
+          completions={completions}
+        />
+      </div>
+      <div
+        className="qt-divider"
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label="Resize editor and results"
+        aria-valuemin={Math.round(MIN_EDITOR_FRACTION * 100)}
+        aria-valuemax={Math.round(MAX_EDITOR_FRACTION * 100)}
+        aria-valuenow={Math.round(editorFraction * 100)}
+        tabIndex={0}
+        title="Drag to resize · double-click to reset"
+        onPointerDown={onDividerPointerDown}
+        onPointerMove={onDividerPointerMove}
+        onPointerUp={onDividerPointerEnd}
+        onPointerCancel={onDividerPointerEnd}
+        onDoubleClick={() => commitFraction(DEFAULT_EDITOR_FRACTION)}
+        onKeyDown={onDividerKeyDown}
       />
       <ResultsPanel tab={tab} />
     </div>

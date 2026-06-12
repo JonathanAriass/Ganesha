@@ -740,10 +740,34 @@ input[type="password"]::placeholder {
   white-space: nowrap;
 }
 
+.qt-editor-pane {
+  /* flex-basis comes inline from React (the persisted drag fraction); this is
+     just the no-JS floor matching DEFAULT_EDITOR_FRACTION. */
+  flex: 0 0 30%;
+  min-height: 80px;
+  /* Hard guard regardless of the stored fraction: leave ~100px of results
+     visible under the toolbar (~37px) and divider (6px) even on short windows.
+     When the window is so short the two constraints cross, min-height wins —
+     the editor floor holds and .results scrolls. */
+  max-height: calc(100% - 150px);
+}
+
 .editor-host {
-  flex: 0 0 42%;
-  min-height: 160px;
-  border-bottom: 1px solid var(--border);
+  height: 100%;
+}
+
+.qt-divider {
+  flex: 0 0 6px;
+  cursor: row-resize;
+  touch-action: none; /* the drag is pointer-captured — never let touch scroll eat it */
+  /* 1px visual line centered in a 6px grab area (replaces the old editor border-bottom) */
+  background: linear-gradient(var(--border), var(--border)) center / 100% 1px no-repeat;
+}
+
+.qt-divider:hover,
+.qt-divider:focus-visible {
+  background: linear-gradient(var(--accent), var(--accent)) center / 100% 2px no-repeat;
+  outline: none; /* the thicker accent line IS the focus indicator */
 }
 
 .results {
