@@ -19,7 +19,11 @@ function exactLongs(v: unknown): unknown {
   if (proto === Object.prototype || proto === null) {
     return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, exactLongs(x)]))
   }
-  return v // Date, ObjectId, Decimal128, Binary, … — not containers, don't walk in
+  // Date, ObjectId, Decimal128, Binary, … — not containers, don't walk in. Known
+  // accepted gap: the two legacy types with interiors (Code-with-scope's $scope,
+  // DBRef's extra fields) can hold Longs we never reach, so those still serialize
+  // relaxed-lossy past 2^53 — too rare/deprecated to earn branches here.
+  return v
 }
 
 /** Serialize a BSON document/value to plain, IPC-safe EJSON (ObjectId -> {$oid}, Date -> {$date}, ...). */

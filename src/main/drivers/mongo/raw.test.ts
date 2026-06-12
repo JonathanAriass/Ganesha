@@ -31,6 +31,29 @@ describe('parseMongoJson', () => {
     expect((cmd.filter!.t as Date).toISOString()).toBe('2026-06-12T00:00:00.000Z')
   })
 
+  it('bare integers past int32 range stay plain JS numbers — canonical parse wraps them in Long, the walk unwraps them back', () => {
+    const cmd = parseMongoJson('{"op":"find","collection":"c","filter":{"n":5000000000,"t":1749722400000}}')
+    expect(cmd.filter).toEqual({ n: 5000000000, t: 1749722400000 }) // toEqual fails on Long instances
+    expect(typeof cmd.filter!.n).toBe('number')
+  })
+
+  it('limit past int32 range is still accepted as a plain envelope number', () => {
+    const cmd = parseMongoJson('{"op":"find","collection":"c","limit":5000000000}')
+    expect(cmd.limit).toBe(5000000000)
+  })
+
+  it('bare big int and explicit $numberLong coexist in one array, each keeping its semantics', () => {
+    const cmd = parseMongoJson('{"op":"find","collection":"c","filter":{"a":{"$in":[5000000000,{"$numberLong":"9007199254740993"},9007199254740993]}}}')
+    const arr = (cmd.filter!.a as { $in: unknown[] }).$in
+    expect(arr[0]).toBe(5000000000) // bare → plain number, exactly what relaxed/shell would give
+    const big = arr[1] as { _bsontype: string; toString(): string }
+    expect(big._bsontype).toBe('Long') // wrapper → exact int64
+    expect(big.toString()).toBe('9007199254740993')
+    // A bare number past 2^53 was already lossy in the source JSON — it stays the
+    // double JSON.parse produced (…992), same as relaxed mode and the shell.
+    expect(arr[2]).toBe(9007199254740992)
+  })
+
   it('parses a find with filter/projection/sort/limit/skip', () => {
     const cmd = parseMongoJson(JSON.stringify({
       op: 'find', collection: 'users',
