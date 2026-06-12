@@ -1,8 +1,9 @@
 import type { ColumnMeta, QueryResult } from '@shared/query'
+import { jsonStringify } from './json'
 
 function csvEscape(v: unknown): string {
   if (v === null || v === undefined) return ''
-  const s = typeof v === 'object' ? JSON.stringify(v) : String(v)
+  const s = typeof v === 'object' ? jsonStringify(v) : String(v)
   return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s
 }
 
@@ -13,11 +14,11 @@ export function toCsv(columns: ColumnMeta[], rows: unknown[][]): string {
 /** Rows as an array of {column: value} objects — the JSON shape for tabular exports. */
 export function toJsonObjects(columns: ColumnMeta[], rows: unknown[][]): string {
   const objects = rows.map((r) => Object.fromEntries(columns.map((c, i) => [c.name, r[i]])))
-  return JSON.stringify(objects, null, 2)
+  return jsonStringify(objects, true)
 }
 
 export function toJsonText(result: QueryResult): string {
-  if (result.documents) return JSON.stringify(result.documents, null, 2)
+  if (result.documents) return jsonStringify(result.documents, true)
   return toJsonObjects(result.columns, result.rows)
 }
 

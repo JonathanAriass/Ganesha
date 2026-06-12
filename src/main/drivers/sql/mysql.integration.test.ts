@@ -56,6 +56,31 @@ describe('MySqlDriver (integration, requires Docker)', () => {
     ).rejects.toThrow(/read[- ]?only/i)
   })
 
+  it('returns BIGINT exactly: native number while safe, digit string past 2^53', async () => {
+    await driver.runQuery(
+      id,
+      { kind: 'sql', sql: 'CREATE TABLE fidelity (big BIGINT, price DECIMAL(20, 6))' },
+      { maxRows: 1000, queryId: 'q7', readOnly: false }
+    )
+    const ins = await driver.runQuery(
+      id,
+      // 9007199254740993 = 2^53 + 1: the default Number decode would silently read it as …992.
+      { kind: 'sql', sql: 'INSERT INTO fidelity VALUES (42, 0.1), (9007199254740993, 1234567890123.456789)' },
+      { maxRows: 1000, queryId: 'q8', readOnly: false }
+    )
+    expect(ins.rowCount).toBe(2) // affectedRows survives the defensive Number() coercion
+
+    const res = await driver.runQuery(
+      id,
+      { kind: 'sql', sql: 'SELECT big, price FROM fidelity ORDER BY big' },
+      { maxRows: 1000, queryId: 'q9', readOnly: false }
+    )
+    expect(res.rows).toEqual([
+      [42, '0.100000'], // DECIMAL is always an exact string (mysql2 default)
+      ['9007199254740993', '1234567890123.456789']
+    ])
+  })
+
   it('listObjects and describeObject return correct schema metadata', async () => {
     await driver.runQuery(
       id,

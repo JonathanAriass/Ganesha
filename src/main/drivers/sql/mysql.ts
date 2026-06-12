@@ -25,6 +25,13 @@ export class MySqlDriver implements DatabaseDriver {
       // mysql2 allows connecting with no default database; '' means "none selected".
       database: p.database || undefined,
       ssl: p.ssl ? { rejectUnauthorized: false } : undefined,
+      // Exactness first: by default mysql2 decodes BIGINT into a JS number even
+      // past 2^53, silently corrupting large ids (…993 reads as …992). With
+      // supportBigNumbers — and deliberately WITHOUT bigNumberStrings — values
+      // stay native numbers while safe and arrive as exact strings only beyond
+      // that, so ordinary ids keep numeric sort/display. DECIMAL is exact
+      // strings by default; node-postgres gives int8/numeric the same way.
+      supportBigNumbers: true,
       connectionLimit: 4,
       connectTimeout: 10_000,
       idleTimeout: 30_000
@@ -83,7 +90,9 @@ export class MySqlDriver implements DatabaseDriver {
       return {
         columns,
         rows,
-        rowCount: isResultSet ? allRows.length : ((rawRows as { affectedRows?: number }).affectedRows ?? 0),
+        // Number() is defensive: supportBigNumbers can widen length-coded
+        // OkPacket fields (affectedRows) to strings for absurd values.
+        rowCount: isResultSet ? allRows.length : Number((rawRows as { affectedRows?: number | string }).affectedRows ?? 0),
         durationMs: Date.now() - start,
         truncated,
         documents: null

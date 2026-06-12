@@ -9,6 +9,11 @@ describe('cellText', () => {
     expect(cellText(42)).toBe('42')
     expect(cellText('x')).toBe('x')
   })
+
+  it('survives BigInt — bare as plain digits, nested as a digit string', () => {
+    expect(cellText(9007199254740993n)).toBe('9007199254740993')
+    expect(cellText({ big: 9007199254740993n })).toBe('{"big":"9007199254740993"}')
+  })
 })
 
 describe('rowMatchesFilter', () => {

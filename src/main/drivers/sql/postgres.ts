@@ -13,6 +13,9 @@ export class PostgresDriver implements DatabaseDriver {
   private running = new Map<string, number>() // queryId -> backend pid
 
   private poolConfig(p: ConnectParams): pg.PoolConfig {
+    // No custom type parsers on purpose: node-postgres defaults return int8 and
+    // numeric as exact strings (never a lossy JS number) — the same contract
+    // MySqlDriver gets from supportBigNumbers. Don't "fix" them into numbers.
     return {
       host: p.host,
       port: p.port,

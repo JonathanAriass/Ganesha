@@ -20,11 +20,22 @@ describe('toCsv', () => {
     expect(csv).toContain('3,"say ""hi"""')
     expect(csv).toContain('4,')
   })
+
+  it('survives BigInt cells — bare as plain digits, nested as a digit string', () => {
+    const csv = toCsv(columns, [[9007199254740993n, { big: 9007199254740993n }]])
+    expect(csv.split('\n')[1]).toBe('9007199254740993,"{""big"":""9007199254740993""}"')
+  })
 })
 
 describe('toJsonObjects / toJsonText', () => {
   it('exports rows as column-keyed objects', () => {
     expect(JSON.parse(toJsonObjects(columns, [[1, 'x']]))).toEqual([{ id: 1, note: 'x' }])
+  })
+
+  it('exports BigInt cells as exact digit strings instead of throwing', () => {
+    expect(JSON.parse(toJsonObjects(columns, [[9007199254740993n, 'x']]))).toEqual([
+      { id: '9007199254740993', note: 'x' }
+    ])
   })
 
   it('toJsonText prefers documents when present, else falls back to row objects', () => {

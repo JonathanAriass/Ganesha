@@ -1,8 +1,10 @@
+import { jsonStringify } from './json'
+
 /** Render a cell value the way the grid does (objects stringify, null/undefined blank). */
 export function cellText(v: unknown): string {
   if (v === null || v === undefined) return ''
-  if (typeof v === 'object') return JSON.stringify(v)
-  return String(v)
+  if (typeof v === 'object') return jsonStringify(v)
+  return String(v) // covers top-level BigInt too: '9007199254740993', unquoted
 }
 
 /** One cell vs the filter — the single matching rule shared by grid and export. */

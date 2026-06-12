@@ -1,4 +1,5 @@
 import type { ColumnMeta } from '@shared/query'
+import { jsonStringify } from './json'
 
 /** One field of the inspected row, projected for display. */
 export interface FieldView {
@@ -14,11 +15,6 @@ export interface FieldView {
   copyText: string
 }
 
-/** JSON.stringify that survives BigInt (mysql2/BSON can hand them over). */
-function stringify(v: unknown, pretty: boolean): string {
-  return JSON.stringify(v, (_k, x) => (typeof x === 'bigint' ? x.toString() : x), pretty ? 2 : undefined)
-}
-
 /** Project one cell value for the inspector. */
 export function fieldView(v: unknown): FieldView {
   if (v === null || v === undefined) {
@@ -26,7 +22,7 @@ export function fieldView(v: unknown): FieldView {
     return { text: 'NULL', isNull: true, formatted: false, copyText: '' }
   }
   if (typeof v === 'object') {
-    const pretty = stringify(v, true)
+    const pretty = jsonStringify(v, true)
     return { text: pretty, isNull: false, formatted: false, copyText: pretty }
   }
   if (typeof v === 'string') {
@@ -49,7 +45,7 @@ export function fieldView(v: unknown): FieldView {
 /** The whole row as a pretty {column: value} JSON object — the Copy-row shape.
  *  Duplicate column names collapse last-wins, same as the JSON export. */
 export function rowJson(columns: ColumnMeta[], row: unknown[]): string {
-  return stringify(Object.fromEntries(columns.map((c, i) => [c.name, row[i]])), true)
+  return jsonStringify(Object.fromEntries(columns.map((c, i) => [c.name, row[i]])), true)
 }
 
 /** Header label: position is the row's index in the CURRENT view order
