@@ -8,7 +8,7 @@ Built with Electron, React and TypeScript (electron-vite). Connections have a **
 
 - **Connections** — create, test, edit and color-code connections for all four engines. Passwords are encrypted with the OS keychain (Electron `safeStorage`) and are *write-only*: no IPC channel can read one back into the UI.
 - **Schema browser** — tables, views and collections in a sidebar tree; double-click to open a ready-made query tab that runs itself. Leave a Mongo connection's database blank to browse *all* databases, Compass-style.
-- **Query tabs** — Monaco editor with per-engine language (SQL or mongosh-style JavaScript), local workers, custom Midnight/Daylight themes. Tab state (text, results, running query) survives switching — and the open tabs themselves survive an app restart (text only; nothing re-runs on launch).
+- **Query tabs** — Monaco editor with per-engine language (SQL or mongosh-style JavaScript), local workers, custom Midnight/Daylight themes. Tab state (text, results, running query) survives switching — and the open tabs themselves survive an app restart (text only; nothing re-runs on launch). Double-click a tab to rename it; names persist too.
 - **Autocomplete** — schema-aware: SQL tables/views, columns after `alias.` or `table.`, objects after `schema.`; Mongo collections after `db.`, database names inside `getSiblingDB("…")`, and operation snippets after `db.coll.`.
 - **Run exactly what you mean** — ⌘↵ runs the selection if there is one, else the statement under the cursor when the tab holds several, else the whole tab. ⌘⇧↵ (or ▶▶) runs *all* statements top-to-bottom as individual queries with per-statement collapsible results, stopping at the first error; scripts that need `BEGIN`/`COMMIT` to span statements are refused up front instead of silently misbehaving on pooled connections.
 - **Saved queries** — name a snippet with ⌘S (or ☆) and it lives in the sidebar and the palette, per connection.
@@ -54,7 +54,7 @@ npm run dev        # launch the app with hot reload
 
 ```bash
 npm run typecheck && npm run lint
-npm test                  # 266 unit tests (Vitest, Node ABI)
+npm test                  # 270 unit tests (Vitest, Node ABI)
 npm run test:integration  # 14 tests vs real Postgres/MySQL/Mongo (testcontainers, needs Docker)
 ```
 
