@@ -80,6 +80,8 @@ interface AppState {
   closeTab: (id: string) => void
   closeTabsForConnection: (connectionId: string) => void
   setActiveTab: (id: string) => void
+  /** Rename a tab (trimmed). Empty/whitespace titles are rejected — the tab keeps its name. */
+  renameTab: (id: string, title: string) => void
   setTabText: (id: string, text: string) => void
   loadQueryText: (id: string, text: string) => void
   /** Load text into the active tab when it belongs to `connectionId`, else open a new tab. */
@@ -194,6 +196,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     }),
 
   setActiveTab: (id) => set({ activeTabId: id }),
+
+  renameTab: (id, title) =>
+    set((s) => {
+      const t = title.trim()
+      if (!t) return s
+      return { tabs: s.tabs.map((tab) => (tab.id === id ? { ...tab, title: t } : tab)) }
+    }),
 
   setTabText: (id, text) =>
     set((s) => ({

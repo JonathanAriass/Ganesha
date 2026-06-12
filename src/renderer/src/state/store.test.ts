@@ -171,6 +171,38 @@ describe('script run lifecycle', () => {
   })
 })
 
+describe('renameTab', () => {
+  beforeEach(() => {
+    useAppStore.setState({ tabs: [], activeTabId: null, _queryCounter: 0 })
+    useAppStore.getState().openQueryTab({ connectionId: 'c1' })
+  })
+
+  const tab = () => useAppStore.getState().tabs[0]
+
+  it('renames with the trimmed title', () => {
+    useAppStore.getState().renameTab(tab().id, '  Orders by day  ')
+    expect(tab().title).toBe('Orders by day')
+  })
+
+  it('rejects empty and whitespace-only titles', () => {
+    useAppStore.getState().renameTab(tab().id, '   ')
+    expect(tab().title).toBe('Query 1')
+  })
+
+  it('unknown id is a no-op', () => {
+    useAppStore.getState().renameTab('nope', 'X')
+    expect(tab().title).toBe('Query 1')
+  })
+
+  it('a renamed title round-trips through hydrateTabs', () => {
+    useAppStore.getState().renameTab(tab().id, 'mine')
+    const persisted = { id: tab().id, connectionId: 'c1', title: tab().title, text: '', active: true }
+    useAppStore.setState({ tabs: [], activeTabId: null })
+    useAppStore.getState().hydrateTabs([persisted])
+    expect(useAppStore.getState().tabs[0].title).toBe('mine')
+  })
+})
+
 describe('hydrateTabs', () => {
   beforeEach(() => {
     useAppStore.setState({ tabs: [], activeTabId: null, activeConnectionId: null, _queryCounter: 0 })
