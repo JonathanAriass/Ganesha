@@ -140,6 +140,10 @@ export default function ResultsGrid({ columns, rows, globalFilter }: Props): JSX
                   selTimer.current = window.setTimeout(() => {
                     selTimer.current = null
                     setSel({ rows, id })
+                    // 250ms is a deliberate trade: Chromium counts double-clicks for
+                    // ~500ms, but charging 500ms to EVERY panel open (the primary
+                    // interaction) isn't worth covering unusually slow double-clicks
+                    // — and the panel visibly opening under the gesture is its own cue.
                   }, 250)
                 }}
               >
