@@ -3,8 +3,8 @@
  *
  *  No driver hands the renderer a BigInt today — pg returns int8/numeric as
  *  exact strings, mysql2 (with supportBigNumbers) goes string once a value
- *  leaves Number-safe range, and Mongo rows arrive EJSON-relaxed (Int64 →
- *  lossy double past 2^53 — unfixed, on the roadmap) — so this is
+ *  leaves Number-safe range, and Mongo Longs are pre-converted in main
+ *  (number while Number-safe, exact digit string beyond) — so this is
  *  defense-in-depth: the grid, exports and inspector all degrade the same
  *  way if one ever does. */
 export function jsonStringify(v: unknown, pretty = false): string {
