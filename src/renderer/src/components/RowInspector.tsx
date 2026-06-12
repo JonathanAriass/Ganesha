@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import type { ColumnMeta } from '@shared/query'
 import { fieldView, rowJson, positionLabel } from '../lib/inspect'
 
@@ -17,6 +18,11 @@ interface Props {
  *  long JSON/text being illegible in ~140px columns. Pure presentation; the
  *  owning grid supplies view-order navigation. */
 export default function RowInspector({ columns, row, pos, total, onPrev, onNext, onClose }: Props): JSX.Element {
+  // Memoized: the virtualizer re-renders the owning grid on every scroll frame,
+  // and re-projecting a multi-MB JSON cell (parse + pretty-print) per frame is
+  // real jank. Both deps are reference-stable until the inspected row changes.
+  const fields = useMemo(() => columns.map((_c, i) => fieldView(row[i])), [columns, row])
+
   return (
     <div className="row-inspector">
       <div className="ri-head">
@@ -46,7 +52,7 @@ export default function RowInspector({ columns, row, pos, total, onPrev, onNext,
       </div>
       <div className="ri-body">
         {columns.map((c, i) => {
-          const f = fieldView(row[i])
+          const f = fields[i]
           return (
             // Index key: column names can duplicate (SELECT 1 AS a, 2 AS a).
             <div className="ri-field" key={i}>

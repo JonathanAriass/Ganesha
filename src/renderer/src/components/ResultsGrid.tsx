@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import {
   useReactTable,
   getCoreRowModel,
@@ -27,7 +27,19 @@ export default function ResultsGrid({ columns, rows, globalFilter }: Props): JSX
   // rows reference is captured alongside it: when a new result lands, the pair
   // no longer matches and the selection self-invalidates (no effect needed).
   const [sel, setSel] = useState<{ rows: unknown[][]; id: string } | null>(null)
+  // Render-phase reset (React's "adjusting state during render" pattern) so a
+  // stale selection doesn't pin the previous result's rows in memory.
+  if (sel !== null && sel.rows !== rows) setSel(null)
   const selId = sel !== null && sel.rows === rows ? sel.id : null
+
+  // Pending deferred panel-open (see the row onClick); cleared on unmount.
+  const selTimer = useRef<number | null>(null)
+  useEffect(
+    () => () => {
+      if (selTimer.current !== null) window.clearTimeout(selTimer.current)
+    },
+    []
+  )
 
   const columnDefs = useMemo<ColumnDef<unknown[]>[]>(
     () =>
@@ -108,10 +120,28 @@ export default function ResultsGrid({ columns, rows, globalFilter }: Props): JSX
                 key={row.id}
                 className={`grid-row${virtualRow.index % 2 === 1 ? ' odd' : ''}${row.id === selId ? ' selected' : ''}`}
                 style={{ gridTemplateColumns, transform: `translateY(${virtualRow.start}px)` }}
-                // Click selects only — never toggles closed. A toggle would make the
-                // cell's double-click-copy open and shut the panel under the cursor
-                // (the layout shift could even retarget the second click).
-                onClick={() => setSel({ rows, id: row.id })}
+                // Click selects only — never toggles closed — and OPENING the panel
+                // is deferred past the double-click window: the panel mounting
+                // reflows the flexed grid, so clicks 1 and 2 of a double-click must
+                // see the SAME layout or click 2 retargets and the cell's
+                // double-click-copy silently grabs a neighboring cell's value.
+                // With the panel already open nothing reflows — select immediately.
+                onClick={(e) => {
+                  if (selTimer.current !== null) {
+                    window.clearTimeout(selTimer.current)
+                    selTimer.current = null
+                  }
+                  if (selId !== null) {
+                    setSel({ rows, id: row.id })
+                    return
+                  }
+                  if (e.detail !== 1) return // part of a double-click: leave the layout alone
+                  const id = row.id
+                  selTimer.current = window.setTimeout(() => {
+                    selTimer.current = null
+                    setSel({ rows, id })
+                  }, 250)
+                }}
               >
                 {row.getVisibleCells().map((cell) => {
                   const raw = cell.getValue()
@@ -139,6 +169,8 @@ export default function ResultsGrid({ columns, rows, globalFilter }: Props): JSX
 
       {selId !== null && (
         <RowInspector
+          // Keyed by row: navigation remounts the panel, resetting its scroll.
+          key={selId}
           columns={columns}
           row={rows[Number(selId)]}
           pos={selPos}

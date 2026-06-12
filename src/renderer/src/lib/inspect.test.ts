@@ -59,6 +59,23 @@ describe('fieldView', () => {
     expect(fieldView(9007199254740993n).text).toBe('9007199254740993')
     expect(fieldView({ big: 9007199254740993n }).text).toContain('"big": "9007199254740993"')
   })
+
+  it('Date (pg timestamps) renders as the quoted ISO string, same as the grid projection', () => {
+    const f = fieldView(new Date('2026-06-12T00:00:00.000Z'))
+    expect(f.text).toBe('"2026-06-12T00:00:00.000Z"')
+    expect(f.formatted).toBe(false)
+  })
+
+  it('Uint8Array (bytea) renders as its numeric-key object', () => {
+    expect(fieldView(new Uint8Array([1, 2])).text).toBe('{\n  "0": 1,\n  "1": 2\n}')
+  })
+
+  it('whitespace-wrapped JSON strings format but copy the exact original bytes', () => {
+    const raw = '  {"a":1}  '
+    const f = fieldView(raw)
+    expect(f.formatted).toBe(true)
+    expect(f.copyText).toBe(raw)
+  })
 })
 
 describe('rowJson', () => {
