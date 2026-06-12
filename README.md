@@ -7,14 +7,17 @@ Built with Electron, React and TypeScript (electron-vite). Connections have a **
 ## Features
 
 - **Connections** — create, test, edit and color-code connections for all four engines. Passwords are encrypted with the OS keychain (Electron `safeStorage`) and are *write-only*: no IPC channel can read one back into the UI.
-- **Schema browser** — tables, views and collections in a sidebar tree; double-click to open a ready-made query tab that runs itself.
-- **Query tabs** — Monaco editor with per-engine language (SQL or mongosh-style JavaScript), local workers, custom Midnight/Daylight themes. Tab state (text, results, running query) survives switching.
+- **Schema browser** — tables, views and collections in a sidebar tree; double-click to open a ready-made query tab that runs itself. Leave a Mongo connection's database blank to browse *all* databases, Compass-style.
+- **Query tabs** — Monaco editor with per-engine language (SQL or mongosh-style JavaScript), local workers, custom Midnight/Daylight themes. Tab state (text, results, running query) survives switching — and the open tabs themselves survive an app restart (text only; nothing re-runs on launch).
+- **Autocomplete** — schema-aware: SQL tables/views, columns after `alias.` or `table.`, objects after `schema.`; Mongo collections after `db.`, database names inside `getSiblingDB("…")`, and operation snippets after `db.coll.`.
+- **Run exactly what you mean** — ⌘↵ runs the selection if there is one, else the statement under the cursor when the tab holds several, else the whole tab. ⌘⇧↵ (or ▶▶) runs *all* statements top-to-bottom as individual queries with per-statement collapsible results, stopping at the first error; scripts that need `BEGIN`/`COMMIT` to span statements are refused up front instead of silently misbehaving on pooled connections.
+- **Saved queries** — name a snippet with ⌘S (or ☆) and it lives in the sidebar and the palette, per connection.
 - **Two Mongo input modes** — raw EJSON commands (`{ "find": "users", ... }`) or mongosh shell syntax (`db.users.find({...}).sort({...}).limit(5)`), parsed by a restricted AST evaluator — no code execution.
 - **Read-only enforcement, twice** — on connections marked read-only, SQL is statement-guarded (writes/DDL rejected, including `SELECT INTO`) *and* runs inside a server-side `READ ONLY` transaction; Mongo commands pass an allow-list that also blocks `$out`/`$merge` aggregations.
-- **Results** — virtualized grid (TanStack Table + Virtual) that handles large result sets, instant client-side filtering, a collapsible document tree view for Mongo, CSV/JSON export.
-- **Cancel** — long queries can be killed mid-flight (`pg_cancel_backend` / `KILL QUERY`; Mongo ops bound themselves via `maxTimeMS`).
+- **Results** — virtualized grid (TanStack Table + Virtual) that handles large result sets, instant client-side filtering, a collapsible document tree view for Mongo, CSV/JSON export that respects the active filter. Row counts are honest: when Mongo can't know the true total, the label says "showing first N (more available)" instead of inventing one.
+- **Cancel** — long queries can be killed mid-flight (`pg_cancel_backend` / `KILL QUERY` / Mongo `killOp` via comment-tagged `$currentOp`). During a script run, Cancel also stops at the next statement boundary.
 - **History** — every run is recorded (success or failure) and can be loaded back into a tab with one click.
-- **⌘K palette** — fuzzy-jump to connections, tables/collections and actions (cmdk).
+- **⌘K palette** — fuzzy-jump to connections, tables/collections, saved queries and actions (cmdk).
 - **Settings** — Midnight ⇄ Light theme (flash-free on launch) and a relocatable data directory (your data is copied, never lost).
 
 ### Keyboard shortcuts
@@ -26,7 +29,9 @@ Built with Electron, React and TypeScript (electron-vite). Connections have a **
 | ⌘W / Ctrl+W | Close tab |
 | ⇧⌘W | Close window |
 | ⌘, / Ctrl+, | Settings |
-| ⌘↵ in editor | Run query |
+| ⌘S / Ctrl+S | Save query as snippet |
+| ⌘↵ in editor | Run selection → statement at cursor → whole tab |
+| ⇧⌘↵ in editor | Run all statements |
 | Esc | Close overlay |
 
 ## Security posture
@@ -49,8 +54,8 @@ npm run dev        # launch the app with hot reload
 
 ```bash
 npm run typecheck && npm run lint
-npm test                  # 67 unit tests (Vitest, Node ABI)
-npm run test:integration  # 12 tests vs real Postgres/MySQL/Mongo (testcontainers, needs Docker)
+npm test                  # 266 unit tests (Vitest, Node ABI)
+npm run test:integration  # 14 tests vs real Postgres/MySQL/Mongo (testcontainers, needs Docker)
 ```
 
 CI (GitHub Actions) runs typecheck + lint + unit tests on every push.
@@ -72,10 +77,10 @@ src/
 ├── main/            # Electron main process
 │   ├── drivers/     # DatabaseDriver implementations (pg, mysql2, mongodb)
 │   │   └── mongo/   # EJSON/mongosh parsing, command guard, BSON normalization
-│   ├── persistence/ # better-sqlite3 store: connections, secrets, history, settings
+│   ├── persistence/ # better-sqlite3 store: connections, secrets, history, saved queries, session tabs, settings
 │   ├── query-service.ts  # config + secret + read-only guard + driver + history
 │   ├── menu.ts      # app menu (frees ⌘W for tab-close)
-│   └── ipc.ts       # all 20 channel handlers
+│   └── ipc.ts       # all 26 channel handlers
 ├── preload/         # typed contextBridge surface (window.api)
 ├── renderer/        # React UI: zustand store, TanStack Query hooks, Monaco, cmdk
 └── shared/          # IPC contract, Result<T>, domain & query types (no runtime deps)
