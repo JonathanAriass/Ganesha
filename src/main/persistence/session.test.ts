@@ -58,6 +58,16 @@ describe('session tabs service', () => {
     expect(listSessionTabs(db).map((t) => t.id)).toEqual(['a', 'b'])
   })
 
+  it('rolls back the whole save when an insert fails — never a half-empty session', () => {
+    const c = createConnection(db, input, 1)
+    saveSessionTabs(db, [tab({ id: 'a', connectionId: c.id }), tab({ id: 'b', connectionId: c.id })])
+    // Duplicate id violates the PK mid-transaction; the DELETE must roll back too.
+    expect(() =>
+      saveSessionTabs(db, [tab({ id: 'dup', connectionId: c.id }), tab({ id: 'dup', connectionId: c.id })])
+    ).toThrow()
+    expect(listSessionTabs(db).map((t) => t.id)).toEqual(['a', 'b'])
+  })
+
   it('cascades when the connection is deleted', () => {
     const c1 = createConnection(db, input, 1)
     const c2 = createConnection(db, { ...input, name: 'other' }, 1)
