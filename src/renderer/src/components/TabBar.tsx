@@ -12,9 +12,11 @@ export default function TabBar(): JSX.Element {
   const openQueryTab = useAppStore((s) => s.openQueryTab)
 
   // Inline rename: double-click a tab to edit its title. Enter/click-away
-  // commits, Escape cancels (Chromium fires no blur when the focused input
-  // unmounts, so cancel never double-fires through onBlur). Empty commits
-  // are rejected by renameTab — the tab keeps its name.
+  // commits, Escape cancels. Cancel relies on React dropping events whose
+  // target is unmounting — Chromium DOES fire blur when the input is removed,
+  // but React never dispatches it, so cancel can't double-fire through onBlur.
+  // (A native blur listener via ref would break this.) Empty commits are
+  // rejected by renameTab — the tab keeps its name.
   const [editing, setEditing] = useState<{ id: string; draft: string } | null>(null)
 
   const commit = (): void => {
@@ -56,6 +58,8 @@ export default function TabBar(): JSX.Element {
                 onChange={(e) => setEditing({ id: tab.id, draft: e.target.value })}
                 onBlur={commit}
                 onKeyDown={(e) => {
+                  // Enter that confirms an IME candidate must not commit the rename.
+                  if (e.nativeEvent.isComposing) return
                   if (e.key === 'Enter') commit()
                   else if (e.key === 'Escape') setEditing(null)
                 }}

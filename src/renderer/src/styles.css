@@ -683,7 +683,10 @@ input[type="password"]::placeholder {
   background: var(--bg-3);
   border: 1px solid var(--accent);
   border-radius: 3px;
-  padding: 1px 4px;
+  /* Match the title span's 18px line box so the strip doesn't jump on edit. */
+  padding: 0 4px;
+  height: 18px;
+  box-sizing: border-box;
   min-width: 6ch;
   outline: none;
 }
