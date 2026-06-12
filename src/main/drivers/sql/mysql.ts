@@ -29,8 +29,10 @@ export class MySqlDriver implements DatabaseDriver {
       // past 2^53, silently corrupting large ids (…993 reads as …992). With
       // supportBigNumbers — and deliberately WITHOUT bigNumberStrings — values
       // stay native numbers while safe and arrive as exact strings only beyond
-      // that, so ordinary ids keep numeric sort/display. DECIMAL is exact
-      // strings by default; node-postgres gives int8/numeric the same way.
+      // that, so ordinary ids keep numeric sort/display. The rare giant then
+      // sorts as a string in the grid — pg's int8 (always a string) has had
+      // that from day one. DECIMAL is exact strings by default; node-postgres
+      // gives int8/numeric the same way.
       supportBigNumbers: true,
       connectionLimit: 4,
       connectTimeout: 10_000,
@@ -90,8 +92,9 @@ export class MySqlDriver implements DatabaseDriver {
       return {
         columns,
         rows,
-        // Number() is defensive: supportBigNumbers can widen length-coded
-        // OkPacket fields (affectedRows) to strings for absurd values.
+        // Number() is defensive: mysql2 returns affectedRows as a string whenever
+        // it exceeds MAX_SAFE_INTEGER (unconditionally — independent of
+        // supportBigNumbers, which doesn't touch OkPacket parsing).
         rowCount: isResultSet ? allRows.length : Number((rawRows as { affectedRows?: number | string }).affectedRows ?? 0),
         durationMs: Date.now() - start,
         truncated,
