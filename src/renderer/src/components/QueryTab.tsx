@@ -122,7 +122,10 @@ export default function QueryTab({ tab }: Props): JSX.Element {
     const step = e.key === 'ArrowUp' ? -0.02 : e.key === 'ArrowDown' ? 0.02 : null
     if (step === null) return
     e.preventDefault() // arrows must resize, not scroll the page
-    commitFraction(clampFraction(editorFraction + step))
+    // Base the step on the ref, not the editorFraction closure: repeats that
+    // batch within one tick (before a re-render) would all read the same stale
+    // state value and collapse to a single step. The ref always holds the latest.
+    commitFraction(clampFraction(dragFracRef.current + step))
   }
 
   /** The tab's text split with this connection's dialect rules. */
