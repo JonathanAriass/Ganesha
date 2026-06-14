@@ -15,6 +15,7 @@ function toConfig(r: Row): ConnectionConfig {
     host: r.host, port: r.port, username: r.username, database: r.db_name,
     ssl: !!r.ssl, readOnly: !!r.read_only,
     authSource: r.auth_source, replicaSet: r.replica_set,
+    ssh: null,
     createdAt: r.created_at, updatedAt: r.updated_at
   }
 }

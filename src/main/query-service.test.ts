@@ -12,7 +12,7 @@ const enc: Encryptor = { encrypt: (s) => Buffer.from(s), decrypt: (b) => b.toStr
 const input: ConnectionInput = {
   type: 'postgres', name: 'p', color: '#000', host: 'h', port: 5432,
   username: 'u', database: 'd', ssl: false, readOnly: true,
-  authSource: '', replicaSet: ''
+  authSource: '', replicaSet: '', ssh: null
 }
 const fakeResult: QueryResult = {
   columns: [{ name: 'n', dataType: '23' }], rows: [[1]], rowCount: 1, durationMs: 3, truncated: false, documents: null

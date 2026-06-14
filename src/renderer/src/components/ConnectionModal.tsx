@@ -38,6 +38,7 @@ const DEFAULT_INPUT: ConnectionInput = {
   readOnly: false,
   authSource: '',
   replicaSet: '',
+  ssh: null,
 }
 
 // ── Test status ──────────────────────────────────────────────────────────────
@@ -82,6 +83,7 @@ export default function ConnectionModal(): JSX.Element {
         readOnly: existingConn.readOnly,
         authSource: existingConn.authSource,
         replicaSet: existingConn.replicaSet,
+        ssh: existingConn.ssh,
       })
       setPassword('') // blank = keep current on edit
     } else if (!isEdit) {

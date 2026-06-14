@@ -7,7 +7,7 @@ import type { ConnectionInput } from '../../shared/domain'
 const input: ConnectionInput = {
   type: 'postgres', name: 'prod', color: '#6366f1', host: 'localhost',
   port: 5432, username: 'admin', database: 'app', ssl: true, readOnly: false,
-  authSource: '', replicaSet: ''
+  authSource: '', replicaSet: '', ssh: null
 }
 
 let db: DB

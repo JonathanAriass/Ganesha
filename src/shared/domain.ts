@@ -1,5 +1,24 @@
 export type ConnectionType = 'postgres' | 'mysql' | 'mariadb' | 'mongodb'
 
+/** One SSH hop in a tunnel chain. hops[0] is the first server reached from this
+ *  machine; the DB host/port is the final forward target, reached from the last hop. */
+export interface SshHop {
+  /** Stable id; secrets are keyed by it so reordering hops never scrambles them. */
+  id: string
+  host: string
+  port: number
+  username: string
+  auth: 'key' | 'password'
+  /** Path to the private key file when auth === 'key'; '' otherwise. */
+  keyPath: string
+}
+
+/** SSH tunnel config for a connection. enabled=false keeps the typed hops but skips the tunnel. */
+export interface SshConfig {
+  enabled: boolean
+  hops: SshHop[]
+}
+
 /** Fields the user supplies when creating/editing a connection (no password here). */
 export interface ConnectionInput {
   type: ConnectionType
@@ -15,6 +34,8 @@ export interface ConnectionInput {
   authSource: string
   /** Mongo only: replica set name; '' = direct connection. */
   replicaSet: string
+  /** SSH tunnel; null = never configured. */
+  ssh: SshConfig | null
 }
 
 /** A stored connection (input + identity + timestamps), password excluded. */
