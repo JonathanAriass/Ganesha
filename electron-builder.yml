@@ -6,6 +6,12 @@ directories:
 files:
   - out/**/*
   - package.json
+# Native modules must live outside the asar so their .node/.dylib/.metallib can be
+# dlopen'd at runtime. electron-builder smart-unpacks .node files; node-llama-cpp also
+# ships separate llama.cpp libraries, so unpack the whole package + its bin packages.
+asarUnpack:
+  - "**/node_modules/node-llama-cpp/**"
+  - "**/node_modules/@node-llama-cpp/**"
 mac:
   target: dmg
   category: public.app-category.developer-tools
