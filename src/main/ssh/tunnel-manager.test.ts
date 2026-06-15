@@ -54,6 +54,18 @@ describe('SshTunnelManager', () => {
     await mgr.close('c1')
   })
 
+  it('concurrent opens for the same id share one tunnel (no double-dial, no leaked port)', async () => {
+    const f = fakeClientFactory()
+    const mgr = new SshTunnelManager({ createClient: f.make })
+    const [a, b] = await Promise.all([
+      mgr.open('c1', hops(1), 'db', 5432),
+      mgr.open('c1', hops(1), 'db', 5432)
+    ])
+    expect(a.port).toBe(b.port) // same local forwarder
+    expect(f.events.filter((e) => e.startsWith('connect')).length).toBe(1) // dialed once
+    await mgr.close('c1')
+  })
+
   it('surfaces a hop auth failure with its index', async () => {
     const f = fakeClientFactory({ failAuthAt: 1 })
     const mgr = new SshTunnelManager({ createClient: f.make })

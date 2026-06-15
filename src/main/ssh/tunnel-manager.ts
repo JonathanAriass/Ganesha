@@ -48,7 +48,10 @@ function forward(client: SshClientLike, dstHost: string, dstPort: number): Promi
 }
 
 export class SshTunnelManager {
-  private tunnels = new Map<string, LiveTunnel>()
+  // The in-flight/opened tunnel PROMISE is stored synchronously so concurrent
+  // open() calls for the same id share one chain instead of each dialing their
+  // own (which would leak ssh clients + a bound local port).
+  private tunnels = new Map<string, Promise<LiveTunnel>>()
   private make: () => SshClientLike
 
   constructor(deps?: { createClient?: () => SshClientLike }) {
@@ -56,8 +59,17 @@ export class SshTunnelManager {
   }
 
   async open(connId: string, hops: ResolvedHop[], dbHost: string, dbPort: number): Promise<TunnelEndpoint> {
-    const existing = this.tunnels.get(connId)
-    if (existing) return existing.endpoint
+    let pending = this.tunnels.get(connId)
+    if (!pending) {
+      pending = this.dialChain(hops, dbHost, dbPort)
+      this.tunnels.set(connId, pending)
+      // A failed open must not stay cached as a permanent rejection — let a retry re-dial.
+      pending.catch(() => { if (this.tunnels.get(connId) === pending) this.tunnels.delete(connId) })
+    }
+    return (await pending).endpoint
+  }
+
+  private async dialChain(hops: ResolvedHop[], dbHost: string, dbPort: number): Promise<LiveTunnel> {
     if (hops.length === 0) throw new Error('SSH tunnel: no hops configured')
 
     const clients: SshClientLike[] = []
@@ -80,23 +92,33 @@ export class SshTunnelManager {
         socket.pipe(stream).pipe(socket)
       })
     })
-    const endpoint = await new Promise<TunnelEndpoint>((resolve, reject) => {
-      server.once('error', reject)
-      server.listen(0, '127.0.0.1', () => {
-        const addr = server.address()
-        if (addr && typeof addr === 'object') resolve({ host: '127.0.0.1', port: addr.port })
-        else reject(new Error('SSH tunnel: failed to bind local forwarder'))
+    try {
+      const endpoint = await new Promise<TunnelEndpoint>((resolve, reject) => {
+        server.once('error', reject)
+        server.listen(0, '127.0.0.1', () => {
+          const addr = server.address()
+          if (addr && typeof addr === 'object') resolve({ host: '127.0.0.1', port: addr.port })
+          else reject(new Error('SSH tunnel: failed to bind local forwarder'))
+        })
       })
-    })
-
-    this.tunnels.set(connId, { clients, server, endpoint })
-    return endpoint
+      return { clients, server, endpoint }
+    } catch (e) {
+      server.close()
+      clients.forEach((c) => c.end())
+      throw e
+    }
   }
 
   async close(connId: string): Promise<void> {
-    const t = this.tunnels.get(connId)
-    if (!t) return
+    const pending = this.tunnels.get(connId)
+    if (!pending) return
     this.tunnels.delete(connId)
+    let t: LiveTunnel
+    try {
+      t = await pending // a close racing an in-flight open waits for it, then tears down
+    } catch {
+      return // open failed and already cleaned up after itself
+    }
     await new Promise<void>((resolve) => t.server.close(() => resolve()))
     t.clients.reverse().forEach((c) => c.end())
   }

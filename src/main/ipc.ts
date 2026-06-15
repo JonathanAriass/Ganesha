@@ -15,7 +15,8 @@ import { MySqlDriver } from './drivers/sql/mysql'
 import { MongoDriver } from './drivers/mongo/mongo'
 import { runUserQuery } from './query-service'
 import { SshTunnelManager } from './ssh/tunnel-manager'
-import { connectVia, disconnectVia } from './connection-runtime'
+import { connectVia, disconnectVia, openTunnel } from './connection-runtime'
+import { buildConnectParams } from './drivers/params'
 import { readFileSync } from 'fs'
 
 const drivers = new DriverManager()
@@ -149,13 +150,16 @@ export function registerIpcHandlers(): void {
     const testId = `test:${id ?? 'new'}`
     const config: ConnectionConfig = { ...input, id: testId, createdAt: 0, updatedAt: 0 }
     try {
-      await connectVia(driver, config, {
+      // Open the tunnel (if any), then a REAL connectivity probe through it.
+      // testConnection actually dials + runs SELECT 1 / ping — the lazy pooled
+      // connect() does not, so it must not stand in for the probe here.
+      const endpoint = await openTunnel(config, {
         tunnels,
         readFile: (p) => readFileSync(p),
         getHopSecret: (hopId) => sshSecrets?.[hopId] || (id ? secrets.getSecret(id, `ssh:${hopId}`) : null),
         dbPassword: pwd
       })
-      await driver.disconnect(testId)
+      await driver.testConnection(buildConnectParams(config, pwd, endpoint))
     } finally {
       await tunnels.close(testId)
     }
