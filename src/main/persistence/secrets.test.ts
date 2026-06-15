@@ -50,6 +50,42 @@ describe('secret store', () => {
   })
 })
 
+describe('composite-key secrets', () => {
+  it('stores/reads/deletes a keyed secret independently of the db password', () => {
+    const c = createConnection(db, input, 1)
+    store.setPassword(c.id, 'dbpw')
+    store.setSecret(c.id, 'ssh:h1', 'passphrase1')
+    expect(store.getSecret(c.id, 'ssh:h1')).toBe('passphrase1')
+    expect(store.getPassword(c.id)).toBe('dbpw') // untouched
+    store.deleteSecret(c.id, 'ssh:h1')
+    expect(store.getSecret(c.id, 'ssh:h1')).toBeNull()
+    expect(store.getPassword(c.id)).toBe('dbpw')
+  })
+  it('deleteAllSecrets clears every key for a connection', () => {
+    const c = createConnection(db, input, 1)
+    store.setPassword(c.id, 'dbpw')
+    store.setSecret(c.id, 'ssh:h1', 'p1')
+    store.deleteAllSecrets(c.id)
+    expect(store.getPassword(c.id)).toBeNull()
+    expect(store.getSecret(c.id, 'ssh:h1')).toBeNull()
+  })
+})
+
+describe('legacy secrets migration', () => {
+  it('rebuilds an old single-key secrets table into the composite shape, preserving the db password', () => {
+    const legacy = new Database(':memory:')
+    legacy.exec(`CREATE TABLE connections (id TEXT PRIMARY KEY, type TEXT, name TEXT, color TEXT, host TEXT, port INTEGER, username TEXT, db_name TEXT, ssl INTEGER, read_only INTEGER, auth_source TEXT, replica_set TEXT, created_at INTEGER, updated_at INTEGER);`)
+    legacy.exec(`CREATE TABLE secrets (connection_id TEXT PRIMARY KEY REFERENCES connections(id) ON DELETE CASCADE, ciphertext BLOB NOT NULL);`)
+    legacy.prepare(`INSERT INTO connections (id,type,name,color,host,port,username,db_name,ssl,read_only,auth_source,replica_set,created_at,updated_at) VALUES ('c1','postgres','p','#000','h',1,'u','d',0,0,'','',1,1)`).run()
+    legacy.prepare(`INSERT INTO secrets (connection_id, ciphertext) VALUES ('c1', ?)`).run(Buffer.from('enc:old', 'utf8'))
+    migrate(legacy) // should rebuild
+    const s = makeSecretStore(legacy, fake)
+    expect(s.getPassword('c1')).toBe('old')
+    const cols = legacy.prepare(`SELECT name FROM pragma_table_info('secrets')`).all() as { name: string }[]
+    expect(cols.some((c) => c.name === 'secret_key')).toBe(true)
+  })
+})
+
 describe('resolveTestPassword', () => {
   it('a typed password wins, even over a stored one', () => {
     const c = createConnection(db, input, 1)

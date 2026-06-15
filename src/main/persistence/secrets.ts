@@ -32,20 +32,31 @@ export function resolveTestPassword(
 }
 
 export function makeSecretStore(db: DB, enc: Encryptor) {
+  const setSecret = (connectionId: string, key: string, value: string): void => {
+    db.prepare(
+      `INSERT INTO secrets (connection_id, secret_key, ciphertext) VALUES (?, ?, ?)
+       ON CONFLICT(connection_id, secret_key) DO UPDATE SET ciphertext = excluded.ciphertext`
+    ).run(connectionId, key, enc.encrypt(value))
+  }
+  const getSecret = (connectionId: string, key: string): string | null => {
+    const row = db.prepare('SELECT ciphertext FROM secrets WHERE connection_id = ? AND secret_key = ?')
+      .get(connectionId, key) as { ciphertext: Buffer } | undefined
+    return row ? enc.decrypt(row.ciphertext) : null
+  }
+  const deleteSecret = (connectionId: string, key: string): void => {
+    db.prepare('DELETE FROM secrets WHERE connection_id = ? AND secret_key = ?').run(connectionId, key)
+  }
+  const deleteAllSecrets = (connectionId: string): void => {
+    db.prepare('DELETE FROM secrets WHERE connection_id = ?').run(connectionId)
+  }
   return {
-    setPassword(connectionId: string, password: string): void {
-      db.prepare(
-        `INSERT INTO secrets (connection_id, ciphertext) VALUES (?, ?)
-         ON CONFLICT(connection_id) DO UPDATE SET ciphertext = excluded.ciphertext`
-      ).run(connectionId, enc.encrypt(password))
-    },
-    getPassword(connectionId: string): string | null {
-      const row = db.prepare('SELECT ciphertext FROM secrets WHERE connection_id = ?')
-        .get(connectionId) as { ciphertext: Buffer } | undefined
-      return row ? enc.decrypt(row.ciphertext) : null
-    },
-    deletePassword(connectionId: string): void {
-      db.prepare('DELETE FROM secrets WHERE connection_id = ?').run(connectionId)
-    }
+    setSecret,
+    getSecret,
+    deleteSecret,
+    deleteAllSecrets,
+    // The DB password is just the 'db'-keyed secret; keep the old names for callers.
+    setPassword: (connectionId: string, password: string) => setSecret(connectionId, 'db', password),
+    getPassword: (connectionId: string) => getSecret(connectionId, 'db'),
+    deletePassword: (connectionId: string) => deleteSecret(connectionId, 'db')
   }
 }

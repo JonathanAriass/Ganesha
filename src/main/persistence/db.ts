@@ -34,8 +34,10 @@ export function migrate(db: DB): void {
       updated_at  INTEGER NOT NULL
     );
     CREATE TABLE IF NOT EXISTS secrets (
-      connection_id TEXT PRIMARY KEY REFERENCES connections(id) ON DELETE CASCADE,
-      ciphertext    BLOB NOT NULL
+      connection_id TEXT NOT NULL REFERENCES connections(id) ON DELETE CASCADE,
+      secret_key    TEXT NOT NULL DEFAULT 'db',
+      ciphertext    BLOB NOT NULL,
+      PRIMARY KEY (connection_id, secret_key)
     );
     CREATE TABLE IF NOT EXISTS query_history (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -73,6 +75,26 @@ export function migrate(db: DB): void {
   addColumnIfMissing(db, 'connections', 'replica_set', "TEXT NOT NULL DEFAULT ''")
   // SSH tunnel config (added later): nullable JSON blob of SshConfig.
   addColumnIfMissing(db, 'connections', 'ssh_json', 'TEXT')
+  migrateSecretsCompositeKey(db)
+}
+
+/** Old DBs have secrets keyed by connection_id alone. Rebuild into the composite
+ *  (connection_id, secret_key) shape, tagging existing rows as the 'db' password. */
+function migrateSecretsCompositeKey(db: DB): void {
+  const cols = db.prepare(`SELECT name FROM pragma_table_info('secrets')`).all() as { name: string }[]
+  if (cols.length === 0 || cols.some((c) => c.name === 'secret_key')) return // fresh (composite) or already migrated
+  db.exec(`
+    CREATE TABLE secrets_new (
+      connection_id TEXT NOT NULL REFERENCES connections(id) ON DELETE CASCADE,
+      secret_key    TEXT NOT NULL DEFAULT 'db',
+      ciphertext    BLOB NOT NULL,
+      PRIMARY KEY (connection_id, secret_key)
+    );
+    INSERT INTO secrets_new (connection_id, secret_key, ciphertext)
+      SELECT connection_id, 'db', ciphertext FROM secrets;
+    DROP TABLE secrets;
+    ALTER TABLE secrets_new RENAME TO secrets;
+  `)
 }
 
 let singleton: DB | null = null
