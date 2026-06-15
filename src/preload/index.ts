@@ -11,10 +11,10 @@ const api: DbClientApi = {
   connections: {
     list: () => invoke('connections.list', undefined),
     get: (id) => invoke('connections.get', id),
-    create: (input, password) => invoke('connections.create', { input, password }),
-    update: (id, patch, password) => invoke('connections.update', { id, patch, password }),
+    create: (input, password, sshSecrets) => invoke('connections.create', { input, password, sshSecrets }),
+    update: (id, patch, password, sshSecrets) => invoke('connections.update', { id, patch, password, sshSecrets }),
     delete: (id) => invoke('connections.delete', id),
-    test: (input, password, id) => invoke('connections.test', { input, password, id }),
+    test: (input, password, id, sshSecrets) => invoke('connections.test', { input, password, id, sshSecrets }),
     disconnect: (id) => invoke('connections.disconnect', id)
   },
   history: {
@@ -49,7 +49,8 @@ const api: DbClientApi = {
     copy: (text) => invoke('clipboard.copy', text)
   },
   dialog: {
-    pickDirectory: () => invoke('dialog.pickDirectory', undefined)
+    pickDirectory: () => invoke('dialog.pickDirectory', undefined),
+    openFile: (title) => invoke('dialog.openFile', { title })
   }
 }
 

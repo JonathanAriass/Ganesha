@@ -6,7 +6,9 @@ import type { DatabaseDriver, QueryResult, QueryRequest } from './drivers/types'
 import { assertSqlWritable } from './drivers/sql/readonly-guard'
 import { parseMongoQuery } from './drivers/mongo/parse'
 import { assertMongoCommandWritable } from './drivers/mongo/command'
-import { buildConnectParams } from './drivers/params'
+import { connectVia } from './connection-runtime'
+import type { SshTunnelManager } from './ssh/tunnel-manager'
+import { readFileSync } from 'fs'
 
 const DEFAULT_MAX_ROWS = 1000
 
@@ -17,6 +19,8 @@ interface RunArgs {
   connectionId: string
   query: string
   queryId: string
+  /** Opens/reuses the SSH tunnel when the connection has one enabled. */
+  tunnels: SshTunnelManager
   /** Injected clock for deterministic history timestamps. */
   now: () => number
 }
@@ -24,11 +28,16 @@ interface RunArgs {
 /** Orchestrate a run: load config+secret, connect, dispatch by type (SQL vs Mongo) through the
  *  read-only guard, run on the driver, and log history on success or failure. */
 export async function runUserQuery(args: RunArgs): Promise<QueryResult> {
-  const { db, secrets, driver, connectionId, query, queryId, now } = args
+  const { db, secrets, driver, connectionId, query, queryId, tunnels, now } = args
   const config = getConnection(db, connectionId)
   if (!config) throw new Error(`Connection not found: ${connectionId}`)
 
-  await driver.connect(buildConnectParams(config, secrets.getPassword(config.id)))
+  await connectVia(driver, config, {
+    tunnels,
+    readFile: (p) => readFileSync(p),
+    getHopSecret: (hopId) => secrets.getSecret(config.id, `ssh:${hopId}`),
+    dbPassword: secrets.getPassword(config.id)
+  })
 
   const started = now()
   try {

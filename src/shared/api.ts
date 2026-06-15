@@ -7,10 +7,10 @@ export interface DbClientApi {
   connections: {
     list(): Promise<IpcResult<'connections.list'>>
     get(id: string): Promise<IpcResult<'connections.get'>>
-    create(input: ConnectionInput, password: string | null): Promise<IpcResult<'connections.create'>>
-    update(id: string, patch: Partial<ConnectionInput>, password?: string | null): Promise<IpcResult<'connections.update'>>
+    create(input: ConnectionInput, password: string | null, sshSecrets?: Record<string, string>): Promise<IpcResult<'connections.create'>>
+    update(id: string, patch: Partial<ConnectionInput>, password?: string | null, sshSecrets?: Record<string, string>): Promise<IpcResult<'connections.update'>>
     delete(id: string): Promise<IpcResult<'connections.delete'>>
-    test(input: ConnectionInput, password: string | null, id?: string): Promise<IpcResult<'connections.test'>>
+    test(input: ConnectionInput, password: string | null, id?: string, sshSecrets?: Record<string, string>): Promise<IpcResult<'connections.test'>>
     disconnect(id: string): Promise<IpcResult<'connections.disconnect'>>
   }
   history: {
@@ -46,5 +46,6 @@ export interface DbClientApi {
   }
   dialog: {
     pickDirectory(): Promise<IpcResult<'dialog.pickDirectory'>>
+    openFile(title?: string): Promise<IpcResult<'dialog.openFile'>>
   }
 }

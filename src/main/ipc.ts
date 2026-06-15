@@ -1,5 +1,6 @@
 import { ipcMain, clipboard, dialog, BrowserWindow } from 'electron'
 import type { ChannelName, Req, Res } from '../shared/ipc'
+import type { ConnectionConfig } from '../shared/domain'
 import { ok, err, type Result } from '../shared/result'
 import { openDb } from './persistence/db'
 import { safeStorageEncryptor, makeSecretStore, resolveTestPassword } from './persistence/secrets'
@@ -13,13 +14,42 @@ import { PostgresDriver } from './drivers/sql/postgres'
 import { MySqlDriver } from './drivers/sql/mysql'
 import { MongoDriver } from './drivers/mongo/mongo'
 import { runUserQuery } from './query-service'
-import { buildConnectParams } from './drivers/params'
+import { SshTunnelManager } from './ssh/tunnel-manager'
+import { connectVia, disconnectVia } from './connection-runtime'
+import { readFileSync } from 'fs'
 
 const drivers = new DriverManager()
 drivers.register(new PostgresDriver())
 drivers.register(new MySqlDriver('mysql'))
 drivers.register(new MySqlDriver('mariadb'))
 drivers.register(new MongoDriver())
+
+const tunnels = new SshTunnelManager()
+
+/** Close every live SSH tunnel — called on app quit. */
+export function closeAllTunnels(): Promise<void> {
+  return tunnels.closeAll()
+}
+
+/** Persist the SSH secrets the user typed this save, keyed `ssh:<hopId>`. Blank
+ *  ones are absent from the map (the renderer only sends typed values) → keep existing. */
+function writeSshSecrets(secrets: ReturnType<typeof makeSecretStore>, connId: string, sshSecrets?: Record<string, string>): void {
+  if (!sshSecrets) return
+  for (const [hopId, value] of Object.entries(sshSecrets)) {
+    if (value !== '') secrets.setSecret(connId, `ssh:${hopId}`, value)
+  }
+}
+
+/** Connect a connection's driver through its SSH tunnel (if enabled), resolving
+ *  hop secrets from the store. */
+function connectStored(driver: ReturnType<DriverManager['get']>, config: ConnectionConfig, secrets: ReturnType<typeof makeSecretStore>): Promise<void> {
+  return connectVia(driver, config, {
+    tunnels,
+    readFile: (p) => readFileSync(p),
+    getHopSecret: (hopId) => secrets.getSecret(config.id, `ssh:${hopId}`),
+    dbPassword: secrets.getPassword(config.id)
+  })
+}
 
 type Handler<K extends ChannelName> = (req: Req<K>) => Result<Res<K>> | Promise<Result<Res<K>>>
 
@@ -54,33 +84,36 @@ export function registerIpcHandlers(): void {
 
   handle('connections.list', () => ok(conns.listConnections(store().db)))
   handle('connections.get', (id) => ok(conns.getConnection(store().db, id)))
-  handle('connections.create', ({ input, password }) => {
+  handle('connections.create', ({ input, password, sshSecrets }) => {
     const { db, secrets } = store()
     const c = conns.createConnection(db, input, now())
     if (password !== null) secrets.setPassword(c.id, password)
+    writeSshSecrets(secrets, c.id, sshSecrets)
     return ok(c)
   })
-  handle('connections.update', async ({ id, patch, password }) => {
+  handle('connections.update', async ({ id, patch, password, sshSecrets }) => {
     const { db, secrets } = store()
     const before = conns.getConnection(db, id)
     const c = conns.updateConnection(db, id, patch, now())
     // If the type changed, the live pool is registered under the OLD type's driver.
     if (before && before.type !== c.type && drivers.has(before.type)) {
-      await drivers.get(before.type).disconnect(id)
+      await disconnectVia(drivers.get(before.type), before, tunnels)
     }
     if (password !== undefined) {
       if (password === null) secrets.deletePassword(id)
       else secrets.setPassword(id, password)
     }
+    writeSshSecrets(secrets, id, sshSecrets)
     // Pools keep their original credentials (connect() is idempotent) — drop the live
-    // pool so the next access reconnects with the just-saved config + password.
-    if (drivers.has(c.type)) await drivers.get(c.type).disconnect(id)
+    // pool AND its tunnel so the next access reconnects with the just-saved config.
+    if (drivers.has(c.type)) await disconnectVia(drivers.get(c.type), c, tunnels)
     return ok(c)
   })
   handle('connections.delete', async (id) => {
-    const { db } = store()
+    const { db, secrets } = store()
     const c = conns.getConnection(db, id)
-    if (c && drivers.has(c.type)) await drivers.get(c.type).disconnect(id)
+    if (c && drivers.has(c.type)) await disconnectVia(drivers.get(c.type), c, tunnels)
+    secrets.deleteAllSecrets(id)
     conns.deleteConnection(db, id)
     return ok(null)
   })
@@ -105,28 +138,39 @@ export function registerIpcHandlers(): void {
   handle('settings.dataDir.get', () => ok(settings.getCurrentDataDir()))
   handle('settings.dataDir.set', (dir) => { settings.relocateDataDir(dir); void openDb(); return ok(dir) })
 
-  handle('connections.test', async ({ input, password, id }) => {
+  handle('connections.test', async ({ input, password, id, sshSecrets }) => {
     // Edit-mode Test with a blank password means "test with the saved password" —
     // resolve the stored secret here in main; it never crosses to the renderer.
-    const pwd = resolveTestPassword(password, id, store().secrets)
+    const { secrets } = store()
+    const pwd = resolveTestPassword(password, id, secrets)
     const driver = drivers.get(input.type)
-    await driver.testConnection({
-      id: 'test', type: input.type, host: input.host, port: input.port,
-      username: input.username, password: pwd, database: input.database, ssl: input.ssl,
-      authSource: input.authSource, replicaSet: input.replicaSet
-    })
+    // Throwaway pooled connection under a test id, brought up through the tunnel
+    // (typed SSH secrets win; blank-on-edit falls back to the stored ones).
+    const testId = `test:${id ?? 'new'}`
+    const config: ConnectionConfig = { ...input, id: testId, createdAt: 0, updatedAt: 0 }
+    try {
+      await connectVia(driver, config, {
+        tunnels,
+        readFile: (p) => readFileSync(p),
+        getHopSecret: (hopId) => sshSecrets?.[hopId] || (id ? secrets.getSecret(id, `ssh:${hopId}`) : null),
+        dbPassword: pwd
+      })
+      await driver.disconnect(testId)
+    } finally {
+      await tunnels.close(testId)
+    }
     return ok(null)
   })
   handle('connections.disconnect', async (id) => {
     const c = conns.getConnection(store().db, id)
-    if (c && drivers.has(c.type)) await drivers.get(c.type).disconnect(id)
+    if (c && drivers.has(c.type)) await disconnectVia(drivers.get(c.type), c, tunnels)
     return ok(null)
   })
   handle('query.run', async ({ connectionId, query, queryId }) => {
     const { db, secrets } = store()
     const c = conns.getConnection(db, connectionId)
     if (!c) throw new Error(`Connection not found: ${connectionId}`)
-    const result = await runUserQuery({ db, secrets, driver: drivers.get(c.type), connectionId, query, queryId, now: () => Date.now() })
+    const result = await runUserQuery({ db, secrets, driver: drivers.get(c.type), connectionId, query, queryId, tunnels, now: () => Date.now() })
     return ok(result)
   })
   handle('query.cancel', async ({ connectionId, queryId }) => {
@@ -139,7 +183,7 @@ export function registerIpcHandlers(): void {
     const c = conns.getConnection(db, connectionId)
     if (!c) throw new Error(`Connection not found: ${connectionId}`)
     const driver = drivers.get(c.type)
-    await driver.connect(buildConnectParams(c, secrets.getPassword(c.id)))
+    await connectStored(driver, c, secrets)
     return ok(await driver.listObjects(c.id))
   })
   handle('schema.columns', async ({ connectionId, ref }) => {
@@ -147,7 +191,7 @@ export function registerIpcHandlers(): void {
     const c = conns.getConnection(db, connectionId)
     if (!c) throw new Error(`Connection not found: ${connectionId}`)
     const driver = drivers.get(c.type)
-    await driver.connect(buildConnectParams(c, secrets.getPassword(c.id)))
+    await connectStored(driver, c, secrets)
     return ok(await driver.describeObject(c.id, ref))
   })
 
@@ -157,6 +201,13 @@ export function registerIpcHandlers(): void {
   handle('dialog.pickDirectory', async () => {
     const win = BrowserWindow.getFocusedWindow()
     const opts = { properties: ['openDirectory', 'createDirectory'] as Array<'openDirectory' | 'createDirectory'> }
+    const r = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
+    return ok(r.canceled || r.filePaths.length === 0 ? null : r.filePaths[0])
+  })
+
+  handle('dialog.openFile', async ({ title }) => {
+    const win = BrowserWindow.getFocusedWindow()
+    const opts = { title, properties: ['openFile'] as Array<'openFile'> }
     const r = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
     return ok(r.canceled || r.filePaths.length === 0 ? null : r.filePaths[0])
   })

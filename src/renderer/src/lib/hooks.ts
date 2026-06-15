@@ -51,20 +51,22 @@ export function useSaveConnection() {
       id,
       input,
       password,
+      sshSecrets,
     }: {
       id?: string
       input: ConnectionInput
       password: string | undefined | null
+      sshSecrets?: Record<string, string>
     }) => {
       if (id) {
         // Update: undefined password means "keep existing"
         return window.api.connections
-          .update(id, input, password === '' ? undefined : password)
+          .update(id, input, password === '' ? undefined : password, sshSecrets)
           .then(unwrap)
       } else {
         // Create: null means no password
         return window.api.connections
-          .create(input, password ?? null)
+          .create(input, password ?? null, sshSecrets)
           .then(unwrap)
       }
     },
@@ -98,11 +100,13 @@ export function useTestConnection() {
       input,
       password,
       id,
+      sshSecrets,
     }: {
       input: ConnectionInput
       password: string | null
       id?: string
-    }) => window.api.connections.test(input, password, id).then(unwrap),
+      sshSecrets?: Record<string, string>
+    }) => window.api.connections.test(input, password, id, sshSecrets).then(unwrap),
   })
 }
 

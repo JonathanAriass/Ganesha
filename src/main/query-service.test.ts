@@ -5,8 +5,11 @@ import { createConnection } from './persistence/connections'
 import { makeSecretStore, type Encryptor } from './persistence/secrets'
 import { listHistory } from './persistence/history'
 import { runUserQuery } from './query-service'
+import { SshTunnelManager } from './ssh/tunnel-manager'
 import type { DatabaseDriver, QueryResult } from './drivers/types'
 import type { ConnectionInput } from '../shared/domain'
+
+const tunnels = new SshTunnelManager()
 
 const enc: Encryptor = { encrypt: (s) => Buffer.from(s), decrypt: (b) => b.toString() }
 const input: ConnectionInput = {
@@ -46,7 +49,7 @@ describe('runUserQuery', () => {
     const secrets = makeSecretStore(db, enc)
     secrets.setPassword(c.id, 'pw')
     const res = await runUserQuery({
-      db, secrets, driver: fakeDriver(calls, queryIds), connectionId: c.id, query: 'SELECT 1', queryId: 'q1', now: () => 42
+      db, secrets, driver: fakeDriver(calls, queryIds), connectionId: c.id, query: 'SELECT 1', queryId: 'q1', tunnels, now: () => 42
     })
     expect(res).toEqual(fakeResult)
     expect(calls).toEqual(['connect', 'run:SELECT 1'])
@@ -61,7 +64,7 @@ describe('runUserQuery', () => {
     const calls: string[] = []
     const c = createConnection(db, input, 1)
     await expect(
-      runUserQuery({ db, secrets: makeSecretStore(db, enc), driver: fakeDriver(calls), connectionId: c.id, query: 'DELETE FROM t', queryId: 'q2', now: () => 42 })
+      runUserQuery({ db, secrets: makeSecretStore(db, enc), driver: fakeDriver(calls), connectionId: c.id, query: 'DELETE FROM t', queryId: 'q2', tunnels, now: () => 42 })
     ).rejects.toThrow(/read-only/i)
     expect(calls).toEqual(['connect']) // driver.runQuery NOT called
     expect(listHistory(db, c.id)[0].success).toBe(false)
@@ -69,7 +72,7 @@ describe('runUserQuery', () => {
 
   it('throws if the connection id is unknown', async () => {
     await expect(
-      runUserQuery({ db, secrets: makeSecretStore(db, enc), driver: fakeDriver([]), connectionId: 'nope', query: 'SELECT 1', queryId: 'q3', now: () => 1 })
+      runUserQuery({ db, secrets: makeSecretStore(db, enc), driver: fakeDriver([]), connectionId: 'nope', query: 'SELECT 1', queryId: 'q3', tunnels, now: () => 1 })
     ).rejects.toThrow(/not found/i)
   })
 
@@ -79,13 +82,13 @@ describe('runUserQuery', () => {
     const c = createConnection(db, mongoInput, 1)
     const res = await runUserQuery({
       db, secrets: makeSecretStore(db, enc), driver: fakeDriver(calls), connectionId: c.id,
-      query: JSON.stringify({ op: 'find', collection: 'users', filter: { age: { $gt: 21 } } }), queryId: 'q4', now: () => 7
+      query: JSON.stringify({ op: 'find', collection: 'users', filter: { age: { $gt: 21 } } }), queryId: 'q4', tunnels, now: () => 7
     })
     expect(res).toEqual(fakeResult)
     expect(calls).toEqual(['connect', 'run:mongo'])
     await expect(runUserQuery({
       db, secrets: makeSecretStore(db, enc), driver: fakeDriver([]), connectionId: c.id,
-      query: JSON.stringify({ op: 'deleteOne', collection: 'users', filter: {} }), queryId: 'q5', now: () => 7
+      query: JSON.stringify({ op: 'deleteOne', collection: 'users', filter: {} }), queryId: 'q5', tunnels, now: () => 7
     })).rejects.toThrow(/read-only/i)
   })
 })
