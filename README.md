@@ -7,6 +7,7 @@ Built with Electron, React and TypeScript (electron-vite). Connections have a **
 ## Features
 
 - **Connections** — create, test, edit and color-code connections for all four engines. Passwords are encrypted with the OS keychain (Electron `safeStorage`) and are *write-only*: no IPC channel can read one back into the UI.
+- **SSH tunnels** — reach a database through one or more SSH hops (a jump-server chain, e.g. bastion → private host), configured per connection. Each hop authenticates with a private key (+ optional passphrase) or a password; passphrases/passwords are encrypted with the OS keychain and write-only like DB passwords. The tunnel is opened in the main process and the drivers connect through it unchanged.
 - **Schema browser** — tables, views and collections in a sidebar tree; double-click to open a ready-made query tab that runs itself. Leave a Mongo connection's database blank to browse *all* databases, Compass-style.
 - **Query tabs** — Monaco editor with per-engine language (SQL or mongosh-style JavaScript), local workers, custom Midnight/Daylight themes. Tab state (text, results, running query) survives switching — and the open tabs themselves survive an app restart (text only; nothing re-runs on launch). Double-click a tab to rename it; names persist too.
 - **Autocomplete** — schema-aware: SQL tables/views, columns after `alias.` or `table.`, objects after `schema.`; Mongo collections after `db.`, database names inside `getSiblingDB("…")`, and operation snippets after `db.coll.`.
@@ -54,8 +55,8 @@ npm run dev        # launch the app with hot reload
 
 ```bash
 npm run typecheck && npm run lint
-npm test                  # 313 unit tests (Vitest, Node ABI)
-npm run test:integration  # 16 tests vs real Postgres/MySQL/Mongo (testcontainers, needs Docker)
+npm test                  # 341 unit tests (Vitest, Node ABI)
+npm run test:integration  # 17 tests vs real Postgres/MySQL/Mongo + an SSH tunnel (testcontainers, needs Docker)
 ```
 
 CI (GitHub Actions) runs typecheck + lint + unit tests on every push.
