@@ -1,4 +1,4 @@
-import type { IpcResult } from './ipc'
+import type { IpcResult, LlmTokenEvent, LlmDownloadEvent } from './ipc'
 import type { ConnectionInput, HistoryEntryInput, SavedQueryInput, SavedQueryPatch, SessionTab } from './domain'
 import type { ObjectRef } from './schema'
 
@@ -47,5 +47,19 @@ export interface DbClientApi {
   dialog: {
     pickDirectory(): Promise<IpcResult<'dialog.pickDirectory'>>
     openFile(title?: string): Promise<IpcResult<'dialog.openFile'>>
+  }
+  llm: {
+    listModels(): Promise<IpcResult<'llm.models.list'>>
+    downloadModel(uri: string): Promise<IpcResult<'llm.models.download'>>
+    deleteModel(id: string): Promise<IpcResult<'llm.models.delete'>>
+    setActiveModel(id: string): Promise<IpcResult<'llm.models.setActive'>>
+    listConversations(connectionId: string): Promise<IpcResult<'llm.conversations.list'>>
+    createConversation(connectionId: string, title: string): Promise<IpcResult<'llm.conversations.create'>>
+    deleteConversation(id: string): Promise<IpcResult<'llm.conversations.delete'>>
+    listMessages(conversationId: string): Promise<IpcResult<'llm.messages.list'>>
+    send(conversationId: string, connectionId: string, prompt: string): Promise<IpcResult<'llm.chat.send'>>
+    cancel(requestId: string): Promise<IpcResult<'llm.chat.cancel'>>
+    onToken(cb: (e: LlmTokenEvent) => void): () => void
+    onDownloadProgress(cb: (e: LlmDownloadEvent) => void): () => void
   }
 }

@@ -18,6 +18,14 @@ import { SshTunnelManager } from './ssh/tunnel-manager'
 import { connectVia, disconnectVia, openTunnel } from './connection-runtime'
 import { buildConnectParams } from './drivers/params'
 import { readFileSync } from 'fs'
+import { randomUUID } from 'crypto'
+import { LlmEngine } from './llm/engine'
+import { MODEL_CATALOG } from './llm/catalog'
+import { listLocalModels, deleteLocalModel, downloadModel } from './llm/models'
+import { buildSchemaContext } from './llm/schema-context'
+import * as llm from './persistence/llm'
+import { getModelsDir } from './persistence/paths'
+import type { LlmTokenEvent, LlmDownloadEvent } from '../shared/ipc'
 
 const drivers = new DriverManager()
 drivers.register(new PostgresDriver())
@@ -26,6 +34,8 @@ drivers.register(new MySqlDriver('mariadb'))
 drivers.register(new MongoDriver())
 
 const tunnels = new SshTunnelManager()
+const engine = new LlmEngine()
+const activeGenerations = new Map<string, AbortController>()
 
 /** Close every live SSH tunnel — called on app quit. */
 export function closeAllTunnels(): Promise<void> {
@@ -214,5 +224,81 @@ export function registerIpcHandlers(): void {
     const opts = { title, properties: ['openFile'] as Array<'openFile'> }
     const r = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
     return ok(r.canceled || r.filePaths.length === 0 ? null : r.filePaths[0])
+  })
+
+  // ── Local LLM assistant ──
+  handle('llm.models.list', () => {
+    const { db } = store()
+    return ok({ downloaded: listLocalModels(getModelsDir()), catalog: MODEL_CATALOG, activeModelId: settings.getSetting(db, 'llm.activeModel') })
+  })
+  handle('llm.models.delete', ({ id }) => { deleteLocalModel(getModelsDir(), id); return ok(null) })
+  handle('llm.models.setActive', ({ id }) => { settings.setSetting(store().db, 'llm.activeModel', id); return ok(null) })
+  handle('llm.conversations.list', ({ connectionId }) => ok(llm.listConversations(store().db, connectionId)))
+  handle('llm.conversations.create', ({ connectionId, title }) => ok(llm.createConversation(store().db, connectionId, title, now())))
+  handle('llm.conversations.delete', ({ id }) => { llm.deleteConversation(store().db, id); return ok(null) })
+  handle('llm.messages.list', ({ conversationId }) => ok(llm.listMessages(store().db, conversationId)))
+  handle('llm.chat.cancel', ({ requestId }) => { activeGenerations.get(requestId)?.abort(); return ok(null) })
+
+  // Download streams progress to the renderer that asked — registered raw for event.sender.
+  ipcMain.handle('llm.models.download', async (event, { uri }: { uri: string }) => {
+    try {
+      await downloadModel(getModelsDir(), uri, (receivedBytes, totalBytes) => {
+        event.sender.send('llm:download', { uri, receivedBytes, totalBytes } satisfies LlmDownloadEvent)
+      })
+      event.sender.send('llm:download', { uri, done: true } satisfies LlmDownloadEvent)
+      return ok(null)
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e)
+      event.sender.send('llm:download', { uri, error: message } satisfies LlmDownloadEvent)
+      return err(message)
+    }
+  })
+
+  // Chat: persist the user message, stream tokens, persist the answer on done.
+  ipcMain.handle('llm.chat.send', async (event, { conversationId, connectionId, prompt }: { conversationId: string; connectionId: string; prompt: string }) => {
+    const { db, secrets } = store()
+    const requestId = randomUUID()
+    const send = (ev: LlmTokenEvent): void => { event.sender.send('llm:token', ev) }
+    try {
+      const activeModelId = settings.getSetting(db, 'llm.activeModel')
+      const models = listLocalModels(getModelsDir())
+      const model = models.find((m) => m.id === activeModelId) ?? models[0]
+      if (!model) throw new Error('No model downloaded — open the model manager to download one.')
+
+      const config = conns.getConnection(db, connectionId)
+      if (!config) throw new Error(`Connection not found: ${connectionId}`)
+
+      // Ground the prompt with the live schema (through the SSH tunnel if any).
+      const driver = drivers.get(config.type)
+      await connectStored(driver, config, secrets)
+      const dbObjects = await driver.listObjects(config.id)
+      const withCols = await Promise.all(dbObjects.map(async (o) => ({
+        object: o,
+        columns: await driver.describeObject(config.id, { schema: o.schema, name: o.name }).catch(() => [])
+      })))
+      const systemPrompt =
+        'You are a database query assistant. Recommend correct queries for the user\'s database. ' +
+        'Return runnable queries in fenced code blocks (```sql, or ```js for MongoDB). Be concise.\n\n' +
+        buildSchemaContext(config.type, withCols)
+
+      const history = llm.listMessages(db, conversationId)
+      llm.addMessage(db, conversationId, 'user', prompt, now())
+      llm.touchConversation(db, conversationId, now())
+
+      await engine.load(model.path)
+      const ac = new AbortController()
+      activeGenerations.set(requestId, ac)
+      // Stream in the background; the invoke resolves immediately with the id.
+      void engine.generate(systemPrompt, history, prompt, (chunk) => send({ requestId, chunk }), ac.signal)
+        .then((full) => { llm.addMessage(db, conversationId, 'assistant', full, now()); llm.touchConversation(db, conversationId, now()); send({ requestId, done: true }) })
+        .catch((e) => send({ requestId, error: e instanceof Error ? e.message : String(e) }))
+        .finally(() => activeGenerations.delete(requestId))
+
+      return ok({ requestId })
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e)
+      send({ requestId, error: message })
+      return err(message)
+    }
   })
 }

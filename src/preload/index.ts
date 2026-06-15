@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { ChannelName, Req, IpcResult } from '../shared/ipc'
+import type { ChannelName, Req, IpcResult, LlmTokenEvent, LlmDownloadEvent } from '../shared/ipc'
 import type { DbClientApi } from '../shared/api'
 
 function invoke<K extends ChannelName>(channel: K, req: Req<K>): Promise<IpcResult<K>> {
@@ -51,6 +51,28 @@ const api: DbClientApi = {
   dialog: {
     pickDirectory: () => invoke('dialog.pickDirectory', undefined),
     openFile: (title) => invoke('dialog.openFile', { title })
+  },
+  llm: {
+    listModels: () => invoke('llm.models.list', undefined),
+    downloadModel: (uri) => invoke('llm.models.download', { uri }),
+    deleteModel: (id) => invoke('llm.models.delete', { id }),
+    setActiveModel: (id) => invoke('llm.models.setActive', { id }),
+    listConversations: (connectionId) => invoke('llm.conversations.list', { connectionId }),
+    createConversation: (connectionId, title) => invoke('llm.conversations.create', { connectionId, title }),
+    deleteConversation: (id) => invoke('llm.conversations.delete', { id }),
+    listMessages: (conversationId) => invoke('llm.messages.list', { conversationId }),
+    send: (conversationId, connectionId, prompt) => invoke('llm.chat.send', { conversationId, connectionId, prompt }),
+    cancel: (requestId) => invoke('llm.chat.cancel', { requestId }),
+    onToken: (cb) => {
+      const l = (_e: unknown, payload: LlmTokenEvent): void => cb(payload)
+      ipcRenderer.on('llm:token', l)
+      return () => ipcRenderer.removeListener('llm:token', l)
+    },
+    onDownloadProgress: (cb) => {
+      const l = (_e: unknown, payload: LlmDownloadEvent): void => cb(payload)
+      ipcRenderer.on('llm:download', l)
+      return () => ipcRenderer.removeListener('llm:download', l)
+    }
   }
 }
 

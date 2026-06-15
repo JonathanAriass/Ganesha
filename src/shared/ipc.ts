@@ -1,7 +1,8 @@
 import type { Result } from './result'
 import type {
   ConnectionConfig, ConnectionInput, HistoryEntry, HistoryEntryInput, AppSettings,
-  SavedQuery, SavedQueryInput, SavedQueryPatch, SessionTab
+  SavedQuery, SavedQueryInput, SavedQueryPatch, SessionTab,
+  LocalModel, CatalogModel, LlmConversation, LlmMessage
 } from './domain'
 import type { QueryResult } from './query'
 import type { DbObject, ObjectRef, ColumnInfo } from './schema'
@@ -42,7 +43,22 @@ export interface IpcChannels {
   'clipboard.copy': { req: string; res: null }
   'dialog.pickDirectory': { req: void; res: string | null }
   'dialog.openFile': { req: { title?: string }; res: string | null }
+  'llm.models.list': { req: void; res: { downloaded: LocalModel[]; catalog: CatalogModel[]; activeModelId: string | null } }
+  'llm.models.download': { req: { uri: string }; res: null }
+  'llm.models.delete': { req: { id: string }; res: null }
+  'llm.models.setActive': { req: { id: string }; res: null }
+  'llm.conversations.list': { req: { connectionId: string }; res: LlmConversation[] }
+  'llm.conversations.create': { req: { connectionId: string; title: string }; res: LlmConversation }
+  'llm.conversations.delete': { req: { id: string }; res: null }
+  'llm.messages.list': { req: { conversationId: string }; res: LlmMessage[] }
+  'llm.chat.send': { req: { conversationId: string; connectionId: string; prompt: string }; res: { requestId: string } }
+  'llm.chat.cancel': { req: { requestId: string }; res: null }
 }
+
+/** main→renderer push payload for streamed chat tokens. */
+export interface LlmTokenEvent { requestId: string; chunk?: string; done?: boolean; error?: string }
+/** main→renderer push payload for model download progress. */
+export interface LlmDownloadEvent { uri: string; receivedBytes?: number; totalBytes?: number; done?: boolean; error?: string }
 
 export type ChannelName = keyof IpcChannels
 export type Req<K extends ChannelName> = IpcChannels[K]['req']
