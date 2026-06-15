@@ -42,6 +42,11 @@ export function closeAllTunnels(): Promise<void> {
   return tunnels.closeAll()
 }
 
+/** Free the loaded LLM model (native memory) — called on app quit. */
+export function unloadLlm(): Promise<void> {
+  return engine.unload()
+}
+
 /** Persist the SSH secrets the user typed this save, keyed `ssh:<hopId>`. Blank
  *  ones are absent from the map (the renderer only sends typed values) → keep existing. */
 function writeSshSecrets(secrets: ReturnType<typeof makeSecretStore>, connId: string, sshSecrets?: Record<string, string>): void {
@@ -241,24 +246,26 @@ export function registerIpcHandlers(): void {
 
   // Download streams progress to the renderer that asked — registered raw for event.sender.
   ipcMain.handle('llm.models.download', async (event, { uri }: { uri: string }) => {
+    const push = (ev: LlmDownloadEvent): void => { if (!event.sender.isDestroyed()) event.sender.send('llm:download', ev) }
     try {
-      await downloadModel(getModelsDir(), uri, (receivedBytes, totalBytes) => {
-        event.sender.send('llm:download', { uri, receivedBytes, totalBytes } satisfies LlmDownloadEvent)
-      })
-      event.sender.send('llm:download', { uri, done: true } satisfies LlmDownloadEvent)
+      await downloadModel(getModelsDir(), uri, (receivedBytes, totalBytes) => push({ uri, receivedBytes, totalBytes }))
+      push({ uri, done: true })
       return ok(null)
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e)
-      event.sender.send('llm:download', { uri, error: message } satisfies LlmDownloadEvent)
+      push({ uri, error: message })
       return err(message)
     }
   })
 
-  // Chat: persist the user message, stream tokens, persist the answer on done.
+  // Chat: stream tokens, persisting the turn only once generation has actually
+  // started — so a failure during setup (no model / bad connection / model load)
+  // never leaves an orphaned user message that would double-feed the model next time.
   ipcMain.handle('llm.chat.send', async (event, { conversationId, connectionId, prompt }: { conversationId: string; connectionId: string; prompt: string }) => {
     const { db, secrets } = store()
     const requestId = randomUUID()
-    const send = (ev: LlmTokenEvent): void => { event.sender.send('llm:token', ev) }
+    // The webContents can be torn down mid-stream (window closed) — guard the push.
+    const send = (ev: LlmTokenEvent): void => { if (!event.sender.isDestroyed()) event.sender.send('llm:token', ev) }
     try {
       const activeModelId = settings.getSetting(db, 'llm.activeModel')
       const models = listLocalModels(getModelsDir())
@@ -281,17 +288,26 @@ export function registerIpcHandlers(): void {
         'Return runnable queries in fenced code blocks (```sql, or ```js for MongoDB). Be concise.\n\n' +
         buildSchemaContext(config.type, withCols)
 
+      // Prior turns BEFORE this one, then load the model. Both happen before we
+      // persist anything, so a setup failure leaves the conversation untouched.
       const history = llm.listMessages(db, conversationId)
+      await engine.load(model.path)
+
+      // Commit the turn: from here every user message gets a paired assistant
+      // message (real answer, partial on Stop, or an error note) — the thread
+      // never ends on a dangling user turn.
       llm.addMessage(db, conversationId, 'user', prompt, now())
       llm.touchConversation(db, conversationId, now())
-
-      await engine.load(model.path)
       const ac = new AbortController()
       activeGenerations.set(requestId, ac)
       // Stream in the background; the invoke resolves immediately with the id.
       void engine.generate(systemPrompt, history, prompt, (chunk) => send({ requestId, chunk }), ac.signal)
         .then((full) => { llm.addMessage(db, conversationId, 'assistant', full, now()); llm.touchConversation(db, conversationId, now()); send({ requestId, done: true }) })
-        .catch((e) => send({ requestId, error: e instanceof Error ? e.message : String(e) }))
+        .catch((e) => {
+          const message = e instanceof Error ? e.message : String(e)
+          llm.addMessage(db, conversationId, 'assistant', `⚠️ Generation failed: ${message}`, now())
+          send({ requestId, error: message })
+        })
         .finally(() => activeGenerations.delete(requestId))
 
       return ok({ requestId })

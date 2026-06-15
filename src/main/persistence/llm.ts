@@ -34,8 +34,10 @@ export function addMessage(db: DB, conversationId: string, role: 'user' | 'assis
 
 export function listMessages(db: DB, conversationId: string): LlmMessage[] {
   const rows = db.prepare(
+    // rowid tiebreak = insertion order, so same-millisecond writes never reorder
+    // (a random-UUID id tiebreak could sort an answer before its question).
     `SELECT id, conversation_id, role, content, created_at FROM llm_messages
-     WHERE conversation_id = ? ORDER BY created_at ASC, id ASC`
+     WHERE conversation_id = ? ORDER BY created_at ASC, rowid ASC`
   ).all(conversationId) as Array<{ id: string; conversation_id: string; role: string; content: string; created_at: number }>
   return rows.map((r) => ({ id: r.id, conversationId: r.conversation_id, role: r.role as 'user' | 'assistant', content: r.content, createdAt: r.created_at }))
 }

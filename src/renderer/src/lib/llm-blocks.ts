@@ -7,7 +7,7 @@ export function extractCodeBlocks(markdown: string): CodeBlock[] {
   const re = /```([^\n`]*)\n([\s\S]*?)```/g
   let m: RegExpExecArray | null
   while ((m = re.exec(markdown)) !== null) {
-    blocks.push({ lang: m[1].trim(), code: m[2].replace(/\n$/, '') })
+    blocks.push({ lang: m[1].trim(), code: m[2].replace(/\r?\n$/, '') })
   }
   return blocks
 }

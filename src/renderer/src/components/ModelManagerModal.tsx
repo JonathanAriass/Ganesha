@@ -62,21 +62,20 @@ export default function ModelManagerModal(): JSX.Element | null {
           ))}
 
           <h3>Catalog</h3>
-          {data?.catalog.map((m) => {
-            const have = data.downloaded.some((d) => d.name === m.id || d.id.includes(m.id))
-            return (
-              <div className="model-row" key={m.id}>
-                <span>
-                  {m.name} <span className="tree-muted">{m.sizeLabel}</span>
-                  <br /><span className="tree-muted">{m.description}</span>
-                </span>
-                <span className="spacer" />
-                <button className="btn xs" disabled={!!progress || have} onClick={() => void download(m.uri)}>
-                  {have ? 'Downloaded' : 'Download'}
-                </button>
-              </div>
-            )
-          })}
+          {data?.catalog.map((m) => (
+            <div className="model-row" key={m.id}>
+              <span>
+                {m.name} <span className="tree-muted">{m.sizeLabel}</span>
+                <br /><span className="tree-muted">{m.description}</span>
+              </span>
+              <span className="spacer" />
+              {/* Re-downloading is idempotent (node-llama-cpp resolves to the existing
+                  file), and the HF filename doesn't carry the catalog slug, so we don't
+                  try to show a (fragile) "already downloaded" state — the Downloaded
+                  section above is the source of truth. */}
+              <button className="btn xs" disabled={!!progress} onClick={() => void download(m.uri)}>Download</button>
+            </div>
+          ))}
 
           <h3>Advanced</h3>
           <div className="ssh-key-pick">

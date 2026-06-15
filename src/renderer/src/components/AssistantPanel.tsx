@@ -97,7 +97,10 @@ export default function AssistantPanel(): JSX.Element | null {
         <span className="spacer" />
         <select
           value={convId ?? ''}
-          onChange={(e) => { setConv(e.target.value || null); setLive([]); reqRef.current = null; setStreaming(false) }}
+          onChange={(e) => {
+            if (reqRef.current) void window.api.llm.cancel(reqRef.current) // don't leave a generation running for a hidden chat
+            setConv(e.target.value || null); setLive([]); reqRef.current = null; setStreaming(false)
+          }}
           aria-label="Conversation"
         >
           <option value="">New chat</option>
