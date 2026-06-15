@@ -12,14 +12,15 @@ export function setSetting(db: DB, key: string, value: string): void {
   ).run(key, value)
 }
 
-function readSetting(db: DB, key: string): string | null {
+/** Read a single raw setting value (null if unset). */
+export function getSetting(db: DB, key: string): string | null {
   const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined
   return row ? row.value : null
 }
 
 /** Build the typed AppSettings from the key/value rows, falling back to defaults. */
 export function getSettings(db: DB): AppSettings {
-  const theme = readSetting(db, 'theme')
+  const theme = getSetting(db, 'theme')
   return { theme: theme === 'light' ? 'light' : DEFAULT_SETTINGS.theme }
 }
 

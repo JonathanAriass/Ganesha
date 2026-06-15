@@ -91,3 +91,40 @@ export interface AppSettings {
 }
 
 export const DEFAULT_SETTINGS: AppSettings = { theme: 'midnight' }
+
+// ── Local LLM assistant ──
+
+/** A GGUF model file downloaded into the app's models dir. id = filename. */
+export interface LocalModel {
+  id: string
+  name: string
+  path: string
+  sizeBytes: number
+}
+
+/** A curated, downloadable model (Hugging Face URI node-llama-cpp understands). */
+export interface CatalogModel {
+  id: string
+  name: string
+  uri: string
+  sizeLabel: string
+  description: string
+}
+
+/** A chat thread, scoped to one connection. */
+export interface LlmConversation {
+  id: string
+  connectionId: string
+  title: string
+  createdAt: number
+  updatedAt: number
+}
+
+/** One message in a conversation. */
+export interface LlmMessage {
+  id: string
+  conversationId: string
+  role: 'user' | 'assistant'
+  content: string
+  createdAt: number
+}

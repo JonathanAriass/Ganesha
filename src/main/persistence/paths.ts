@@ -37,3 +37,10 @@ export function getDbPath(): string {
   mkdirSync(dir, { recursive: true })
   return join(dir, DB_FILENAME)
 }
+
+/** Directory holding downloaded GGUF models, under the current data dir. */
+export function getModelsDir(): string {
+  const dir = join(getDataDir(), 'models')
+  mkdirSync(dir, { recursive: true })
+  return dir
+}

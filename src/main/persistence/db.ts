@@ -69,6 +69,22 @@ export function migrate(db: DB): void {
       position      INTEGER NOT NULL,
       active        INTEGER NOT NULL DEFAULT 0
     );
+    CREATE TABLE IF NOT EXISTS llm_conversations (
+      id            TEXT PRIMARY KEY,
+      connection_id TEXT NOT NULL REFERENCES connections(id) ON DELETE CASCADE,
+      title         TEXT NOT NULL,
+      created_at    INTEGER NOT NULL,
+      updated_at    INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_llm_conv ON llm_conversations(connection_id, updated_at DESC);
+    CREATE TABLE IF NOT EXISTS llm_messages (
+      id              TEXT PRIMARY KEY,
+      conversation_id TEXT NOT NULL REFERENCES llm_conversations(id) ON DELETE CASCADE,
+      role            TEXT NOT NULL,
+      content         TEXT NOT NULL,
+      created_at      INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_llm_msg ON llm_messages(conversation_id, created_at);
   `)
   // Mongo Atlas / replica-set connectivity (added after first release of the schema).
   addColumnIfMissing(db, 'connections', 'auth_source', "TEXT NOT NULL DEFAULT ''")
