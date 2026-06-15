@@ -23,6 +23,10 @@ describe('clampWidth', () => {
     expect(clampWidth(NaN)).toBe(DEFAULT_WIDTH)
     expect(clampWidth(Infinity)).toBe(DEFAULT_WIDTH)
   })
+  it('rounds sub-pixel widths to a whole pixel', () => {
+    expect(clampWidth(420.7)).toBe(421)
+    expect(clampWidth(500.2)).toBe(500)
+  })
 })
 
 describe('dragWidth', () => {

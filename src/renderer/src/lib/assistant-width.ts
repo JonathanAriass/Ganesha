@@ -8,10 +8,11 @@ export const DEFAULT_WIDTH = 420
 export const MIN_WIDTH = 320
 export const MAX_WIDTH = 900
 
-/** Garbage (NaN/±Infinity) heals to the default; finite values clamp into range. */
+/** Garbage (NaN/±Infinity) heals to the default; finite values clamp into range
+ *  and round to a whole pixel (getBoundingClientRect can hand back sub-pixel floats). */
 export function clampWidth(w: number): number {
   if (!Number.isFinite(w)) return DEFAULT_WIDTH
-  return Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, w))
+  return Math.round(Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, w)))
 }
 
 /** The panel is docked at the right, so its width is the distance from the

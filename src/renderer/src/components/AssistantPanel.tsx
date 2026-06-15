@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useAppStore } from '../state/store'
 import { useLlmModels, useLlmConversations, useLlmMessages } from '../lib/hooks'
 import { extractCodeBlocks } from '../lib/llm-blocks'
-import { clampWidth, dragWidth, loadWidth, saveWidth, DEFAULT_WIDTH } from '../lib/assistant-width'
+import { clampWidth, dragWidth, loadWidth, saveWidth, DEFAULT_WIDTH, MIN_WIDTH, MAX_WIDTH } from '../lib/assistant-width'
 import type { LlmMessage } from '@shared/domain'
 
 let liveSeq = 0
@@ -35,6 +35,12 @@ export default function AssistantPanel(): JSX.Element | null {
   // ── Horizontal resize (drag the left edge) ──
   const panelRef = useRef<HTMLElement>(null)
   const [width, setWidth] = useState(() => loadWidth())
+  const widthRef = useRef(width) // leads every commit so same-tick key repeats accumulate
+  function commitWidth(w: number): void {
+    widthRef.current = w
+    setWidth(w)
+    saveWidth(w)
+  }
   function onResizePointerDown(e: React.PointerEvent<HTMLDivElement>): void {
     if (e.button !== 0) return
     e.preventDefault()
@@ -48,9 +54,14 @@ export default function AssistantPanel(): JSX.Element | null {
   }
   function onResizePointerEnd(e: React.PointerEvent<HTMLDivElement>): void {
     if (!e.currentTarget.hasPointerCapture(e.pointerId) || !panelRef.current) return
-    const w = clampWidth(panelRef.current.getBoundingClientRect().width)
-    setWidth(w)
-    saveWidth(w)
+    commitWidth(clampWidth(panelRef.current.getBoundingClientRect().width))
+  }
+  function onResizeKeyDown(e: React.KeyboardEvent<HTMLDivElement>): void {
+    // Left edge of a right-docked panel: ArrowLeft widens, ArrowRight narrows.
+    const step = e.key === 'ArrowLeft' ? 24 : e.key === 'ArrowRight' ? -24 : null
+    if (step === null) return
+    e.preventDefault()
+    commitWidth(clampWidth(widthRef.current + step))
   }
 
   const messages: LlmMessage[] = [...(persisted ?? []), ...live]
@@ -119,12 +130,17 @@ export default function AssistantPanel(): JSX.Element | null {
         role="separator"
         aria-orientation="vertical"
         aria-label="Resize assistant panel"
-        title="Drag to resize · double-click to reset"
+        aria-valuemin={MIN_WIDTH}
+        aria-valuemax={MAX_WIDTH}
+        aria-valuenow={Math.round(width)}
+        tabIndex={0}
+        title="Drag to resize · double-click to reset · ←/→ to adjust"
         onPointerDown={onResizePointerDown}
         onPointerMove={onResizePointerMove}
         onPointerUp={onResizePointerEnd}
         onPointerCancel={onResizePointerEnd}
-        onDoubleClick={() => { setWidth(DEFAULT_WIDTH); saveWidth(DEFAULT_WIDTH) }}
+        onDoubleClick={() => commitWidth(DEFAULT_WIDTH)}
+        onKeyDown={onResizeKeyDown}
       />
       <div className="assistant-head">
         <strong>Assistant</strong>

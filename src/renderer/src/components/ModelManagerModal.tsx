@@ -18,7 +18,7 @@ export default function ModelManagerModal(): JSX.Element | null {
       if (e.done) { setProgress(null); void qc.invalidateQueries({ queryKey: ['llm', 'models'] }); return }
       const received = e.receivedBytes ?? 0
       const total = e.totalBytes ?? 0
-      setProgress({ uri: e.uri, pct: total ? Math.round((received / total) * 100) : 0, received, total })
+      setProgress({ uri: e.uri, pct: total ? Math.min(100, Math.round((received / total) * 100)) : 0, received, total })
     })
   }, [qc])
 

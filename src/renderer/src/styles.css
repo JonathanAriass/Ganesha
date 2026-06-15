@@ -1412,8 +1412,10 @@ input[type="password"]::placeholder {
 .btn.ghost.active { background: var(--btn-hover-bg); border-color: var(--accent); }
 .link-btn { background: none; border: none; color: var(--accent); cursor: pointer; padding: 0; font: inherit; text-decoration: underline; }
 
-/* width comes inline from React (the persisted, drag-set value). */
-.assistant-panel { position: relative; display: flex; flex-direction: column; flex-shrink: 0; border-left: 1px solid var(--border); background: var(--bg-2); min-height: 0; }
+/* width comes inline from React (the persisted, drag-set value). The max-width
+   guard keeps a wide saved width from clipping the panel / starving the editor
+   on a narrow window (leaves room for the sidebar + a usable main area). */
+.assistant-panel { position: relative; display: flex; flex-direction: column; flex-shrink: 0; max-width: calc(100vw - 480px); border-left: 1px solid var(--border); background: var(--bg-2); min-height: 0; }
 .assistant-resizer { position: absolute; left: 0; top: 0; bottom: 0; width: 6px; z-index: 2; cursor: col-resize; touch-action: none; background: linear-gradient(var(--border), var(--border)) center / 1px 100% no-repeat; }
 .assistant-resizer:hover, .assistant-resizer:focus-visible { background: linear-gradient(var(--accent), var(--accent)) center / 2px 100% no-repeat; outline: none; }
 
