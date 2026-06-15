@@ -2,12 +2,17 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import Database from 'better-sqlite3'
 import { migrate, type DB } from './db'
 import { createConnection, listConnections, getConnection, updateConnection, deleteConnection } from './connections'
-import type { ConnectionInput } from '../../shared/domain'
+import type { ConnectionInput, SshConfig } from '../../shared/domain'
 
 const input: ConnectionInput = {
   type: 'postgres', name: 'prod', color: '#6366f1', host: 'localhost',
   port: 5432, username: 'admin', database: 'app', ssl: true, readOnly: false,
   authSource: '', replicaSet: '', ssh: null
+}
+
+const ssh: SshConfig = {
+  enabled: true,
+  hops: [{ id: 'h1', host: 'bastion', port: 22, username: 'ec2-user', auth: 'key', keyPath: '/k.pem' }]
 }
 
 let db: DB
@@ -84,5 +89,21 @@ describe('connections service', () => {
       authSource: '',
       replicaSet: ''
     })
+  })
+})
+
+describe('ssh config persistence', () => {
+  it('defaults to null when never set', () => {
+    const c = createConnection(db, { ...input, ssh: null }, 1)
+    expect(getConnection(db, c.id)!.ssh).toBeNull()
+  })
+  it('round-trips an SSH chain through create', () => {
+    const c = createConnection(db, { ...input, ssh }, 1)
+    expect(getConnection(db, c.id)!.ssh).toEqual(ssh)
+  })
+  it('updates the SSH config', () => {
+    const c = createConnection(db, { ...input, ssh: null }, 1)
+    updateConnection(db, c.id, { ssh }, 2)
+    expect(getConnection(db, c.id)!.ssh).toEqual(ssh)
   })
 })

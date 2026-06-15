@@ -29,6 +29,7 @@ export function migrate(db: DB): void {
       read_only   INTEGER NOT NULL DEFAULT 0,
       auth_source TEXT NOT NULL DEFAULT '',
       replica_set TEXT NOT NULL DEFAULT '',
+      ssh_json    TEXT,
       created_at  INTEGER NOT NULL,
       updated_at  INTEGER NOT NULL
     );
@@ -70,6 +71,8 @@ export function migrate(db: DB): void {
   // Mongo Atlas / replica-set connectivity (added after first release of the schema).
   addColumnIfMissing(db, 'connections', 'auth_source', "TEXT NOT NULL DEFAULT ''")
   addColumnIfMissing(db, 'connections', 'replica_set', "TEXT NOT NULL DEFAULT ''")
+  // SSH tunnel config (added later): nullable JSON blob of SshConfig.
+  addColumnIfMissing(db, 'connections', 'ssh_json', 'TEXT')
 }
 
 let singleton: DB | null = null

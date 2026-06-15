@@ -5,7 +5,7 @@ import type { ConnectionConfig, ConnectionInput } from '../../shared/domain'
 interface Row {
   id: string; type: string; name: string; color: string; host: string; port: number
   username: string; db_name: string; ssl: number; read_only: number
-  auth_source: string; replica_set: string
+  auth_source: string; replica_set: string; ssh_json: string | null
   created_at: number; updated_at: number
 }
 
@@ -15,17 +15,19 @@ function toConfig(r: Row): ConnectionConfig {
     host: r.host, port: r.port, username: r.username, database: r.db_name,
     ssl: !!r.ssl, readOnly: !!r.read_only,
     authSource: r.auth_source, replicaSet: r.replica_set,
-    ssh: null,
+    ssh: r.ssh_json ? (JSON.parse(r.ssh_json) as ConnectionConfig['ssh']) : null,
     createdAt: r.created_at, updatedAt: r.updated_at
   }
 }
 
 export function createConnection(db: DB, input: ConnectionInput, now: number): ConnectionConfig {
   const id = randomUUID()
+  // ssh is an object/null — store it as JSON, not as a bind param of its own.
+  const { ssh, ...flat } = input
   db.prepare(`INSERT INTO connections
-    (id,type,name,color,host,port,username,db_name,ssl,read_only,auth_source,replica_set,created_at,updated_at)
-    VALUES (@id,@type,@name,@color,@host,@port,@username,@database,@ssl,@readOnly,@authSource,@replicaSet,@now,@now)`)
-    .run({ id, ...input, ssl: input.ssl ? 1 : 0, readOnly: input.readOnly ? 1 : 0, now })
+    (id,type,name,color,host,port,username,db_name,ssl,read_only,auth_source,replica_set,ssh_json,created_at,updated_at)
+    VALUES (@id,@type,@name,@color,@host,@port,@username,@database,@ssl,@readOnly,@authSource,@replicaSet,@ssh_json,@now,@now)`)
+    .run({ id, ...flat, ssl: input.ssl ? 1 : 0, readOnly: input.readOnly ? 1 : 0, ssh_json: ssh ? JSON.stringify(ssh) : null, now })
   return getConnection(db, id) as ConnectionConfig
 }
 
@@ -45,8 +47,8 @@ export function updateConnection(db: DB, id: string, patch: Partial<ConnectionIn
   db.prepare(`UPDATE connections SET
     type=@type,name=@name,color=@color,host=@host,port=@port,username=@username,
     db_name=@database,ssl=@ssl,read_only=@readOnly,
-    auth_source=@authSource,replica_set=@replicaSet,updated_at=@now WHERE id=@id`)
-    .run({ ...next, id, ssl: next.ssl ? 1 : 0, readOnly: next.readOnly ? 1 : 0, now })
+    auth_source=@authSource,replica_set=@replicaSet,ssh_json=@ssh_json,updated_at=@now WHERE id=@id`)
+    .run({ ...next, id, ssl: next.ssl ? 1 : 0, readOnly: next.readOnly ? 1 : 0, ssh_json: next.ssh ? JSON.stringify(next.ssh) : null, now })
   return getConnection(db, id) as ConnectionConfig
 }
 
