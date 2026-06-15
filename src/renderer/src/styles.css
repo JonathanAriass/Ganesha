@@ -1401,3 +1401,21 @@ input[type="password"]::placeholder {
 .ssh-key-pick { display: flex; gap: 6px; }
 .ssh-key-pick input { flex: 1; }
 .btn.xs { padding: 2px 6px; font-size: 12px; line-height: 1; }
+
+/* ── Assistant panel ── */
+.btn.ghost.active { background: var(--btn-hover-bg); border-color: var(--accent); }
+.link-btn { background: none; border: none; color: var(--accent); cursor: pointer; padding: 0; font: inherit; text-decoration: underline; }
+.assistant-panel { display: flex; flex-direction: column; width: 360px; flex-shrink: 0; border-left: 1px solid var(--border); background: var(--bg-2); min-height: 0; }
+.assistant-head { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.assistant-head select { max-width: 150px; }
+.assistant-empty { padding: 16px; color: var(--text-2); font-size: 13px; }
+.assistant-thread { flex: 1; min-height: 0; overflow: auto; padding: 10px; display: flex; flex-direction: column; gap: 10px; }
+.assistant-msg { font-size: 13px; }
+.assistant-msg.user .assistant-msg-body { background: var(--bg-3); border-radius: 8px; padding: 6px 8px; }
+.assistant-msg.assistant .assistant-msg-body { white-space: pre-wrap; line-height: 1.5; }
+.assistant-block { margin-top: 6px; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.assistant-block pre { margin: 0; padding: 8px; overflow: auto; font-size: 12px; background: var(--bg); font-family: 'SF Mono', 'Fira Mono', 'Consolas', monospace; }
+.assistant-block button { margin: 6px; }
+.assistant-input { display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--border); flex-shrink: 0; }
+.assistant-input textarea { flex: 1; resize: none; height: 56px; font: inherit; }
+.model-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }

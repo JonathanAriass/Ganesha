@@ -12,6 +12,7 @@ import QueryTab from './components/QueryTab'
 import SavedSection from './components/SavedSection'
 import HistorySection from './components/HistorySection'
 import SaveQueryModal from './components/SaveQueryModal'
+import AssistantPanel from './components/AssistantPanel'
 import { useSettings } from './lib/hooks'
 import { applyTheme } from './lib/theme'
 import { useGlobalShortcuts } from './lib/use-global-shortcuts'
@@ -65,6 +66,7 @@ function AppShell(): JSX.Element {
             <Welcome />
           )}
         </main>
+        <AssistantPanel />
       </div>
       {connectionModal && <ConnectionModal />}
       {settingsOpen && <SettingsModal />}

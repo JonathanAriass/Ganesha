@@ -58,6 +58,11 @@ interface AppState {
   paletteOpen: boolean
   saveQueryModal: SaveQueryModalState | null
 
+  // ── LLM assistant ─────────────────────────────────────────────────────────
+  assistantOpen: boolean
+  activeConversationId: string | null
+  modelManagerOpen: boolean
+
   // ── Tabs ──────────────────────────────────────────────────────────────────
   tabs: QueryTabData[]
   activeTabId: string | null
@@ -72,6 +77,11 @@ interface AppState {
   setPaletteOpen: (open: boolean) => void
   openSaveQueryModal: (state: SaveQueryModalState) => void
   closeSaveQueryModal: () => void
+
+  toggleAssistant: () => void
+  setActiveConversation: (id: string | null) => void
+  openModelManager: () => void
+  closeModelManager: () => void
 
   openQueryTab: (args: { connectionId: string; title?: string; text?: string; runOnOpen?: boolean }) => void
   /** One-shot boot restore of a persisted session. No-ops once any tab exists —
@@ -106,6 +116,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   settingsOpen: false,
   paletteOpen: false,
   saveQueryModal: null,
+  assistantOpen: false,
+  activeConversationId: null,
+  modelManagerOpen: false,
   tabs: [],
   activeTabId: null,
   _queryCounter: 0,
@@ -120,6 +133,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Like openSettings: an overlay opening from the palette must replace it.
   openSaveQueryModal: (state) => set({ saveQueryModal: state, paletteOpen: false }),
   closeSaveQueryModal: () => set({ saveQueryModal: null }),
+
+  toggleAssistant: () => set((s) => ({ assistantOpen: !s.assistantOpen })),
+  setActiveConversation: (id) => set({ activeConversationId: id }),
+  openModelManager: () => set({ modelManagerOpen: true }),
+  closeModelManager: () => set({ modelManagerOpen: false }),
 
   openQueryTab: ({ connectionId, title, text, runOnOpen }) =>
     set((s) => {

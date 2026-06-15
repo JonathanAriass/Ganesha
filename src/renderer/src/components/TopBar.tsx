@@ -8,6 +8,8 @@ export default function TopBar(): JSX.Element {
   const setActiveConnection = useAppStore((s) => s.setActiveConnection)
   const openModal = useAppStore((s) => s.openModal)
   const openSettings = useAppStore((s) => s.openSettings)
+  const toggleAssistant = useAppStore((s) => s.toggleAssistant)
+  const assistantOpen = useAppStore((s) => s.assistantOpen)
 
   const { data: connections = [] } = useConnections()
 
@@ -61,6 +63,16 @@ export default function TopBar(): JSX.Element {
         onClick={() => openModal({ mode: 'create' })}
       >
         + New connection
+      </button>
+
+      <button
+        className={`btn ghost${assistantOpen ? ' active' : ''}`}
+        onClick={toggleAssistant}
+        aria-label="Toggle assistant"
+        aria-pressed={assistantOpen}
+        title="AI assistant"
+      >
+        💬 Assistant
       </button>
 
       <button
