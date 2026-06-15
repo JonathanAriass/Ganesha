@@ -13,6 +13,7 @@ import SavedSection from './components/SavedSection'
 import HistorySection from './components/HistorySection'
 import SaveQueryModal from './components/SaveQueryModal'
 import AssistantPanel from './components/AssistantPanel'
+import ModelManagerModal from './components/ModelManagerModal'
 import { useSettings } from './lib/hooks'
 import { applyTheme } from './lib/theme'
 import { useGlobalShortcuts } from './lib/use-global-shortcuts'
@@ -72,6 +73,7 @@ function AppShell(): JSX.Element {
       {settingsOpen && <SettingsModal />}
       {paletteOpen && <CommandPalette />}
       {saveQueryModal && <SaveQueryModal />}
+      <ModelManagerModal />
     </div>
   )
 }
