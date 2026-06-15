@@ -213,3 +213,27 @@ export function useSetDataDir() {
     onSuccess: () => void qc.invalidateQueries(),
   })
 }
+
+// ── LLM assistant ──────────────────────────────────────────────────────────────
+
+export function useLlmModels() {
+  return useQuery({ queryKey: ['llm', 'models'], queryFn: () => window.api.llm.listModels().then(unwrap), retry: false })
+}
+
+export function useLlmConversations(connectionId: string | null) {
+  return useQuery({
+    queryKey: ['llm', 'conversations', connectionId],
+    queryFn: () => window.api.llm.listConversations(connectionId!).then(unwrap),
+    enabled: connectionId != null,
+    retry: false,
+  })
+}
+
+export function useLlmMessages(conversationId: string | null) {
+  return useQuery({
+    queryKey: ['llm', 'messages', conversationId],
+    queryFn: () => window.api.llm.listMessages(conversationId!).then(unwrap),
+    enabled: conversationId != null,
+    retry: false,
+  })
+}
