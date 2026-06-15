@@ -1392,3 +1392,12 @@ input[type="password"]::placeholder {
 .kbd {
   font-family: ui-monospace, 'SF Mono', 'Fira Mono', monospace;
 }
+
+/* ── SSH hop editor ── */
+.ssh-hops { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+.ssh-hop { border: 1px solid var(--border); border-radius: 8px; padding: 10px; background: var(--bg-2); }
+.ssh-hop-head { display: flex; align-items: center; gap: 4px; margin-bottom: 8px; }
+.ssh-hop-order { font-size: 12px; color: var(--text-2); font-weight: 600; }
+.ssh-key-pick { display: flex; gap: 6px; }
+.ssh-key-pick input { flex: 1; }
+.btn.xs { padding: 2px 6px; font-size: 12px; line-height: 1; }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import type { ConnectionInput, ConnectionType } from '@shared/domain'
+import type { ConnectionInput, ConnectionType, SshConfig } from '@shared/domain'
 import { useAppStore } from '../state/store'
 import {
   useConnections,
@@ -7,6 +7,8 @@ import {
   useDeleteConnection,
   useTestConnection,
 } from '../lib/hooks'
+import SshHopEditor from './SshHopEditor'
+import { emptyHop, validateSshConfig } from '../lib/ssh-config'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -65,6 +67,8 @@ export default function ConnectionModal(): JSX.Element {
 
   const [form, setForm] = useState<ConnectionInput>(DEFAULT_INPUT)
   const [password, setPassword] = useState<string>('')
+  // SSH passphrases/passwords by hop id — write-only, blank = keep current on edit.
+  const [sshSecrets, setSshSecrets] = useState<Record<string, string>>({})
   const [testStatus, setTestStatus] = useState<TestStatus>({ kind: 'idle' })
   const [saveError, setSaveError] = useState<string | null>(null)
 
@@ -90,6 +94,7 @@ export default function ConnectionModal(): JSX.Element {
       setForm(DEFAULT_INPUT)
       setPassword('')
     }
+    setSshSecrets({}) // typed-this-session only; never preload stored secrets
     setTestStatus({ kind: 'idle' })
     setSaveError(null)
   }, [isEdit, existingConn])
@@ -115,13 +120,22 @@ export default function ConnectionModal(): JSX.Element {
     setSaveError(null)
   }
 
+  function setSshEnabled(enabled: boolean) {
+    const cur: SshConfig = form.ssh ?? { enabled: false, hops: [] }
+    // Enabling with no hops yet seeds one so the editor isn't empty.
+    const hops = enabled && cur.hops.length === 0 ? [emptyHop(crypto.randomUUID())] : cur.hops
+    setField('ssh', { enabled, hops })
+  }
+
   function handleTest() {
+    const sshErr = validateSshConfig(form.ssh)
+    if (sshErr) { setTestStatus({ kind: 'err', message: sshErr }); return }
     setTestStatus({ kind: 'pending' })
     // Blank password on edit means "keep current" — send the id so main can
     // test with the stored secret (it never comes back to the renderer).
     const pwd = password || null
     test.mutate(
-      { input: form, password: pwd, id: editId },
+      { input: form, password: pwd, id: editId, sshSecrets },
       {
         onSuccess: () => setTestStatus({ kind: 'ok' }),
         onError: (e) =>
@@ -135,6 +149,8 @@ export default function ConnectionModal(): JSX.Element {
 
   const handleSave = useCallback(() => {
     setSaveError(null)
+    const sshErr = validateSshConfig(form.ssh)
+    if (sshErr) { setSaveError(sshErr); return }
     // password semantics:
     //   create → pass password || null
     //   edit   → blank string becomes undefined (keep), non-blank becomes value
@@ -145,7 +161,7 @@ export default function ConnectionModal(): JSX.Element {
       : password || null
 
     save.mutate(
-      { id: editId, input: form, password: pwd },
+      { id: editId, input: form, password: pwd, sshSecrets },
       {
         onSuccess: (saved) => {
           setActiveConnection(saved.id)
@@ -155,7 +171,7 @@ export default function ConnectionModal(): JSX.Element {
           setSaveError(e instanceof Error ? e.message : String(e)),
       },
     )
-  }, [editId, form, password, save, setActiveConnection, closeModal])
+  }, [editId, form, password, sshSecrets, save, setActiveConnection, closeModal])
 
   function handleDelete() {
     if (!editId) return
@@ -344,6 +360,27 @@ export default function ConnectionModal(): JSX.Element {
                 Read-only mode
               </label>
             </div>
+
+            {/* SSH tunnel */}
+            <div className="form-row">
+              <label className="checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={!!form.ssh?.enabled}
+                  onChange={(e) => setSshEnabled(e.target.checked)}
+                />
+                Use SSH tunnel
+              </label>
+            </div>
+            {form.ssh?.enabled && (
+              <SshHopEditor
+                ssh={form.ssh}
+                secrets={sshSecrets}
+                isEdit={isEdit}
+                onChange={(ssh) => setField('ssh', ssh)}
+                onSecretChange={(hopId, value) => setSshSecrets((prev) => ({ ...prev, [hopId]: value }))}
+              />
+            )}
 
             {/* Test status */}
             {testStatus.kind === 'ok' && (
