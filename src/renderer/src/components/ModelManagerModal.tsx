@@ -9,14 +9,16 @@ export default function ModelManagerModal(): JSX.Element | null {
   const { data } = useLlmModels()
   const qc = useQueryClient()
   const [customUri, setCustomUri] = useState('')
-  const [progress, setProgress] = useState<{ uri: string; pct: number } | null>(null)
+  const [progress, setProgress] = useState<{ uri: string; pct: number; received: number; total: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     return window.api.llm.onDownloadProgress((e) => {
       if (e.error) { setError(e.error); setProgress(null); return }
       if (e.done) { setProgress(null); void qc.invalidateQueries({ queryKey: ['llm', 'models'] }); return }
-      setProgress({ uri: e.uri, pct: e.totalBytes ? Math.round(((e.receivedBytes ?? 0) / e.totalBytes) * 100) : 0 })
+      const received = e.receivedBytes ?? 0
+      const total = e.totalBytes ?? 0
+      setProgress({ uri: e.uri, pct: total ? Math.round((received / total) * 100) : 0, received, total })
     })
   }, [qc])
 
@@ -24,7 +26,7 @@ export default function ModelManagerModal(): JSX.Element | null {
 
   async function download(uri: string): Promise<void> {
     setError(null)
-    setProgress({ uri, pct: 0 })
+    setProgress({ uri, pct: 0, received: 0, total: 0 })
     const res = await window.api.llm.downloadModel(uri)
     if (!res.ok) { setError(res.error); setProgress(null) }
   }
@@ -47,12 +49,15 @@ export default function ModelManagerModal(): JSX.Element | null {
     >
       <div className="modal">
         <div className="modal-header"><h2>Model Manager</h2></div>
-        <div className="modal-body">
+        <div className="modal-body model-manager">
           <h3>Downloaded</h3>
           {(data?.downloaded.length ?? 0) === 0 && <p className="tree-muted">None yet — pick one from the catalog below.</p>}
           {data?.downloaded.map((m) => (
             <div className="model-row" key={m.id}>
-              <span>{m.name} <span className="tree-muted">({(m.sizeBytes / 1e9).toFixed(1)} GB)</span></span>
+              <span className="model-name">
+                <span>{m.name}</span>
+                <span className="tree-muted">{(m.sizeBytes / 1e9).toFixed(1)} GB</span>
+              </span>
               <span className="spacer" />
               {data.activeModelId === m.id
                 ? <span className="status ok">active</span>
@@ -64,9 +69,9 @@ export default function ModelManagerModal(): JSX.Element | null {
           <h3>Catalog</h3>
           {data?.catalog.map((m) => (
             <div className="model-row" key={m.id}>
-              <span>
-                {m.name} <span className="tree-muted">{m.sizeLabel}</span>
-                <br /><span className="tree-muted">{m.description}</span>
+              <span className="model-name">
+                <span>{m.name} <span className="tree-muted">· {m.sizeLabel}</span></span>
+                <span className="tree-muted">{m.description}</span>
               </span>
               <span className="spacer" />
               {/* Re-downloading is idempotent (node-llama-cpp resolves to the existing
@@ -90,7 +95,17 @@ export default function ModelManagerModal(): JSX.Element | null {
             </button>
           </div>
 
-          {progress && <div className="status">Downloading… {progress.pct}%</div>}
+          {progress && (
+            <div className="progress-wrap">
+              <div className="progress-track">
+                <div className="progress-fill" style={{ width: `${progress.pct}%` }} />
+              </div>
+              <div className="progress-label">
+                Downloading… {progress.pct}%
+                {progress.total > 0 && ` · ${(progress.received / 1e9).toFixed(2)} / ${(progress.total / 1e9).toFixed(2)} GB`}
+              </div>
+            </div>
+          )}
           {error && <div className="status err" role="alert">{error}</div>}
         </div>
         <div className="modal-footer">

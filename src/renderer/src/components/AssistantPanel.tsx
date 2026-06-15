@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useAppStore } from '../state/store'
 import { useLlmModels, useLlmConversations, useLlmMessages } from '../lib/hooks'
 import { extractCodeBlocks } from '../lib/llm-blocks'
+import { clampWidth, dragWidth, loadWidth, saveWidth, DEFAULT_WIDTH } from '../lib/assistant-width'
 import type { LlmMessage } from '@shared/domain'
 
 let liveSeq = 0
@@ -30,6 +31,27 @@ export default function AssistantPanel(): JSX.Element | null {
   const reqRef = useRef<string | null>(null)
   const cidRef = useRef<string | null>(null)
   const threadRef = useRef<HTMLDivElement>(null)
+
+  // ── Horizontal resize (drag the left edge) ──
+  const panelRef = useRef<HTMLElement>(null)
+  const [width, setWidth] = useState(() => loadWidth())
+  function onResizePointerDown(e: React.PointerEvent<HTMLDivElement>): void {
+    if (e.button !== 0) return
+    e.preventDefault()
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+  function onResizePointerMove(e: React.PointerEvent<HTMLDivElement>): void {
+    if (!e.currentTarget.hasPointerCapture(e.pointerId) || !panelRef.current) return
+    // Direct DOM write during the drag; commit to state + localStorage on pointerup
+    // (a re-render per move would re-render the streaming thread).
+    panelRef.current.style.width = `${dragWidth(e.clientX, panelRef.current.getBoundingClientRect().right)}px`
+  }
+  function onResizePointerEnd(e: React.PointerEvent<HTMLDivElement>): void {
+    if (!e.currentTarget.hasPointerCapture(e.pointerId) || !panelRef.current) return
+    const w = clampWidth(panelRef.current.getBoundingClientRect().width)
+    setWidth(w)
+    saveWidth(w)
+  }
 
   const messages: LlmMessage[] = [...(persisted ?? []), ...live]
 
@@ -91,7 +113,19 @@ export default function AssistantPanel(): JSX.Element | null {
   const hasModel = (models?.downloaded.length ?? 0) > 0
 
   return (
-    <aside className="assistant-panel">
+    <aside className="assistant-panel" ref={panelRef} style={{ width }}>
+      <div
+        className="assistant-resizer"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize assistant panel"
+        title="Drag to resize · double-click to reset"
+        onPointerDown={onResizePointerDown}
+        onPointerMove={onResizePointerMove}
+        onPointerUp={onResizePointerEnd}
+        onPointerCancel={onResizePointerEnd}
+        onDoubleClick={() => { setWidth(DEFAULT_WIDTH); saveWidth(DEFAULT_WIDTH) }}
+      />
       <div className="assistant-head">
         <strong>Assistant</strong>
         <span className="spacer" />
