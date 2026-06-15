@@ -1451,14 +1451,18 @@ input[type="password"]::placeholder {
 .progress-label { margin-top: 6px; font-size: 12px; color: var(--text-2); }
 
 /* ── Monaco autocomplete (suggest) widget ──
-   Our custom editor themes didn't make the suggest-widget labels legible (Monaco
-   colors them from --vscode-editorSuggestWidget-* theme vars that didn't resolve
-   against our palette, leaving labels invisible). Force readable colors directly. */
+   Our custom editor themes left the labels illegible: Monaco colors them from
+   --vscode-editorSuggestWidget-* theme vars that don't resolve against our
+   palette, so the label text rendered black/invisible. The label lives on
+   .monaco-icon-label (suggest.css:144) — NOT .label-name (which the suggest
+   widget doesn't use) — so force colors on the real elements with !important.
+   Coloring .monaco-icon-label also lights up the kind-icon glyph (its ::before),
+   fixing the faint "boxes". */
 .monaco-editor .suggest-widget { background-color: var(--bg-2) !important; border: 1px solid var(--border) !important; }
-.monaco-editor .suggest-widget .monaco-list .monaco-list-row .label-name { color: var(--text) !important; }
+.monaco-editor .suggest-widget .monaco-list .monaco-list-row .monaco-icon-label { color: var(--text) !important; }
 .monaco-editor .suggest-widget .monaco-list .monaco-list-row .monaco-highlighted-label .highlight { color: var(--accent) !important; font-weight: 600; }
 .monaco-editor .suggest-widget .monaco-list .monaco-list-row .details-label { color: var(--text-2) !important; }
 .monaco-editor .suggest-widget .monaco-list .monaco-list-row.focused { background-color: var(--accent) !important; }
-.monaco-editor .suggest-widget .monaco-list .monaco-list-row.focused .label-name,
+.monaco-editor .suggest-widget .monaco-list .monaco-list-row.focused .monaco-icon-label,
 .monaco-editor .suggest-widget .monaco-list .monaco-list-row.focused .monaco-highlighted-label .highlight,
 .monaco-editor .suggest-widget .monaco-list .monaco-list-row.focused .details-label { color: #ffffff !important; }
