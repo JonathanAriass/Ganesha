@@ -8,6 +8,8 @@ import {
   resolveSqlQualifier,
   columnSuggestions,
   schemaObjectSuggestions,
+  sqlBoundRefs,
+  unqualifiedColumnSuggestions,
   mongoCursorContext,
   mongoCollectionSuggestions,
   mongoOpSuggestions,
@@ -61,6 +63,11 @@ describe('sqlDotQualifier', () => {
   it('does not treat a decimal number as a qualifier', () => {
     expect(sqlDotQualifier('select 1.')).toBeNull()
   })
+
+  it('captures a digit-leading identifier (MySQL allows `43_settings`)', () => {
+    expect(sqlDotQualifier('select * from 43_settings s where s.')).toBe('s')
+    expect(sqlDotQualifier('select 43_settings.')).toBe('43_settings')
+  })
 })
 
 describe('sqlTableBindings', () => {
@@ -89,6 +96,11 @@ describe('sqlTableBindings', () => {
   it('binds every table in an unaliased join chain', () => {
     const b = sqlTableBindings('select * from a join b join c')
     expect(b.map((x) => x.ref.name)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('binds a table whose name starts with a digit (MySQL `43_settings`)', () => {
+    const b = sqlTableBindings('select * from 43_settings where id = 1')
+    expect(b).toEqual([{ ref: { schema: null, name: '43_settings' }, alias: null }])
   })
 })
 
@@ -137,6 +149,42 @@ describe('columnSuggestions / schemaObjectSuggestions', () => {
   it('lists only the objects of the given schema', () => {
     const sugs = schemaObjectSuggestions(SQL_OBJECTS, 'sales')
     expect(sugs.map((s) => s.label)).toEqual(['orders'])
+  })
+})
+
+describe('sqlBoundRefs', () => {
+  it('resolves FROM/JOIN tables to refs, labelled by alias then name', () => {
+    const refs = sqlBoundRefs('select * from users u join sales.orders where ', SQL_OBJECTS)
+    expect(refs).toEqual([
+      { label: 'u', ref: { schema: 'public', name: 'users' } },
+      { label: 'orders', ref: { schema: 'sales', name: 'orders' } }
+    ])
+  })
+
+  it('is empty when the statement binds no tables', () => {
+    expect(sqlBoundRefs('select ', SQL_OBJECTS)).toEqual([])
+  })
+})
+
+describe('unqualifiedColumnSuggestions', () => {
+  it('lists each table\'s columns with the table as detail', () => {
+    const sugs = unqualifiedColumnSuggestions([
+      { label: 'u', cols: [{ name: 'id', dataType: 'integer', nullable: false }, { name: 'email', dataType: 'text', nullable: true }] },
+      { label: 'o', cols: [{ name: 'id', dataType: 'bigint', nullable: false }] }
+    ])
+    expect(sugs).toEqual([
+      { label: 'id', kind: 'column', insertText: 'id', detail: 'u · integer' },
+      { label: 'email', kind: 'column', insertText: 'email', detail: 'u · text' },
+      { label: 'id', kind: 'column', insertText: 'id', detail: 'o · bigint' }
+    ])
+  })
+
+  it('collapses exact (table, column) duplicates', () => {
+    const sugs = unqualifiedColumnSuggestions([
+      { label: 'u', cols: [{ name: 'id', dataType: 'integer', nullable: false }] },
+      { label: 'u', cols: [{ name: 'id', dataType: 'integer', nullable: false }] }
+    ])
+    expect(sugs.map((s) => s.detail)).toEqual(['u · integer'])
   })
 })
 

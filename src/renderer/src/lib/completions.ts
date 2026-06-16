@@ -57,11 +57,18 @@ export function sqlPlainSuggestions(objects: DbObject[]): Suggestion[] {
   ]
 }
 
+// MySQL permits identifiers that start with a digit (e.g. `43_settings`) provided
+// they are not entirely numeric. The leading-digits-then-required-non-digit shape
+// captures those while still excluding a bare number — so a decimal literal (`1.`)
+// is never mistaken for a qualifier.
+const SQL_IDENT = String.raw`[0-9]*[A-Za-z_$][\w$]*`
+const SQL_DOT_QUALIFIER = new RegExp(String.raw`(${SQL_IDENT})\.\w*$`)
+
 /** "… u." / "… u.na" → "u"; null when the cursor is not right after `ident.`.
  *  Quoted identifiers ("Users".) are not recognized — unquoted-lowercase is the
  *  overwhelmingly common case in a query scratchpad. */
 export function sqlDotQualifier(textBeforeCursor: string): string | null {
-  const m = /([A-Za-z_][\w$]*)\.\w*$/.exec(textBeforeCursor)
+  const m = SQL_DOT_QUALIFIER.exec(textBeforeCursor)
   return m ? m[1] : null
 }
 
@@ -80,8 +87,8 @@ const NOT_ALIAS = [
 // a consumed `join` would make matchAll resume past it and drop the next table
 // (`from users join orders o` would lose orders entirely).
 const BINDING_RE = new RegExp(
-  String.raw`\b(?:from|join)\s+([A-Za-z_][\w$]*(?:\.[A-Za-z_][\w$]*)?)` +
-    String.raw`(?:\s+(?:as\s+)?(?!(?:${NOT_ALIAS.join('|')})\b)([A-Za-z_][\w$]*))?`,
+  String.raw`\b(?:from|join)\s+(${SQL_IDENT}(?:\.${SQL_IDENT})?)` +
+    String.raw`(?:\s+(?:as\s+)?(?!(?:${NOT_ALIAS.join('|')})\b)(${SQL_IDENT}))?`,
   'gi'
 )
 
@@ -141,6 +148,34 @@ export function columnSuggestions(cols: ColumnInfo[]): Suggestion[] {
 
 export function schemaObjectSuggestions(objects: DbObject[], schema: string): Suggestion[] {
   return objects.filter((o) => o.schema === schema).map(objectSuggestion)
+}
+
+/** Tables bound by FROM/JOIN in the statement, resolved against the object list and
+ *  tagged with the label the user references them by (alias if present, else name).
+ *  Powers unqualified column completion: inside a WHERE/SELECT the columns of every
+ *  in-scope table are useful without typing `alias.` first. */
+export function sqlBoundRefs(fullText: string, objects: DbObject[]): { label: string; ref: ObjectRef }[] {
+  return sqlTableBindings(fullText).map((b) => ({
+    label: b.alias ?? b.ref.name,
+    ref: lookupRef(b.ref, objects)
+  }))
+}
+
+/** Columns of the in-scope tables for an unqualified cursor (e.g. inside WHERE). The
+ *  owning table is carried as detail so colliding names (two `id`s) stay distinguishable;
+ *  exact (table, column) duplicates collapse. */
+export function unqualifiedColumnSuggestions(perTable: { label: string; cols: ColumnInfo[] }[]): Suggestion[] {
+  const seen = new Set<string>()
+  const out: Suggestion[] = []
+  for (const { label, cols } of perTable) {
+    for (const c of cols) {
+      const key = label + '.' + c.name
+      if (seen.has(key)) continue
+      seen.add(key)
+      out.push({ label: c.name, kind: 'column', insertText: c.name, detail: `${label} · ${c.dataType}` })
+    }
+  }
+  return out
 }
 
 // ── Mongo shell ──────────────────────────────────────────────────────────────

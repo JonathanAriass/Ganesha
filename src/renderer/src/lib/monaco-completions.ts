@@ -4,6 +4,8 @@ import {
   sqlPlainSuggestions,
   sqlDatabaseSuggestions,
   sqlDotQualifier,
+  sqlBoundRefs,
+  unqualifiedColumnSuggestions,
   resolveSqlQualifier,
   columnSuggestions,
   schemaObjectSuggestions,
@@ -90,7 +92,26 @@ const sqlProvider = monaco.languages.registerCompletionItemProvider('sql', {
       // Still after a dot, just not a qualifier one (`1.`, `count(*).`) — nothing
       // applies there; the full keyword/object list would be noise.
       if (/\.\w*$/.test(before)) return EMPTY
-      return { suggestions: toItems([...sqlDatabaseSuggestions(ctx.databases), ...sqlPlainSuggestions(ctx.objects)], range) }
+      // Columns of every FROM/JOIN table come first so an unqualified WHERE/SELECT
+      // can complete a column without typing `alias.`. Each fetch can fail (connection
+      // down) — degrade that table to no columns rather than the whole list.
+      const bound = sqlBoundRefs(model.getValue(), ctx.objects)
+      const perTable = await Promise.all(
+        bound.map(async ({ label, ref }) => ({
+          label,
+          cols: await ctx.getColumns(ref).catch(() => [] as ColumnInfo[])
+        }))
+      )
+      return {
+        suggestions: toItems(
+          [
+            ...unqualifiedColumnSuggestions(perTable),
+            ...sqlDatabaseSuggestions(ctx.databases),
+            ...sqlPlainSuggestions(ctx.objects)
+          ],
+          range
+        )
+      }
     }
     const target = resolveSqlQualifier(model.getValue(), qualifier, ctx.objects)
     if (!target) return EMPTY
