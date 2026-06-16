@@ -25,6 +25,15 @@ describe('substringMatch', () => {
   it('returns [] for an empty query (matches everything, no highlight)', () => {
     expect(substringMatch('', 'users')).toEqual([])
   })
+  it('returns code-point indices, not UTF-16 units, so highlights align past an astral char', () => {
+    // '😀' is one code point but two UTF-16 units; positions must stay code-point based
+    // to line up with the component's [...name] rendering.
+    expect(substringMatch('tbl', '😀tbl_users')).toEqual([1, 2, 3])
+    expect(substringMatch('😀a', '😀abc')).toEqual([0, 1])
+  })
+  it('stays aligned when a char lowercases to a different length (İ → i̇)', () => {
+    expect(substringMatch('tab', 'İ_table')).toEqual([2, 3, 4])
+  })
 })
 
 const OBJECTS: DbObject[] = [
