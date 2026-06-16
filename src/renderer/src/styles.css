@@ -245,7 +245,11 @@ button, input, select, textarea {
 }
 
 /* ── Main area ── */
-.main {
+/* Scoped to the app layout: `.main` is a generic class Monaco also uses for its
+   suggest-widget rows, and an unscoped `flex-direction: column` here leaked into
+   them — stacking the kind-icon over the label and clipping the label out of the
+   short row (the autocomplete "blank labels" bug). */
+.app-body > .main {
   flex: 1;
   display: flex;
   flex-direction: column;

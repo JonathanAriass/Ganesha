@@ -22,6 +22,22 @@ export interface MonacoEditorHandle {
   cursorOffset(): number
 }
 
+/** A single body-level container for Monaco's overflowing widgets (suggest, hover).
+ *  Inside the editor's DOM these stacked below the app's results/sidebar panels and
+ *  got occluded; appended to <body> with a high z-index they always sit on top.
+ *  The `.monaco-editor` class is required so Monaco's widget CSS (scoped to it) applies. */
+function overflowWidgetsContainer(): HTMLElement {
+  let el = document.getElementById('monaco-overflow-widgets')
+  if (!el) {
+    el = document.createElement('div')
+    el.id = 'monaco-overflow-widgets'
+    el.className = 'monaco-editor'
+    el.style.cssText = 'position:absolute;top:0;left:0;z-index:10000'
+    document.body.appendChild(el)
+  }
+  return el
+}
+
 /** Mount-once Monaco instance; parents remount it (via key) to replace content. */
 const MonacoEditor = forwardRef<MonacoEditorHandle, Props>(function MonacoEditor(
   { initialValue, language, onChange, onRun, onRunAll, completions },
@@ -69,7 +85,12 @@ const MonacoEditor = forwardRef<MonacoEditorHandle, Props>(function MonacoEditor
       automaticLayout: true,
       scrollBeyondLastLine: false,
       padding: { top: 8 },
-      tabSize: 2
+      tabSize: 2,
+      // Render suggest/hover widgets in a body-level container (see above) instead
+      // of inside the editor: in our flex layout the editor's own layers AND the
+      // results/sidebar panels stacked OVER the widget, occluding the labels.
+      fixedOverflowWidgets: true,
+      overflowWidgetsDomNode: overflowWidgetsContainer()
     })
     editorRef.current = editor
     const model = editor.getModel()
