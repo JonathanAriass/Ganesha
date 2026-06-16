@@ -480,6 +480,51 @@ input[type="password"]::placeholder {
   padding: 4px 0;
 }
 
+/* Pinned at the top of the scrolling object list so it stays reachable; the solid
+   --bg-2 (sidebar) background lets rows scroll underneath it. */
+.tree-filter {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  margin-bottom: 2px;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--border);
+}
+.tree-filter input[type="text"] {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+.tree-filter-clear {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--text-2);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.tree-filter-clear:hover {
+  background: var(--bg-3);
+  color: var(--text);
+}
+.tree-match {
+  color: var(--accent);
+  font-weight: 700;
+}
+
 .tree-schema {
   padding: 8px 12px 2px;
   font-size: 10px;
