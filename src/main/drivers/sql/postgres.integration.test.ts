@@ -81,4 +81,11 @@ describe('PostgresDriver (integration, requires Docker)', () => {
       { name: 'b', dataType: 'text', nullable: true }
     ])
   })
+
+  it('listDatabases returns user schemas, excluding system ones', async () => {
+    const dbs = await driver.listDatabases(id)
+    expect(dbs).toContain('public')
+    expect(dbs).not.toContain('pg_catalog')
+    expect(dbs).not.toContain('information_schema')
+  })
 })

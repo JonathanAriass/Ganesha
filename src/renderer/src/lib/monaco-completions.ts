@@ -2,6 +2,7 @@ import { monaco } from './monaco'
 import type { DbObject, ObjectRef, ColumnInfo } from '@shared/schema'
 import {
   sqlPlainSuggestions,
+  sqlDatabaseSuggestions,
   sqlDotQualifier,
   resolveSqlQualifier,
   columnSuggestions,
@@ -17,6 +18,8 @@ import {
  *  lazy column fetch (QueryTab routes it through the schema tree's query cache). */
 export interface CompletionCtx {
   objects: DbObject[]
+  /** Database (MySQL) / schema (Postgres) names for bare SQL suggestions. */
+  databases: string[]
   getColumns: (ref: ObjectRef) => Promise<ColumnInfo[]>
 }
 
@@ -87,7 +90,7 @@ const sqlProvider = monaco.languages.registerCompletionItemProvider('sql', {
       // Still after a dot, just not a qualifier one (`1.`, `count(*).`) — nothing
       // applies there; the full keyword/object list would be noise.
       if (/\.\w*$/.test(before)) return EMPTY
-      return { suggestions: toItems(sqlPlainSuggestions(ctx.objects), range) }
+      return { suggestions: toItems([...sqlDatabaseSuggestions(ctx.databases), ...sqlPlainSuggestions(ctx.objects)], range) }
     }
     const target = resolveSqlQualifier(model.getValue(), qualifier, ctx.objects)
     if (!target) return EMPTY

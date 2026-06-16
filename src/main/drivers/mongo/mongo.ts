@@ -201,6 +201,17 @@ export class MongoDriver implements DatabaseDriver {
     return conn
   }
 
+  async listDatabases(id: string): Promise<string[]> {
+    const { client } = this.require(id)
+    try {
+      const { databases } = await client.db('admin').admin().listDatabases({ nameOnly: true })
+      return databases.map((d) => d.name).filter((n) => !MONGO_SYSTEM_DBS.has(n))
+    } catch {
+      // A single-db connection may lack the admin privilege — not fatal for a hint.
+      return []
+    }
+  }
+
   async listObjects(id: string): Promise<DbObject[]> {
     const { client, database } = this.require(id)
     if (database) {

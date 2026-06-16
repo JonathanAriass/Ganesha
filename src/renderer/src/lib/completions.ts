@@ -35,6 +35,20 @@ function objectSuggestion(o: DbObject): Suggestion {
   }
 }
 
+/** Database (MySQL) / schema (Postgres) name suggestions for a plain SQL cursor
+ *  position — so a database name can be picked before `name.table`. Blanks and
+ *  duplicates are dropped; order is preserved. */
+export function sqlDatabaseSuggestions(databases: string[]): Suggestion[] {
+  const seen = new Set<string>()
+  const out: Suggestion[] = []
+  for (const d of databases) {
+    if (!d || seen.has(d)) continue
+    seen.add(d)
+    out.push({ label: d, kind: 'database', insertText: d })
+  }
+  return out
+}
+
 /** Keyword + table/view suggestions for a plain (no-dot) SQL cursor position. */
 export function sqlPlainSuggestions(objects: DbObject[]): Suggestion[] {
   return [

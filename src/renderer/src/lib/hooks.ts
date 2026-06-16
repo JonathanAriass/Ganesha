@@ -26,6 +26,17 @@ export function useObjects(connectionId: string | null) {
   })
 }
 
+/** Database/schema names for autocomplete. `enabled` lets callers skip the fetch
+ *  where it isn't useful (e.g. Mongo tabs, which complete databases their own way). */
+export function useDatabases(connectionId: string | null, enabled = true) {
+  return useQuery({
+    queryKey: ['databases', connectionId],
+    queryFn: () => window.api.schema.databases(connectionId!).then(unwrap),
+    enabled: enabled && connectionId != null,
+    retry: false,
+  })
+}
+
 // ── Schema: columns (lazy) ───────────────────────────────────────────────────
 
 export function useColumns(

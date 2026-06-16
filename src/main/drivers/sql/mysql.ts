@@ -127,6 +127,15 @@ export class MySqlDriver implements DatabaseDriver {
     return pool
   }
 
+  async listDatabases(id: string): Promise<string[]> {
+    const [rows] = await this.requirePool(id).query(
+      `SELECT SCHEMA_NAME AS name FROM information_schema.SCHEMATA
+       WHERE SCHEMA_NAME NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
+       ORDER BY SCHEMA_NAME`
+    )
+    return (rows as { name: string }[]).map((r) => r.name)
+  }
+
   async listObjects(id: string): Promise<DbObject[]> {
     const [rows] = await this.requirePool(id).query(
       `SELECT TABLE_NAME AS name, TABLE_TYPE AS tableType

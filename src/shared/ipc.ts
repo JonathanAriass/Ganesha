@@ -39,6 +39,7 @@ export interface IpcChannels {
   'connections.test': { req: { input: ConnectionInput; password: string | null; id?: string; sshSecrets?: Record<string, string> }; res: null }
   'connections.disconnect': { req: string; res: null }
   'schema.objects': { req: string; res: DbObject[] }
+  'schema.databases': { req: string; res: string[] }
   'schema.columns': { req: { connectionId: string; ref: ObjectRef }; res: ColumnInfo[] }
   'clipboard.copy': { req: string; res: null }
   'dialog.pickDirectory': { req: void; res: string | null }

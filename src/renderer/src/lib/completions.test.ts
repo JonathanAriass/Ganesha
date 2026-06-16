@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import type { DbObject } from '@shared/schema'
 import {
   sqlPlainSuggestions,
+  sqlDatabaseSuggestions,
   sqlDotQualifier,
   sqlTableBindings,
   resolveSqlQualifier,
@@ -25,6 +26,22 @@ describe('sqlPlainSuggestions', () => {
     expect(sugs).toContainEqual({ label: 'SELECT', kind: 'keyword', insertText: 'SELECT' })
     expect(sugs).toContainEqual({ label: 'users', kind: 'table', insertText: 'users', detail: 'public' })
     expect(sugs).toContainEqual({ label: 'active_users', kind: 'view', insertText: 'active_users', detail: 'public' })
+  })
+})
+
+describe('sqlDatabaseSuggestions', () => {
+  it('maps database/schema names to database-kind suggestions', () => {
+    expect(sqlDatabaseSuggestions(['admin_okt', 'analytics'])).toEqual([
+      { label: 'admin_okt', kind: 'database', insertText: 'admin_okt' },
+      { label: 'analytics', kind: 'database', insertText: 'analytics' }
+    ])
+  })
+  it('drops blanks/dupes and is empty for no databases', () => {
+    expect(sqlDatabaseSuggestions([])).toEqual([])
+    expect(sqlDatabaseSuggestions(['a', '', 'a', 'b'])).toEqual([
+      { label: 'a', kind: 'database', insertText: 'a' },
+      { label: 'b', kind: 'database', insertText: 'b' }
+    ])
   })
 })
 

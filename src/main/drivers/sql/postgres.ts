@@ -109,6 +109,18 @@ export class PostgresDriver implements DatabaseDriver {
     return pool
   }
 
+  async listDatabases(id: string): Promise<string[]> {
+    // Postgres connections are scoped to one database; its schemas are the
+    // queryable namespaces (`schema.table`), so those are what we suggest.
+    const res = await this.requirePool(id).query(
+      `SELECT schema_name FROM information_schema.schemata
+       WHERE schema_name NOT IN ('pg_catalog', 'information_schema')
+         AND schema_name NOT LIKE 'pg_temp_%' AND schema_name NOT LIKE 'pg_toast%'
+       ORDER BY schema_name`
+    )
+    return (res.rows as { schema_name: string }[]).map((r) => r.schema_name)
+  }
+
   async listObjects(id: string): Promise<DbObject[]> {
     const res = await this.requirePool(id).query(
       `SELECT table_schema AS schema, table_name AS name,

@@ -205,6 +205,14 @@ export function registerIpcHandlers(): void {
     await connectStored(driver, c, secrets)
     return ok(await driver.listObjects(c.id))
   })
+  handle('schema.databases', async (connectionId) => {
+    const { db, secrets } = store()
+    const c = conns.getConnection(db, connectionId)
+    if (!c) throw new Error(`Connection not found: ${connectionId}`)
+    const driver = drivers.get(c.type)
+    await connectStored(driver, c, secrets)
+    return ok(await driver.listDatabases(c.id))
+  })
   handle('schema.columns', async ({ connectionId, ref }) => {
     const { db, secrets } = store()
     const c = conns.getConnection(db, connectionId)

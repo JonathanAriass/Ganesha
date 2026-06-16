@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { QueryTabData } from '../state/store'
 import { useAppStore } from '../state/store'
-import { useConnections, useRunQuery, useCancelQuery, useObjects } from '../lib/hooks'
+import { useConnections, useRunQuery, useCancelQuery, useObjects, useDatabases } from '../lib/hooks'
 import MonacoEditor, { type MonacoEditorHandle } from './MonacoEditor'
 import ResultsPanel from './ResultsPanel'
 import type { ConnectionType } from '@shared/domain'
@@ -59,12 +59,15 @@ export default function QueryTab({ tab }: Props): JSX.Element {
   const cancelQuery = useCancelQuery()
 
   const { data: objects = [] } = useObjects(tab.connectionId)
+  // Database/schema name suggestions are SQL-only; Mongo completes databases via getSiblingDB.
+  const { data: databases = [] } = useDatabases(tab.connectionId, connection?.type !== 'mongodb')
   const queryClient = useQueryClient()
   // Editor completions. getColumns shares the schema tree's cache entry — the key
   // must match useColumns exactly. Identity per render is fine: MonacoEditor reads
   // it through a ref-thunk, never as an effect dependency.
   const completions: CompletionCtx = {
     objects,
+    databases,
     getColumns: (ref: ObjectRef) =>
       queryClient.fetchQuery({
         queryKey: ['columns', tab.connectionId, ref.schema, ref.name],

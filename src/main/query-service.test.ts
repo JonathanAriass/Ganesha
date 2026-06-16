@@ -33,6 +33,7 @@ function fakeDriver(calls: string[], queryIds?: string[]): DatabaseDriver {
       return fakeResult
     },
     cancel: async () => {},
+    listDatabases: async () => [],
     listObjects: async () => [],
     describeObject: async () => []
   }

@@ -48,6 +48,9 @@ export interface DatabaseDriver {
   runQuery(id: string, request: QueryRequest, opts: RunOptions): Promise<QueryResult>
   /** Best-effort cancellation of an in-flight query by its RunOptions.queryId. */
   cancel(id: string, queryId: string): Promise<void>
+  /** List the databases (MySQL) / schemas (Postgres) / databases (Mongo) the
+   *  connection can see — names only, for autocomplete. System ones are excluded. */
+  listDatabases(id: string): Promise<string[]>
   /** List user tables/views/collections visible on this connection. */
   listObjects(id: string): Promise<DbObject[]>
   /** Describe an object's columns/fields. */

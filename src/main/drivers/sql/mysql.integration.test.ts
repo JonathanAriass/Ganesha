@@ -96,4 +96,11 @@ describe('MySqlDriver (integration, requires Docker)', () => {
       { name: 'b', dataType: 'text', nullable: true }
     ])
   })
+
+  it('listDatabases returns user databases, excluding system ones', async () => {
+    const dbs = await driver.listDatabases(id)
+    expect(dbs).toContain(container.getDatabase())
+    expect(dbs).not.toContain('information_schema')
+    expect(dbs).not.toContain('performance_schema')
+  })
 })
