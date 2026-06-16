@@ -13,10 +13,53 @@ export interface SshClientLike {
   end(): void
 }
 
+/** The slice of net.Socket the forwarder touches — narrowed so tests can fake it. */
+export interface ForwardSocket {
+  on(event: string, cb: (arg?: unknown) => void): this | ForwardSocket
+  destroy(): void
+  pipe(dst: NodeJS.ReadWriteStream): NodeJS.ReadWriteStream
+}
+
+/** Pipe one inbound local socket out through the ssh client to the DB.
+ *
+ *  ssh2's `forwardOut` throws SYNCHRONOUSLY with "Not connected" once the client has
+ *  dropped (idle disconnect, network blip). Unguarded, that throw escapes the
+ *  net.Server 'connection' handler and crashes the whole main process. Catching it
+ *  (and a late callback error, and socket/stream errors) degrades a dead tunnel to a
+ *  destroyed socket — the driver sees a connection failure and can reconnect. */
+export function pipeThroughForward(
+  client: SshClientLike,
+  socket: ForwardSocket,
+  dbHost: string,
+  dbPort: number
+): void {
+  socket.on('error', () => socket.destroy())
+  try {
+    client.forwardOut('127.0.0.1', 0, dbHost, dbPort, (err, stream) => {
+      if (err || !stream) {
+        socket.destroy()
+        return
+      }
+      stream.on('error', () => socket.destroy())
+      socket.pipe(stream).pipe(socket as unknown as NodeJS.ReadWriteStream)
+    })
+  } catch {
+    socket.destroy()
+  }
+}
+
 interface LiveTunnel { clients: SshClientLike[]; server: net.Server; endpoint: TunnelEndpoint }
 
 function connectConfig(hop: ResolvedHop, sock?: NodeJS.ReadWriteStream): Record<string, unknown> {
-  const cfg: Record<string, unknown> = { host: hop.host, port: hop.port, username: hop.username }
+  const cfg: Record<string, unknown> = {
+    host: hop.host,
+    port: hop.port,
+    username: hop.username,
+    // Detect a silently-dropped connection (and keep NAT/firewall state warm) instead
+    // of discovering it only when a query tries to forward through a dead client.
+    keepaliveInterval: 15000,
+    keepaliveCountMax: 3
+  }
   if (sock) cfg.sock = sock
   if (hop.auth === 'key') {
     cfg.privateKey = hop.privateKey
@@ -65,8 +108,29 @@ export class SshTunnelManager {
       this.tunnels.set(connId, pending)
       // A failed open must not stay cached as a permanent rejection — let a retry re-dial.
       pending.catch(() => { if (this.tunnels.get(connId) === pending) this.tunnels.delete(connId) })
+      // A live tunnel whose ssh connection later drops must not stay cached either, or
+      // the next open() hands back a dead endpoint and the forwarder throws on it.
+      const owned = pending
+      pending.then((t) => this.watchForDrop(connId, owned, t)).catch(() => {})
     }
     return (await pending).endpoint
+  }
+
+  /** Tear the tunnel down and evict it the moment any hop's ssh connection drops, so
+   *  the next open() dials a fresh chain instead of forwarding onto a closed client. */
+  private watchForDrop(connId: string, owned: Promise<LiveTunnel>, t: LiveTunnel): void {
+    let torn = false
+    const teardown = (): void => {
+      if (torn) return
+      torn = true
+      if (this.tunnels.get(connId) === owned) this.tunnels.delete(connId)
+      t.server.close()
+      t.clients.forEach((c) => c.end())
+    }
+    t.clients.forEach((c) => {
+      c.on('close', teardown)
+      c.on('error', teardown)
+    })
   }
 
   private async dialChain(hops: ResolvedHop[], dbHost: string, dbPort: number): Promise<LiveTunnel> {
@@ -86,16 +150,17 @@ export class SshTunnelManager {
     }
 
     const last = clients[clients.length - 1]
-    const server = net.createServer((socket) => {
-      last.forwardOut('127.0.0.1', 0, dbHost, dbPort, (err, stream) => {
-        if (err || !stream) { socket.destroy(); return }
-        socket.pipe(stream).pipe(socket)
-      })
-    })
+    const server = net.createServer((socket) => pipeThroughForward(last, socket, dbHost, dbPort))
+    // A persistent 'error' listener for the server's whole life: an unhandled 'error'
+    // event on a net.Server is itself a process-crashing throw. During bind it rejects
+    // the listen promise; afterward it is benign (the dropped-client watcher tears down).
+    let onBindError: ((e: Error) => void) | null = null
+    server.on('error', (e) => onBindError?.(e))
     try {
       const endpoint = await new Promise<TunnelEndpoint>((resolve, reject) => {
-        server.once('error', reject)
+        onBindError = reject
         server.listen(0, '127.0.0.1', () => {
+          onBindError = null
           const addr = server.address()
           if (addr && typeof addr === 'object') resolve({ host: '127.0.0.1', port: addr.port })
           else reject(new Error('SSH tunnel: failed to bind local forwarder'))
