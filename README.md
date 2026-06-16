@@ -9,7 +9,7 @@ Built with Electron, React and TypeScript (electron-vite). Connections have a **
 - **Connections** — create, test, edit and color-code connections for all four engines. Passwords are encrypted with the OS keychain (Electron `safeStorage`) and are *write-only*: no IPC channel can read one back into the UI.
 - **SSH tunnels** — reach a database through one or more SSH hops (a jump-server chain, e.g. bastion → private host), configured per connection. Each hop authenticates with a private key (+ optional passphrase) or a password; passphrases/passwords are encrypted with the OS keychain and write-only like DB passwords. The tunnel is opened in the main process and the drivers connect through it unchanged.
 - **Local AI assistant** — a built-in chat powered by a GGUF model you download and run entirely on your machine (`node-llama-cpp`, no data leaves the app). It's grounded with the active connection's schema, so it recommends queries against your real tables; one click drops a suggestion into a new query tab. Download/manage models in-app (curated picks or any Hugging Face `hf:` URI); conversations are saved per connection.
-- **Schema browser** — tables, views and collections in a sidebar tree; double-click to open a ready-made query tab that runs itself. Leave a Mongo connection's database blank to browse *all* databases, Compass-style.
+- **Schema browser** — tables, views and collections in a sidebar tree; double-click to open a ready-made query tab that runs itself. Filter the tree by name with a substring search box at the top (matches object or schema names, highlights the hit). Leave a Mongo connection's database blank to browse *all* databases, Compass-style.
 - **Query tabs** — Monaco editor with per-engine language (SQL or mongosh-style JavaScript), local workers, custom Midnight/Daylight themes. Tab state (text, results, running query) survives switching — and the open tabs themselves survive an app restart (text only; nothing re-runs on launch). Double-click a tab to rename it; names persist too.
 - **Autocomplete** — schema-aware: SQL tables/views, database/schema names, and the in-scope FROM/JOIN tables' columns offered unqualified (e.g. inside a `WHERE`) as well as after `alias.`/`table.`, objects after `schema.`; Mongo collections after `db.`, document fields inside a method's argument, database names inside `getSiblingDB("…")`, and operation snippets after `db.coll.`. MySQL identifiers that start with a digit (e.g. `43_settings`) are recognized too.
 - **Run exactly what you mean** — ⌘↵ runs the selection if there is one, else the statement under the cursor when the tab holds several, else the whole tab. ⌘⇧↵ (or ▶▶) runs *all* statements top-to-bottom as individual queries with per-statement collapsible results, stopping at the first error; scripts that need `BEGIN`/`COMMIT` to span statements are refused up front instead of silently misbehaving on pooled connections.
@@ -56,7 +56,7 @@ npm run dev        # launch the app with hot reload
 
 ```bash
 npm run typecheck && npm run lint
-npm test                  # 375 unit tests (Vitest, Node ABI)
+npm test                  # 399 unit tests (Vitest, Node ABI)
 npm run test:integration  # 17 tests vs real Postgres/MySQL/Mongo + an SSH tunnel (testcontainers, needs Docker)
 ```
 
