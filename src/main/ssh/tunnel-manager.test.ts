@@ -99,6 +99,16 @@ describe('SshTunnelManager', () => {
     expect(f.events.filter((e) => e.startsWith('connect')).length).toBe(2)
     await mgr.close('c1')
   })
+
+  it('notifies onDrop with the connection id when a tunnel drops (to evict the stale pool)', async () => {
+    const f = fakeClientFactory()
+    const dropped: string[] = []
+    const mgr = new SshTunnelManager({ createClient: f.make, onDrop: (id) => dropped.push(id) })
+    await mgr.open('c1', hops(1), 'db', 5432)
+    f.clients[0].emit('error', new Error('keepalive timeout'))
+    await new Promise((r) => setTimeout(r, 0))
+    expect(dropped).toEqual(['c1'])
+  })
 })
 
 describe('pipeThroughForward', () => {

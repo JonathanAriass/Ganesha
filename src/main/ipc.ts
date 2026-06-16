@@ -33,7 +33,9 @@ drivers.register(new MySqlDriver('mysql'))
 drivers.register(new MySqlDriver('mariadb'))
 drivers.register(new MongoDriver())
 
-const tunnels = new SshTunnelManager()
+// When a tunnel drops, evict the connection's now-stale driver pool (still bound to
+// the closed local forwarder port) so the next query re-dials the tunnel and re-pools.
+const tunnels = new SshTunnelManager({ onDrop: (connId) => void drivers.disconnectAll(connId) })
 const engine = new LlmEngine()
 const activeGenerations = new Map<string, AbortController>()
 

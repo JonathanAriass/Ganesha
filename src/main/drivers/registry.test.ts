@@ -16,4 +16,15 @@ describe('DriverManager', () => {
     expect(m.has('mysql')).toBe(false)
     expect(() => m.get('mysql')).toThrow(/no driver/i)
   })
+
+  it('disconnectAll disconnects the id on every driver, swallowing per-driver errors', async () => {
+    const calls: string[] = []
+    const pg = { type: 'postgres', disconnect: async (id: string) => { calls.push(`pg:${id}`) } } as unknown as DatabaseDriver
+    const mongo = { type: 'mongodb', disconnect: async () => { throw new Error('already closed') } } as unknown as DatabaseDriver
+    const m = new DriverManager()
+    m.register(pg)
+    m.register(mongo)
+    await expect(m.disconnectAll('c1')).resolves.toBeUndefined() // mongo's throw is swallowed
+    expect(calls).toEqual(['pg:c1'])
+  })
 })

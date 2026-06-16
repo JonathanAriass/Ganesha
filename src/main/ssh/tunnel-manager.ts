@@ -96,9 +96,13 @@ export class SshTunnelManager {
   // own (which would leak ssh clients + a bound local port).
   private tunnels = new Map<string, Promise<LiveTunnel>>()
   private make: () => SshClientLike
+  // Notified with the connection id when a live tunnel drops, so the caller can
+  // evict the now-stale driver pool that still points at the closed local port.
+  private onDrop?: (connId: string) => void
 
-  constructor(deps?: { createClient?: () => SshClientLike }) {
+  constructor(deps?: { createClient?: () => SshClientLike; onDrop?: (connId: string) => void }) {
     this.make = deps?.createClient ?? (() => new Ssh2Client() as unknown as SshClientLike)
+    this.onDrop = deps?.onDrop
   }
 
   async open(connId: string, hops: ResolvedHop[], dbHost: string, dbPort: number): Promise<TunnelEndpoint> {
@@ -126,6 +130,8 @@ export class SshTunnelManager {
       if (this.tunnels.get(connId) === owned) this.tunnels.delete(connId)
       t.server.close()
       t.clients.forEach((c) => c.end())
+      // A throwing callback must never break teardown (the crash this fix prevents).
+      try { this.onDrop?.(connId) } catch { /* recovery wiring is best-effort */ }
     }
     t.clients.forEach((c) => {
       c.on('close', teardown)

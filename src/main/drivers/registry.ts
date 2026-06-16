@@ -18,4 +18,11 @@ export class DriverManager {
     if (!driver) throw new Error(`No driver registered for connection type '${type}'`)
     return driver
   }
+
+  /** Drop any pool/connection a connection id holds across every registered driver.
+   *  disconnect is a no-op when a driver has no pool for the id, so this needs no
+   *  type lookup — used to evict a stale pool when its SSH tunnel drops. */
+  async disconnectAll(connId: string): Promise<void> {
+    await Promise.all([...this.drivers.values()].map((d) => d.disconnect(connId).catch(() => {})))
+  }
 }
