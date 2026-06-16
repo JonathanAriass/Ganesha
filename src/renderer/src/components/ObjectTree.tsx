@@ -1,18 +1,20 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { DbObject } from '@shared/schema'
 import { useAppStore } from '../state/store'
 import { useObjects, useColumns, useConnections } from '../lib/hooks'
 import { defaultTableQuery } from '../lib/tabquery'
+import { filterObjects, fuzzyMatch } from '../lib/object-filter'
 
 // ── ObjectNode ────────────────────────────────────────────────────────────────
 
 interface ObjectNodeProps {
   connectionId: string
   obj: DbObject
+  query: string
   onDoubleClick: (obj: DbObject) => void
 }
 
-function ObjectNode({ connectionId, obj, onDoubleClick }: ObjectNodeProps): JSX.Element {
+function ObjectNode({ connectionId, obj, query, onDoubleClick }: ObjectNodeProps): JSX.Element {
   const [expanded, setExpanded] = useState(false)
   const ref = { schema: obj.schema, name: obj.name }
 
@@ -42,7 +44,9 @@ function ObjectNode({ connectionId, obj, onDoubleClick }: ObjectNodeProps): JSX.
         <span className={`obj-icon ${obj.kind}`} aria-hidden="true">
           {kindLabel}
         </span>
-        <span className="tree-label">{obj.name}</span>
+        <span className="tree-label">
+          <Highlighted text={obj.name} positions={fuzzyMatch(query, obj.name) ?? []} />
+        </span>
       </button>
 
       {expanded && (
@@ -77,6 +81,25 @@ function ObjectNode({ connectionId, obj, onDoubleClick }: ObjectNodeProps): JSX.
   )
 }
 
+/** Renders `text`, bolding the characters at `positions` (a fuzzyMatch result). */
+function Highlighted({ text, positions }: { text: string; positions: number[] }): JSX.Element {
+  if (positions.length === 0) return <>{text}</>
+  const set = new Set(positions)
+  return (
+    <>
+      {[...text].map((ch, i) =>
+        set.has(i) ? (
+          <b key={i} className="tree-match">
+            {ch}
+          </b>
+        ) : (
+          <span key={i}>{ch}</span>
+        )
+      )}
+    </>
+  )
+}
+
 // ── ObjectTree ────────────────────────────────────────────────────────────────
 
 export default function ObjectTree(): JSX.Element {
@@ -87,6 +110,10 @@ export default function ObjectTree(): JSX.Element {
   const { data: objects, isLoading, error } = useObjects(activeConnectionId)
 
   const activeConn = connections.find((c) => c.id === activeConnectionId)
+
+  const [query, setQuery] = useState('')
+  // Objects differ per connection — a stale filter would hide everything.
+  useEffect(() => setQuery(''), [activeConnectionId])
 
   function handleDoubleClick(obj: DbObject) {
     if (!activeConnectionId || !activeConn) return
@@ -133,17 +160,51 @@ export default function ObjectTree(): JSX.Element {
     )
   }
 
-  // Group by schema: if any object has a non-null schema, group them
+  // Group by schema: if any object has a non-null schema, group them. Decided from
+  // the ORIGINAL objects so the layout doesn't flip between grouped/flat while typing.
   const hasSchemas = objects.some((o) => o.schema !== null)
+  const filtered = filterObjects(objects, query)
+
+  const filterBar = (
+    <div className="tree-filter">
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') setQuery('')
+        }}
+        placeholder="Filter tables…"
+        aria-label="Filter database objects by name"
+        spellCheck={false}
+      />
+      {query && (
+        <button className="tree-filter-clear" onClick={() => setQuery('')} aria-label="Clear filter">
+          ×
+        </button>
+      )}
+    </div>
+  )
+
+  if (filtered.length === 0) {
+    return (
+      <nav className="tree" aria-label="Database objects">
+        {filterBar}
+        <div className="tree-muted">No tables match “{query}”</div>
+      </nav>
+    )
+  }
 
   if (!hasSchemas) {
     return (
       <nav className="tree" aria-label="Database objects">
-        {objects.map((obj) => (
+        {filterBar}
+        {filtered.map((obj) => (
           <ObjectNode
             key={`${obj.schema ?? ''}:${obj.name}`}
             connectionId={activeConnectionId}
             obj={obj}
+            query={query}
             onDoubleClick={handleDoubleClick}
           />
         ))}
@@ -151,9 +212,10 @@ export default function ObjectTree(): JSX.Element {
     )
   }
 
-  // Build groups preserving insertion order
+  // Build groups preserving insertion order (over the FILTERED set, so empty
+  // schema groups disappear).
   const groups = new Map<string, DbObject[]>()
-  for (const obj of objects) {
+  for (const obj of filtered) {
     const key = obj.schema ?? ''
     if (!groups.has(key)) groups.set(key, [])
     groups.get(key)!.push(obj)
@@ -161,6 +223,7 @@ export default function ObjectTree(): JSX.Element {
 
   return (
     <nav className="tree" aria-label="Database objects">
+      {filterBar}
       {Array.from(groups.entries()).map(([schema, objs]) => (
         <div key={schema}>
           {schema && (
@@ -173,6 +236,7 @@ export default function ObjectTree(): JSX.Element {
               key={`${obj.schema ?? ''}:${obj.name}`}
               connectionId={activeConnectionId}
               obj={obj}
+              query={query}
               onDoubleClick={handleDoubleClick}
             />
           ))}
