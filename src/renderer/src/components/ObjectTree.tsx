@@ -3,7 +3,7 @@ import type { DbObject } from '@shared/schema'
 import { useAppStore } from '../state/store'
 import { useObjects, useColumns, useConnections } from '../lib/hooks'
 import { defaultTableQuery } from '../lib/tabquery'
-import { filterObjects, fuzzyMatch } from '../lib/object-filter'
+import { filterObjects, substringMatch } from '../lib/object-filter'
 
 // ── ObjectNode ────────────────────────────────────────────────────────────────
 
@@ -45,7 +45,7 @@ function ObjectNode({ connectionId, obj, query, onDoubleClick }: ObjectNodeProps
           {kindLabel}
         </span>
         <span className="tree-label">
-          <Highlighted text={obj.name} positions={fuzzyMatch(query, obj.name) ?? []} />
+          <Highlighted text={obj.name} positions={substringMatch(query, obj.name) ?? []} />
         </span>
       </button>
 
@@ -81,7 +81,7 @@ function ObjectNode({ connectionId, obj, query, onDoubleClick }: ObjectNodeProps
   )
 }
 
-/** Renders `text`, bolding the characters at `positions` (a fuzzyMatch result). */
+/** Renders `text`, bolding the characters at `positions` (a substringMatch result). */
 function Highlighted({ text, positions }: { text: string; positions: number[] }): JSX.Element {
   if (positions.length === 0) return <>{text}</>
   const set = new Set(positions)

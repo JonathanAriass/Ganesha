@@ -9,9 +9,10 @@ name, in any way**.
 
 ## Decisions
 
-- **Match style: fuzzy (subsequence).** Case-insensitive; the query characters must
-  appear in order in the target but need not be adjacent (`usr` matches `users`).
-  Same spirit as the ⌘K palette, satisfying "in any way".
+- **Match style: substring ("contains").** Case-insensitive; the query must occur as
+  a contiguous run in the target (`set` matches `43_settings`; `usr` does NOT match
+  `users`). Predictable — what matches is literally a slice of the name. (An earlier
+  draft used fuzzy subsequence; switched to substring on user preference.)
 - **Match scope: object names + schema names.** No column/field matching — columns
   are lazy-loaded per node, so matching them would force an eager fetch of every
   table's columns. Matching a *schema* name surfaces all of that schema's objects.
@@ -28,22 +29,22 @@ Mirrors the existing pure-logic / thin-wiring split used by `completions.ts`,
 ### Pure module — `src/renderer/src/lib/object-filter.ts`
 
 ```ts
-/** Case-insensitive greedy subsequence match. Returns the matched character
- *  indices in `target` (for highlighting), or null if `query` is not a
- *  subsequence of `target`. An empty query returns [] (matches everything). */
-export function fuzzyMatch(query: string, target: string): number[] | null
+/** Case-insensitive substring ("contains") match. Returns the matched character
+ *  indices in `target` (the contiguous run, for highlighting), or null if `query`
+ *  does not occur in `target`. An empty query returns [] (matches everything). */
+export function substringMatch(query: string, target: string): number[] | null
 
 /** True when the object should be shown for `query`: empty query → true; else a
- *  fuzzy hit on the object name OR on its schema name. */
+ *  substring hit on the object name OR on its schema name. */
 export function objectMatches(obj: DbObject, query: string): boolean
 
 /** The objects to show, in original order (no re-ranking). Empty query → all. */
 export function filterObjects(objects: DbObject[], query: string): DbObject[]
 ```
 
-Greedy left-to-right matching: walk `target`, consuming a query char each time it
-matches (case-folded). Match succeeds when all query chars are consumed. Positions
-are indices into `target` so the component can bold the original-case characters.
+`substringMatch` is `target.toLowerCase().indexOf(query.toLowerCase())`; on a hit it
+expands the start index into the contiguous run of positions so the component can
+bold the original-case characters.
 
 ### Wiring — `src/renderer/src/components/ObjectTree.tsx`
 
@@ -57,7 +58,7 @@ are indices into `target` so the component can bold the original-case characters
   layout (`hasSchemas`) is decided from the *original* objects so it does not flip
   while typing.
 - Each object name bolds its matched characters: a small `Highlighted` helper
-  renders `fuzzyMatch(query, obj.name)` positions (no highlight when the object
+  renders `substringMatch(query, obj.name)` positions (no highlight when the object
   matched only via its schema).
 - A non-empty query with no matches renders a muted `No tables match "<query>"`.
 
@@ -74,8 +75,8 @@ loading / error states are unchanged.
 
 `src/renderer/src/lib/object-filter.test.ts` (pure, no React):
 
-- `fuzzyMatch`: exact match, gapped subsequence, case-insensitivity, non-match →
-  null, empty query → `[]`, correct matched positions, adjacency not required,
+- `substringMatch`: contiguous run at start and mid-string, case-insensitivity,
+  gapped query → null, absent → null, empty query → `[]`, correct matched positions,
   query longer than target → null.
 - `objectMatches`: hit via name, hit via schema, empty query → true, miss → false.
 - `filterObjects`: filters the list, preserves original order, empty query returns

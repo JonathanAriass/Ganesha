@@ -1,26 +1,29 @@
 import { describe, it, expect } from 'vitest'
 import type { DbObject } from '@shared/schema'
-import { fuzzyMatch, objectMatches, filterObjects } from './object-filter'
+import { substringMatch, objectMatches, filterObjects } from './object-filter'
 
-describe('fuzzyMatch', () => {
-  it('matches an exact substring and returns its positions', () => {
-    expect(fuzzyMatch('user', 'users')).toEqual([0, 1, 2, 3])
+describe('substringMatch', () => {
+  it('matches a contiguous run at the start and returns its positions', () => {
+    expect(substringMatch('user', 'users')).toEqual([0, 1, 2, 3])
   })
-  it('matches a gapped subsequence (chars in order, not adjacent)', () => {
-    expect(fuzzyMatch('usr', 'users')).toEqual([0, 1, 3]) // u, s, (e skipped), r
+  it('matches a contiguous run in the middle', () => {
+    expect(substringMatch('set', '43_settings')).toEqual([3, 4, 5])
   })
   it('is case-insensitive but returns indices into the original target', () => {
-    expect(fuzzyMatch('US', 'users')).toEqual([0, 1])
+    expect(substringMatch('US', 'users')).toEqual([0, 1])
   })
-  it('returns null when not a subsequence', () => {
-    expect(fuzzyMatch('xyz', 'users')).toBeNull()
-    expect(fuzzyMatch('sru', 'users')).toBeNull() // wrong order
+  it('returns null for a gapped (non-contiguous) match', () => {
+    expect(substringMatch('usr', 'users')).toBeNull() // u·s·r is not a substring
+    expect(substringMatch('oes', 'orders')).toBeNull()
+  })
+  it('returns null when not present at all', () => {
+    expect(substringMatch('xyz', 'users')).toBeNull()
   })
   it('returns null when the query is longer than the target', () => {
-    expect(fuzzyMatch('userss', 'users')).toBeNull()
+    expect(substringMatch('userss', 'users')).toBeNull()
   })
   it('returns [] for an empty query (matches everything, no highlight)', () => {
-    expect(fuzzyMatch('', 'users')).toEqual([])
+    expect(substringMatch('', 'users')).toEqual([])
   })
 })
 
@@ -31,8 +34,11 @@ const OBJECTS: DbObject[] = [
 ]
 
 describe('objectMatches', () => {
-  it('matches on the object name', () => {
-    expect(objectMatches(OBJECTS[0], 'usr')).toBe(true)
+  it('matches on a contiguous run in the object name', () => {
+    expect(objectMatches(OBJECTS[0], 'ser')).toBe(true) // 'users' contains 'ser'
+  })
+  it('does not match a gapped query', () => {
+    expect(objectMatches(OBJECTS[0], 'usr')).toBe(false)
   })
   it('matches on the schema name (surfaces the whole schema)', () => {
     expect(objectMatches(OBJECTS[2], 'sales')).toBe(true)
@@ -47,8 +53,8 @@ describe('objectMatches', () => {
 
 describe('filterObjects', () => {
   it('keeps matches in original order', () => {
-    // 'es' is a subsequence of users, orders, AND invoices.
-    expect(filterObjects(OBJECTS, 'es').map((o) => o.name)).toEqual(['users', 'orders', 'invoices'])
+    // 'r' is a substring of users and orders, but not invoices.
+    expect(filterObjects(OBJECTS, 'r').map((o) => o.name)).toEqual(['users', 'orders'])
   })
   it('returns all objects for an empty query', () => {
     expect(filterObjects(OBJECTS, '')).toEqual(OBJECTS)
