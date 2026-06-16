@@ -104,7 +104,7 @@ const sqlProvider = monaco.languages.registerCompletionItemProvider('sql', {
 // being exact-prefix matches) the TS worker's generic suggestions.
 const mongoProvider = monaco.languages.registerCompletionItemProvider('javascript', {
   triggerCharacters: ['.', '"', "'"],
-  provideCompletionItems(model, position) {
+  async provideCompletionItems(model, position) {
     const ctx = ctxByModel.get(model.id)?.()
     if (!ctx) return EMPTY
     const cursor = mongoCursorContext(textBefore(model, position))
@@ -125,6 +125,12 @@ const mongoProvider = monaco.languages.registerCompletionItemProvider('javascrip
     const range = wordRange(model, position)
     if (cursor.type === 'collections') {
       return { suggestions: toItems(mongoCollectionSuggestions(ctx.objects, cursor.database), range) }
+    }
+    if (cursor.type === 'fields') {
+      // Field fetch can fail (connection down) — no suggestions is the right degradation.
+      const ref = { schema: cursor.database, name: cursor.collection }
+      const cols = await ctx.getColumns(ref).catch(() => [] as ColumnInfo[])
+      return { suggestions: toItems(columnSuggestions(cols), range) }
     }
     return { suggestions: toItems(mongoOpSuggestions(), range) }
   }

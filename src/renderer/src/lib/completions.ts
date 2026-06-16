@@ -136,6 +136,9 @@ export type MongoCursorContext =
   /** database: null = the connection's default db (listObjects tags those schema: null). */
   | { type: 'collections'; database: string | null }
   | { type: 'ops' }
+  /** Inside a method's argument object (filter/projection/$set/pipeline stage) — the
+   *  document fields of that collection are the useful completions there. */
+  | { type: 'fields'; collection: string; database: string | null }
 
 const IDENT = String.raw`[A-Za-z_$][\w$]*`
 // Ordered most-specific-first; each is anchored at the cursor ($) so they can't
@@ -145,15 +148,26 @@ const RE_SIBLING_OP = new RegExp(String.raw`\bdb\.getSiblingDB\(\s*["'][^"']+["'
 const RE_SIBLING_COLL = new RegExp(String.raw`\bdb\.getSiblingDB\(\s*["']([^"']+)["']\s*\)\.\w*$`)
 const RE_OP = new RegExp(String.raw`\bdb\.${IDENT}\.\w*$`)
 const RE_COLL = new RegExp(String.raw`\bdb\.\w*$`)
+// Inside a collection method's argument object: `db.<coll>.<method>({…` (or `([{…`)
+// with no closing `)` yet, so the cursor is still within the call. `[^)]*$` is the
+// heuristic that we haven't left the argument list (handles nested {}/[] and prior
+// key/value pairs); it intentionally also fires in value positions — offering fields
+// there is harmless, and a key/value parser isn't worth the complexity.
+const RE_FIELD = new RegExp(String.raw`\bdb\.(${IDENT})\.${IDENT}\(\s*[[{][^)]*$`)
+const RE_SIBLING_FIELD = new RegExp(String.raw`\bdb\.getSiblingDB\(\s*["']([^"']+)["']\s*\)\.(${IDENT})\.${IDENT}\(\s*[[{][^)]*$`)
 
 /** Classify the cursor position in a mongo shell command. Null = not a spot we
  *  complete (chained cursor methods, inside filters, …). */
 export function mongoCursorContext(textBeforeCursor: string): MongoCursorContext | null {
   let m = RE_DATABASE.exec(textBeforeCursor)
   if (m) return { type: 'databases', partial: m[1] }
+  m = RE_SIBLING_FIELD.exec(textBeforeCursor)
+  if (m) return { type: 'fields', collection: m[2], database: m[1] }
   if (RE_SIBLING_OP.test(textBeforeCursor)) return { type: 'ops' }
   m = RE_SIBLING_COLL.exec(textBeforeCursor)
   if (m) return { type: 'collections', database: m[1] }
+  m = RE_FIELD.exec(textBeforeCursor)
+  if (m) return { type: 'fields', collection: m[1], database: null }
   if (RE_OP.test(textBeforeCursor)) return { type: 'ops' }
   if (RE_COLL.test(textBeforeCursor)) return { type: 'collections', database: null }
   return null

@@ -154,10 +154,27 @@ describe('mongoCursorContext', () => {
     expect(mongoCursorContext('db.users.find({}); db.ord')).toEqual({ type: 'collections', database: null })
   })
 
+  it('classifies inside a query object as fields of that collection', () => {
+    expect(mongoCursorContext('db.tickets.find({ ')).toEqual({ type: 'fields', collection: 'tickets', database: null })
+    expect(mongoCursorContext('db.tickets.find({ us')).toEqual({ type: 'fields', collection: 'tickets', database: null })
+    // still inside after an earlier key/value pair
+    expect(mongoCursorContext('db.tickets.find({ status: "open", us')).toEqual({ type: 'fields', collection: 'tickets', database: null })
+    // aggregate pipeline stage, and update's $set object
+    expect(mongoCursorContext('db.orders.aggregate([{ ')).toEqual({ type: 'fields', collection: 'orders', database: null })
+    expect(mongoCursorContext('db.users.updateOne({ }, { $set: { ')).toEqual({ type: 'fields', collection: 'users', database: null })
+  })
+
+  it('classifies fields inside a getSiblingDB collection query', () => {
+    expect(mongoCursorContext('db.getSiblingDB("analytics").events.find({ ev')).toEqual({
+      type: 'fields', collection: 'events', database: 'analytics'
+    })
+  })
+
   it('is null outside a completable spot', () => {
     expect(mongoCursorContext('select * from users')).toBeNull()
     expect(mongoCursorContext('foo.')).toBeNull()
     expect(mongoCursorContext('db.users.find({}).')).toBeNull() // chained cursor methods
+    expect(mongoCursorContext('db.users.find(')).toBeNull() // opened call but no argument object yet
   })
 })
 
