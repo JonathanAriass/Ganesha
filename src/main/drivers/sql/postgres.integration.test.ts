@@ -106,6 +106,9 @@ describe('PostgresDriver (integration, requires Docker)', () => {
     expect(cte.editable).toBeNull()
     const derived = await driver.runQuery(id, { kind: 'sql', sql: 'SELECT x.id, y.name FROM (SELECT * FROM t_edit WHERE id > 0) x JOIN t_edit y ON y.id = x.id' }, { maxRows: 10, queryId: 'e3d', readOnly: false })
     expect(derived.editable).toBeNull()
+    // A parenthesis-wrapped CTE is a valid top-level statement — must not bypass the guard.
+    const parenCte = await driver.runQuery(id, { kind: 'sql', sql: '(WITH c AS (SELECT * FROM t_edit) SELECT a.id, b.name FROM c a JOIN c b ON b.id = a.id)' }, { maxRows: 10, queryId: 'e3e', readOnly: false })
+    expect(parenCte.editable).toBeNull()
   })
 
   it('applyEdits updates by primary key in a transaction', async () => {

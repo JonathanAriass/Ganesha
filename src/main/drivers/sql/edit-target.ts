@@ -57,7 +57,9 @@ export function isSingleTableScan(sql: string, name: string): boolean {
     .replace(/--[^\n]*/g, ' ')
     .replace(/\/\*[\s\S]*?\*\//g, ' ')
     .replace(/'(?:[^']|'')*'/g, "''")
-  if (/^\s*with\b/i.test(cleaned)) return false
+  // Leading parens too: `(WITH c AS (…) …)` is a valid top-level statement whose outer
+  // FROM references the CTE alias, so a bare `^\s*with` anchor would let it slip through.
+  if (/^[\s(]*with\b/i.test(cleaned)) return false
   // A table reference is the name (optionally schema-qualified / quoted) right after
   // FROM, JOIN or a comma — catching `JOIN t`, comma-style `, t`, and references nested
   // in subqueries (we scan the whole statement, not just the first FROM clause).

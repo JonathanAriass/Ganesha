@@ -71,6 +71,14 @@ describe('isSingleTableScan', () => {
   it('is false for a derived-table self-join (reference hidden in a subquery)', () => {
     expect(isSingleTableScan('SELECT x.id, y.val FROM (SELECT * FROM t WHERE id > 0) x JOIN t y ON y.id = x.parent', 't')).toBe(false)
   })
+  it('is false for a parenthesis-wrapped CTE (anchor bypass)', () => {
+    expect(isSingleTableScan('(WITH c AS (SELECT * FROM t) SELECT a.id, b.val FROM c a JOIN c b ON true)', 't')).toBe(false)
+    expect(isSingleTableScan('( WITH c AS (SELECT * FROM t) SELECT * FROM c a, c b )', 't')).toBe(false)
+    expect(isSingleTableScan('((WITH c AS (SELECT * FROM t) SELECT * FROM c))', 't')).toBe(false)
+  })
+  it('stays true for a parenthesized plain single-table select', () => {
+    expect(isSingleTableScan('(SELECT id, val FROM t)', 't')).toBe(true)
+  })
   it('stays true for a subquery over a DIFFERENT table', () => {
     expect(isSingleTableScan('SELECT * FROM t WHERE id IN (SELECT tid FROM other)', 't')).toBe(true)
   })
