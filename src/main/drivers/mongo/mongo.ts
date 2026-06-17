@@ -1,6 +1,7 @@
 import { MongoClient } from 'mongodb'
 import type { Document, Filter, Sort, UpdateFilter } from 'mongodb'
-import type { DatabaseDriver, ConnectParams, RunOptions, QueryRequest, QueryResult, DbObject, ObjectRef, ColumnInfo } from '../types'
+import { EJSON } from 'bson'
+import type { DatabaseDriver, ConnectParams, RunOptions, QueryRequest, QueryResult, DbObject, ObjectRef, ColumnInfo, TableEdits } from '../types'
 import type { MongoCommand } from './command'
 import { isMongoCommandWrite } from './command'
 import { normalizeFind, normalizeScalar, normalizeValues, normalizeWriteResult } from './normalize'
@@ -105,10 +106,27 @@ export class MongoDriver implements DatabaseDriver {
     }
   }
 
-  // Mongo results report editable=null in Phase A, so the UI never calls this; the real
-  // updateOne-by-_id apply lands in Phase B.
-  async applyEdits(): Promise<{ updated: number }> {
-    throw new Error('Editing MongoDB results is not supported yet')
+  async applyEdits(id: string, edits: TableEdits, opts: { readOnly: boolean }): Promise<{ updated: number }> {
+    if (opts.readOnly) throw new Error('Connection is read-only: edits are blocked')
+    if (!edits.table.schema) throw new Error('No database for the edit target')
+    const { client } = this.require(id)
+    const coll = client.db(edits.table.schema).collection(edits.table.name)
+    // No multi-document transaction (standalone mongod doesn't support them): apply each
+    // updateOne in turn. $set is idempotent, so re-committing after a partial failure
+    // safely re-applies the ones that already succeeded.
+    let updated = 0
+    for (const row of edits.rows) {
+      // EJSON round-trip: the _id comes back from the result as { $oid: … } / a scalar,
+      // and an edited value may be an EJSON wrapper too — deserialize both to real BSON.
+      const filter = EJSON.deserialize(row.key) as Filter<Document>
+      const update = { $set: EJSON.deserialize(row.set) as Document }
+      const res = await coll.updateOne(filter, update)
+      if (res.matchedCount !== 1) {
+        throw new Error(`Edit matched ${res.matchedCount} documents (expected exactly one) — the document may have changed; refresh and retry`)
+      }
+      updated += res.matchedCount
+    }
+    return { updated }
   }
 
   async runQuery(id: string, request: QueryRequest, opts: RunOptions): Promise<QueryResult> {

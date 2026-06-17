@@ -123,4 +123,37 @@ describe('MongoDriver (integration, requires Docker)', () => {
     const columns = await driver.describeObject(idAll, { schema: 'otherdb', name: 'things' })
     expect(columns.map((c) => c.name)).toContain('x')
   })
+
+  it('a find result reports an editable descriptor keyed by _id; aggregate does not', async () => {
+    await driver.runQuery(id, { kind: 'mongo', command: { op: 'insertMany', collection: 'edit_c', documents: [{ _id: 1, name: 'a', age: 30 }, { _id: 2, name: 'b', age: 40 }] } }, { maxRows: 100, queryId: 'e0', readOnly: false })
+    const sel = await driver.runQuery(id, { kind: 'mongo', command: { op: 'find', collection: 'edit_c', sort: { _id: 1 } } }, { maxRows: 100, queryId: 'e1', readOnly: false })
+    expect(sel.editable).toEqual({ table: { schema: 'testdb', name: 'edit_c' }, keyColumns: ['_id'], columnSources: expect.arrayContaining(['_id', 'name', 'age']) })
+    const agg = await driver.runQuery(id, { kind: 'mongo', command: { op: 'aggregate', collection: 'edit_c', pipeline: [{ $match: {} }] } }, { maxRows: 100, queryId: 'e1b', readOnly: false })
+    expect(agg.editable).toBeNull()
+  })
+
+  it('applyEdits updates a document by _id and preserves value types', async () => {
+    const r = await driver.applyEdits(id, { table: { schema: 'testdb', name: 'edit_c' }, rows: [{ key: { _id: 1 }, set: { name: 'AA', age: 31 } }] }, { readOnly: false })
+    expect(r.updated).toBe(1)
+    const after = await driver.runQuery(id, { kind: 'mongo', command: { op: 'find', collection: 'edit_c', filter: { _id: 1 } } }, { maxRows: 10, queryId: 'e2', readOnly: false })
+    const doc = after.documents![0]
+    expect(doc.name).toBe('AA')
+    expect(doc.age).toBe(31) // stayed a number, not "31"
+  })
+
+  it('applyEdits round-trips an ObjectId _id (from the result EJSON)', async () => {
+    await driver.runQuery(id, { kind: 'mongo', command: { op: 'insertOne', collection: 'edit_oid', document: { tag: 'x' } } }, { maxRows: 10, queryId: 'e3', readOnly: false })
+    const sel = await driver.runQuery(id, { kind: 'mongo', command: { op: 'find', collection: 'edit_oid' } }, { maxRows: 10, queryId: 'e4', readOnly: false })
+    const idCol = sel.columns.findIndex((c) => c.name === '_id')
+    const oid = sel.rows[0][idCol] // EJSON { $oid: "…" }
+    const r = await driver.applyEdits(id, { table: { schema: 'testdb', name: 'edit_oid' }, rows: [{ key: { _id: oid }, set: { tag: 'y' } }] }, { readOnly: false })
+    expect(r.updated).toBe(1)
+    const after = await driver.runQuery(id, { kind: 'mongo', command: { op: 'find', collection: 'edit_oid' } }, { maxRows: 10, queryId: 'e5', readOnly: false })
+    expect(after.documents![0].tag).toBe('y')
+  })
+
+  it('applyEdits refuses on read-only and throws when the document is gone', async () => {
+    await expect(driver.applyEdits(id, { table: { schema: 'testdb', name: 'edit_c' }, rows: [{ key: { _id: 1 }, set: { name: 'z' } }] }, { readOnly: true })).rejects.toThrow(/read-only/i)
+    await expect(driver.applyEdits(id, { table: { schema: 'testdb', name: 'edit_c' }, rows: [{ key: { _id: 9999 }, set: { name: 'z' } }] }, { readOnly: false })).rejects.toThrow(/matched 0|expected exactly one/i)
+  })
 })
