@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildEditableResult, type PerColumnSource } from './edit-target'
+import { buildEditableResult, sourceTableReferenceCount, type PerColumnSource } from './edit-target'
 
 const T = { schema: 'public', name: 'users' }
 const cols = (...c: (string | null)[]): PerColumnSource[] =>
@@ -51,5 +51,27 @@ describe('buildEditableResult', () => {
       keyColumns: ['a', 'b'],
       columnSources: ['a', 'b', 'v']
     })
+  })
+})
+
+describe('sourceTableReferenceCount', () => {
+  it('counts one for a plain single-table select', () => {
+    expect(sourceTableReferenceCount('SELECT * FROM users WHERE id = 1', 'users')).toBe(1)
+    expect(sourceTableReferenceCount('select id, name from users u', 'users')).toBe(1)
+  })
+  it('counts two for a self-join, even with disjoint columns', () => {
+    expect(sourceTableReferenceCount('SELECT a.id, b.val FROM t a JOIN t b ON b.parent = a.id', 't')).toBe(2)
+    expect(sourceTableReferenceCount('SELECT * FROM t a, t b', 't')).toBe(2)
+  })
+  it('handles a schema qualifier and quoting', () => {
+    expect(sourceTableReferenceCount('SELECT * FROM public.users', 'users')).toBe(1)
+    expect(sourceTableReferenceCount('SELECT * FROM "users" a JOIN "users" b', 'users')).toBe(2)
+  })
+  it('ignores the name inside string literals and comments', () => {
+    expect(sourceTableReferenceCount("SELECT * FROM t WHERE note = 'from t'", 't')).toBe(1)
+    expect(sourceTableReferenceCount('SELECT * FROM t -- join t\n', 't')).toBe(1)
+  })
+  it('does not match a longer table name sharing a prefix', () => {
+    expect(sourceTableReferenceCount('SELECT * FROM t2 JOIN t ON true', 't')).toBe(1)
   })
 })

@@ -96,6 +96,10 @@ describe('PostgresDriver (integration, requires Docker)', () => {
     expect(sel.editable).toEqual({ table: { schema: 'public', name: 't_edit' }, keyColumns: ['id'], columnSources: ['id', 'name'] })
     const join = await driver.runQuery(id, { kind: 'sql', sql: 'SELECT a.id, b.id AS bid FROM t_edit a, t_edit b' }, { maxRows: 10, queryId: 'e3', readOnly: false })
     expect(join.editable).toBeNull()
+    // A self-join projecting DIFFERENT columns shows one source table in the metadata,
+    // but one result row spans two base rows — must still be refused (no wrong-row write).
+    const selfJoin = await driver.runQuery(id, { kind: 'sql', sql: 'SELECT a.id, b.name FROM t_edit a JOIN t_edit b ON b.id = a.id' }, { maxRows: 10, queryId: 'e3b', readOnly: false })
+    expect(selfJoin.editable).toBeNull()
   })
 
   it('applyEdits updates by primary key in a transaction', async () => {

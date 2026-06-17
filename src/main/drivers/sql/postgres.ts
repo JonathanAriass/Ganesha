@@ -3,7 +3,7 @@ import type {
   DatabaseDriver, ConnectParams, RunOptions, QueryRequest, QueryResult, ColumnMeta,
   DbObject, ObjectRef, ColumnInfo, EditableResult, TableEdits
 } from '../types'
-import { buildEditableResult, type PerColumnSource } from './edit-target'
+import { buildEditableResult, sourceTableReferenceCount, type PerColumnSource } from './edit-target'
 import { buildUpdate } from './update-builder'
 
 const { Pool } = pg
@@ -86,7 +86,7 @@ export class PostgresDriver implements DatabaseDriver {
         durationMs: Date.now() - start,
         truncated,
         documents: null,
-        editable: await this.deriveEditable(id, fields)
+        editable: await this.deriveEditable(id, fields, request.sql)
       }
     } catch (e) {
       if (opts.readOnly) {
@@ -135,12 +135,15 @@ export class PostgresDriver implements DatabaseDriver {
 
   /** Derive the editable descriptor from the result's column metadata: a single source
    *  table (oid) whose attnum→name + primary key are resolved (and cached) on first use. */
-  private async deriveEditable(id: string, fields: pg.FieldDef[]): Promise<EditableResult | null> {
+  private async deriveEditable(id: string, fields: pg.FieldDef[], sql: string): Promise<EditableResult | null> {
     try {
       const oids = [...new Set(fields.map((f) => f.tableID).filter((t) => t && t > 0))]
       if (oids.length !== 1) return null
       const meta = await this.resolvePgTable(id, oids[0])
       if (!meta) return null
+      // A self-join shows one source table in the metadata but spans two base rows per
+      // result row — refuse it (the row key would target the wrong row).
+      if (sourceTableReferenceCount(sql, meta.name) !== 1) return null
       const perColumn: PerColumnSource[] = fields.map((f) =>
         f.tableID === oids[0] && meta.cols.has(f.columnID)
           ? { table: { schema: meta.schema, name: meta.name }, column: meta.cols.get(f.columnID)! }

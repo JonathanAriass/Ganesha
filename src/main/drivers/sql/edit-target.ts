@@ -34,3 +34,34 @@ export function buildEditableResult(perColumn: PerColumnSource[], pkColumns: str
 
   return { table, keyColumns: pkColumns, columnSources }
 }
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/** How many times `name` appears as a FROM/JOIN source in the SQL (string literals and
+ *  comments stripped first). A self-join projecting *different* columns of one table is
+ *  metadata-indistinguishable from a plain single-table SELECT — both show one source
+ *  table — yet a result row then spans two base rows, so the row key read from the
+ *  result can target the wrong row. Editing requires exactly one reference; anything
+ *  else (self-join, self-referencing subquery) is refused. Conservative: a false >1
+ *  only declines editing, never mis-writes. */
+export function sourceTableReferenceCount(sql: string, name: string): number {
+  const cleaned = sql
+    .replace(/--[^\n]*/g, ' ')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/'(?:[^']|'')*'/g, "''")
+  // Isolate the FROM clause (tables, JOINs and their ON conditions) up to the next
+  // top-level keyword, so SELECT-list / WHERE mentions of the name don't count.
+  const body = /\bfrom\b[\s\S]*?(?=\bwhere\b|\bgroup\s+by\b|\border\s+by\b|\bhaving\b|\blimit\b|\boffset\b|\bunion\b|\bfetch\b|$)/i.exec(cleaned)
+  if (!body) return 0
+  // A table reference is the name (optionally schema-qualified / quoted) right after
+  // FROM, JOIN or a comma — catching both `JOIN t` and comma-style `, t` self-joins.
+  const re = new RegExp(
+    String.raw`(?:\bfrom\b|\bjoin\b|,)\s*(?:(?:[\w$]+|"[^"]+"|\`[^\`]+\`)\.)?["\`]?` +
+      escapeRegExp(name) +
+      String.raw`["\`]?(?![\w$])`,
+    'gi'
+  )
+  return (body[0].match(re) || []).length
+}

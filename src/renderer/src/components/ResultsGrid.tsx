@@ -39,7 +39,9 @@ function EditingCell({
   onCommit: (value: unknown) => void
   onCancel: () => void
 }): JSX.Element {
-  const [text, setText] = useState(initial === null || initial === undefined ? '' : String(initial))
+  // Seed with the same projection the grid displays (cellText), so an object/jsonb/array
+  // cell opens as its JSON text — not `[object Object]`, which String() would write back.
+  const [text, setText] = useState(initial === null || initial === undefined ? '' : cellText(initial))
   const done = useRef(false)
   const commit = (value: unknown): void => {
     if (done.current) return

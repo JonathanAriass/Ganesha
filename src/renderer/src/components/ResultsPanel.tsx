@@ -141,7 +141,7 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
           globalFilter={filter}
           tabId={tab.id}
           connectionId={tab.connectionId}
-          editable={connection?.readOnly ? null : result.editable}
+          editable={connection && !connection.readOnly ? result.editable : null}
           readOnly={connection?.readOnly ?? true}
           requireCommit={connection?.requireCommit ?? true}
         />

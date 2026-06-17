@@ -4,7 +4,7 @@ import type {
   DbObject, ObjectRef, ColumnInfo, EditableResult, TableEdits
 } from '../types'
 import type { ConnectionType } from '../../../shared/domain'
-import { buildEditableResult, type PerColumnSource } from './edit-target'
+import { buildEditableResult, sourceTableReferenceCount, type PerColumnSource } from './edit-target'
 import { buildUpdate } from './update-builder'
 
 /** MySQL/MariaDB driver (shared wire protocol) backed by a per-connection mysql2 pool.
@@ -37,11 +37,9 @@ export class MySqlDriver implements DatabaseDriver {
       // that from day one. DECIMAL is exact strings by default; node-postgres
       // gives int8/numeric the same way.
       supportBigNumbers: true,
-      // CLIENT_FOUND_ROWS: report MATCHED rows, not changed rows, so applyEdits' "each
-      // UPDATE must affect exactly one row" guard can tell a missing/changed-underneath
-      // row (0 matched) from a no-op edit to the same value. (UPDATE in the query editor
-      // then also reports matched rows — the more intuitive count.)
-      flags: ['FOUND_ROWS'],
+      // mysql2 enables CLIENT_FOUND_ROWS by default, so affectedRows reports MATCHED
+      // (not just changed) rows — which applyEdits' "exactly one row" guard relies on to
+      // tell a missing/changed-underneath row (0 matched) from a no-op edit (same value).
       connectionLimit: 4,
       connectTimeout: 10_000,
       idleTimeout: 30_000
@@ -107,7 +105,7 @@ export class MySqlDriver implements DatabaseDriver {
         durationMs: Date.now() - start,
         truncated,
         documents: null,
-        editable: await this.deriveEditable(conn, id, fields)
+        editable: await this.deriveEditable(conn, id, fields, request.sql)
       }
     } catch (e) {
       if (opts.readOnly) {
@@ -157,11 +155,13 @@ export class MySqlDriver implements DatabaseDriver {
 
   /** Derive the editable descriptor from the result fields' orgTable/orgName/db, with
    *  the table's primary key resolved (and cached) on first use. */
-  private async deriveEditable(conn: mysql.PoolConnection, id: string, fields: mysql.FieldPacket[]): Promise<EditableResult | null> {
+  private async deriveEditable(conn: mysql.PoolConnection, id: string, fields: mysql.FieldPacket[], sql: string): Promise<EditableResult | null> {
     try {
       const fds = fields as unknown as Array<{ orgTable?: string; orgName?: string; db?: string }>
       const tables = [...new Set(fds.map((f) => f.orgTable).filter((t): t is string => !!t))]
       if (tables.length !== 1) return null
+      // A self-join shows one source table but spans two base rows per result row — refuse.
+      if (sourceTableReferenceCount(sql, tables[0]) !== 1) return null
       const db = fds.find((f) => f.orgTable === tables[0])?.db ?? ''
       const pk = await this.pkColumns(conn, id, db, tables[0])
       const perColumn: PerColumnSource[] = fds.map((f) =>
