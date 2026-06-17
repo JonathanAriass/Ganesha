@@ -17,6 +17,7 @@ Built with Electron, React and TypeScript (electron-vite). Connections have a **
 - **Two Mongo input modes** — raw EJSON commands (`{ "find": "users", ... }`) or mongosh shell syntax (`db.users.find({...}).sort({...}).limit(5)`), parsed by a restricted AST evaluator — no code execution.
 - **Read-only enforcement, twice** — on connections marked read-only, SQL is statement-guarded (writes/DDL rejected, including `SELECT INTO`) *and* runs inside a server-side `READ ONLY` transaction; Mongo commands pass an allow-list that also blocks `$out`/`$merge` aggregations.
 - **Results** — virtualized grid (TanStack Table + Virtual) that handles large result sets, instant client-side filtering, a collapsible document tree view for Mongo, CSV/JSON export that respects the active filter. Row counts are honest: when Mongo can't know the true total, the label says "showing first N (more available)" instead of inventing one. Numbers are honest too: BIGINT/DECIMAL/Mongo Int64 values beyond JavaScript's safe range arrive as exact strings instead of silently rounding — and an explicit `{"$numberLong": "…"}` in a raw Mongo command reaches the server as a true int64, exact in both directions. Click a row to open the **inspector** — every field at full value (JSON pretty-printed, copy keeps the original bytes), with copy-row and prev/next that follow the current sort/filter. Drag the divider between the editor and the grid to resize them (double-click to reset, arrow keys when it's focused); the split is remembered.
+- **Edit results in place** — double-click a cell to edit it when the result maps to a single table with a primary key (SQL); changed cells stay highlighted as pending. Each connection has a *"require explicit commit"* switch: ON, edits stage until you press **Commit** (one transaction, each row's UPDATE must match exactly one row or the whole batch rolls back); OFF, an edit writes on Enter. Read-only connections can't edit, and edits never build SQL in the renderer — the driver sends parameterized statements. (MongoDB editing is coming next.)
 - **Cancel** — long queries can be killed mid-flight (`pg_cancel_backend` / `KILL QUERY` / Mongo `killOp` via comment-tagged `$currentOp`). During a script run, Cancel also stops at the next statement boundary.
 - **History** — every run is recorded (success or failure) and can be loaded back into a tab with one click.
 - **⌘K palette** — fuzzy-jump to connections, tables/collections, saved queries and actions (cmdk).
@@ -56,7 +57,7 @@ npm run dev        # launch the app with hot reload
 
 ```bash
 npm run typecheck && npm run lint
-npm test                  # 399 unit tests (Vitest, Node ABI)
+npm test                  # 423 unit tests (Vitest, Node ABI)
 npm run test:integration  # 17 tests vs real Postgres/MySQL/Mongo + an SSH tunnel (testcontainers, needs Docker)
 ```
 
