@@ -89,7 +89,8 @@ describe('script run lifecycle', () => {
     rowCount: 1,
     durationMs: 5,
     truncated: false,
-    documents: null
+    documents: null,
+    editable: null
   }
 
   beforeEach(() => {

@@ -18,7 +18,7 @@ const input: ConnectionInput = {
   authSource: '', replicaSet: '', ssh: null
 }
 const fakeResult: QueryResult = {
-  columns: [{ name: 'n', dataType: '23' }], rows: [[1]], rowCount: 1, durationMs: 3, truncated: false, documents: null
+  columns: [{ name: 'n', dataType: '23' }], rows: [[1]], rowCount: 1, durationMs: 3, truncated: false, documents: null, editable: null
 }
 
 function fakeDriver(calls: string[], queryIds?: string[]): DatabaseDriver {

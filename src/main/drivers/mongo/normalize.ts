@@ -53,13 +53,13 @@ export function normalizeFind(docs: unknown[], maxRows: number, durationMs: numb
   const rows = capped.map((d) => keys.map((k) => (k in d ? d[k] : null)))
   // The fetch is bounded at maxRows+1, so when truncated the true total is unknown —
   // `total` would just be the probe size. Report the shown count; `truncated` says "more".
-  return { columns, rows, rowCount: capped.length, durationMs, truncated, documents: capped }
+  return { columns, rows, rowCount: capped.length, durationMs, truncated, documents: capped, editable: null }
 }
 
 /** count / countDocuments → single scalar cell. */
 export function normalizeScalar(name: string, value: unknown, durationMs: number): QueryResult {
   const cell = (toPlain<{ v: unknown }>({ v: value })).v
-  return { columns: [{ name, dataType: null }], rows: [[cell]], rowCount: 1, durationMs, truncated: false, documents: null }
+  return { columns: [{ name, dataType: null }], rows: [[cell]], rowCount: 1, durationMs, truncated: false, documents: null, editable: null }
 }
 
 /** distinct → one column of values. */
@@ -67,7 +67,7 @@ export function normalizeValues(name: string, values: unknown[], maxRows: number
   const plain = toPlain<unknown[]>(values)
   const truncated = plain.length > maxRows
   const capped = truncated ? plain.slice(0, maxRows) : plain
-  return { columns: [{ name, dataType: null }], rows: capped.map((v) => [v]), rowCount: plain.length, durationMs, truncated, documents: null }
+  return { columns: [{ name, dataType: null }], rows: capped.map((v) => [v]), rowCount: plain.length, durationMs, truncated, documents: null, editable: null }
 }
 
 /** insert/update/delete/replace → flatten the driver's result object into one row. */
@@ -80,6 +80,7 @@ export function normalizeWriteResult(result: unknown, durationMs: number): Query
     rowCount: 1,
     durationMs,
     truncated: false,
-    documents: null
+    documents: null,
+    editable: null
   }
 }

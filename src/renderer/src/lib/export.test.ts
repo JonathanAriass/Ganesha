@@ -39,7 +39,7 @@ describe('toJsonObjects / toJsonText', () => {
   })
 
   it('toJsonText prefers documents when present, else falls back to row objects', () => {
-    const base = { columns, rows: [[1, 'x']], rowCount: 1, durationMs: 0, truncated: false }
+    const base = { columns, rows: [[1, 'x']], rowCount: 1, durationMs: 0, truncated: false, editable: null }
     const withDocs: QueryResult = { ...base, documents: [{ _id: 'a' }] }
     const withoutDocs: QueryResult = { ...base, documents: null }
     expect(JSON.parse(toJsonText(withDocs))).toEqual([{ _id: 'a' }])

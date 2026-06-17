@@ -98,7 +98,8 @@ export class MySqlDriver implements DatabaseDriver {
         rowCount: isResultSet ? allRows.length : Number((rawRows as { affectedRows?: number | string }).affectedRows ?? 0),
         durationMs: Date.now() - start,
         truncated,
-        documents: null
+        documents: null,
+        editable: null
       }
     } catch (e) {
       if (opts.readOnly) {

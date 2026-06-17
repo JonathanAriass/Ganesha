@@ -80,7 +80,8 @@ export class PostgresDriver implements DatabaseDriver {
         rowCount: typeof res.rowCount === 'number' ? res.rowCount : rows.length,
         durationMs: Date.now() - start,
         truncated,
-        documents: null
+        documents: null,
+        editable: null
       }
     } catch (e) {
       if (opts.readOnly) {
