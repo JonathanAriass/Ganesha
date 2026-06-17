@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { editKey, parseEditKey, getAtPath, setAtPath, isEjsonWrapper } from './doc-path'
+import { editKey, parseEditKey, getAtPath, setAtPath, isEjsonWrapper, isKeyPath } from './doc-path'
 
 describe('editKey', () => {
   it('round-trips row index and path (path may contain dots/colons/spaces)', () => {
@@ -31,6 +31,22 @@ describe('getAtPath / setAtPath', () => {
   })
   it('sets a top-level field', () => {
     expect(setAtPath({ a: 1 }, 'a', 2)).toEqual({ a: 2 })
+  })
+  it('refuses to walk the prototype chain (returns root unchanged)', () => {
+    expect(setAtPath({ a: 1 }, '__proto__.polluted', true)).toEqual({ a: 1 })
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined()
+  })
+})
+
+describe('isKeyPath', () => {
+  it('matches a key column and any path nested under it', () => {
+    expect(isKeyPath('_id', ['_id'])).toBe(true)
+    expect(isKeyPath('_id.foo', ['_id'])).toBe(true)
+    expect(isKeyPath('name', ['_id'])).toBe(false)
+    expect(isKeyPath('_idea', ['_id'])).toBe(false) // not a real segment boundary
+  })
+  it('supports composite keys', () => {
+    expect(isKeyPath('b', ['a', 'b'])).toBe(true)
   })
 })
 

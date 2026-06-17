@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import type { EditableResult } from '@shared/query'
-import { editKey, getAtPath, isEjsonWrapper } from '../lib/doc-path'
+import { editKey, getAtPath, isEjsonWrapper, isKeyPath } from '../lib/doc-path'
 import { coerceMongoEditValue } from '../lib/mongo-edit-value'
 import { cellText } from '../lib/grid-text'
 import { useAppStore } from '../state/store'
@@ -74,7 +74,7 @@ function JsonNode({ name, value, depth, rowIndex, path, ctx }: JsonNodeProps): J
   const isDirty = Object.prototype.hasOwnProperty.call(ctx.edits, k)
   const shown = isDirty ? ctx.edits[k] : value
   const canEdit =
-    !!ctx.editable && !ctx.readOnly && path !== '' && !ctx.editable.keyColumns.includes(path)
+    !!ctx.editable && !ctx.readOnly && path !== '' && !isKeyPath(path, ctx.editable.keyColumns)
 
   if (ctx.editing === k) {
     return (
@@ -120,10 +120,10 @@ export default function DocumentView({ documents, tabId, editable, readOnly, req
   }
 
   const stage = (rowIndex: number, path: string, value: unknown): void => {
+    setEditing(null) // close the editor regardless
     if (!tabId) return
     const original = getAtPath(documents[rowIndex], path)
     useAppStore.getState().setCellEdit(tabId, editKey(rowIndex, path), coerceMongoEditValue(value as string | null, original))
-    setEditing(null)
     if (!requireCommit) void useAppStore.getState().commitEdits(tabId)
   }
   const reset = (k: string): void => {

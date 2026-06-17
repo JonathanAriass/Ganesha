@@ -300,20 +300,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         if (t.id !== id || !t.result) return t
         const result = t.result
         const touched = new Set(edits.map((e) => e.rowIndex))
-        // A top-level path is also a table column — patch the row cell so the grid updates.
-        const rows = result.rows.map((row, i) => {
-          if (!touched.has(i)) return row
-          let next = row
-          for (const e of edits) {
-            if (e.rowIndex !== i) continue
-            const colIndex = result.columns.findIndex((c) => c.name === e.path)
-            if (colIndex >= 0) {
-              if (next === row) next = row.slice()
-              next[colIndex] = e.value
-            }
-          }
-          return next
-        })
         // Mongo results carry a parallel `documents` array (the JSON/tree view reads it),
         // index-aligned with rows; patch each edited field by its (possibly nested) path so
         // that view doesn't show stale values after a commit.
@@ -325,6 +311,22 @@ export const useAppStore = create<AppState>((set, get) => ({
               return next
             })
           : null
+        const rows = result.rows.map((row, i) => {
+          if (!touched.has(i)) return row
+          // Mongo: the table rows are the flattened documents — rebuild a touched row from
+          // its patched doc so a NESTED edit also refreshes its top-level column cell.
+          if (documents) {
+            const doc = documents[i]
+            return result.columns.map((c) => (c.name in doc ? doc[c.name] : null))
+          }
+          // SQL: patch the cell at each top-level path (= column name).
+          const next = row.slice()
+          for (const e of edits) {
+            const colIndex = result.columns.findIndex((c) => c.name === e.path)
+            if (colIndex >= 0) next[colIndex] = e.value
+          }
+          return next
+        })
         return { ...t, result: { ...result, rows, documents } }
       }),
     })),

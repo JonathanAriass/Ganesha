@@ -24,6 +24,7 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
   const view: View = userView ?? (hasDocuments ? 'documents' : 'table')
   const { data: connections = [] } = useConnections()
   const connection = connections.find((c) => c.id === tab.connectionId)
+  const pendingEdits = Object.keys(tab.edits).length
 
   // Before the running spinner: a script renders progressively while it executes.
   if (tab.scriptRun) {
@@ -159,14 +160,14 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
 
       {/* Pending-edit commit bar — shown for both the table and document views, so an edit
           staged in either can be reviewed/committed. Only in require-commit mode. */}
-      {connection?.requireCommit && (Object.keys(tab.edits).length > 0 || tab.editError) && (
+      {connection?.requireCommit && (pendingEdits > 0 || tab.editError) && (
         <div className="edit-bar">
           <span>
-            {Object.keys(tab.edits).length} pending change{Object.keys(tab.edits).length === 1 ? '' : 's'}
+            {pendingEdits} pending change{pendingEdits === 1 ? '' : 's'}
           </span>
           <button
             className="btn primary"
-            disabled={Object.keys(tab.edits).length === 0}
+            disabled={pendingEdits === 0}
             onClick={() => useAppStore.getState().openCommitModal(tab.id)}
           >
             Commit… (⌘S)

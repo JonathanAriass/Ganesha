@@ -1,5 +1,5 @@
 import type { ColumnMeta, EditableResult, RowEdit } from '@shared/query'
-import { parseEditKey, getAtPath } from './doc-path'
+import { parseEditKey, getAtPath, isKeyPath } from './doc-path'
 
 export { editKey } from './doc-path'
 
@@ -15,7 +15,7 @@ export function buildRowEdits(
   const byRow = new Map<number, RowEdit>()
   for (const [k, value] of Object.entries(dirty)) {
     const { rowIndex, path } = parseEditKey(k)
-    if (editable.keyColumns.includes(path)) continue // never edit a key column
+    if (isKeyPath(path, editable.keyColumns)) continue // never edit a key column
     let edit = byRow.get(rowIndex)
     if (!edit) {
       const key: Record<string, unknown> = {}
@@ -54,7 +54,7 @@ export function describeEdits(
   const out: (EditChange & { rowIndex: number })[] = []
   for (const [k, newValue] of Object.entries(dirty)) {
     const { rowIndex, path } = parseEditKey(k)
-    if (editable.keyColumns.includes(path)) continue
+    if (isKeyPath(path, editable.keyColumns)) continue
     const row = rows[rowIndex]
     if (!row) continue
     const key: Record<string, unknown> = {}

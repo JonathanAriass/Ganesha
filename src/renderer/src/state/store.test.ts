@@ -328,10 +328,10 @@ describe('applyResultEdits', () => {
     expect(tab().result!.rows[1][1]).toBe('B') // and the table cell too
   })
 
-  it('patches a nested document path (tree edit) without touching the table rows', () => {
+  it('patches a nested document path (tree edit) and refreshes the ancestor table cell', () => {
     const mongoResult = {
       columns: [{ name: '_id', dataType: null }, { name: 'addr', dataType: null }],
-      rows: [[1, { city: 'Paris' }]],
+      rows: [[1, { city: 'Paris', zip: 75001 }]],
       rowCount: 1, durationMs: 1, truncated: false,
       documents: [{ _id: 1, addr: { city: 'Paris', zip: 75001 } }],
       editable: { table: { schema: 'db', name: 'c' }, keyColumns: ['_id'], columnSources: ['_id', 'addr'] }
@@ -339,6 +339,8 @@ describe('applyResultEdits', () => {
     useAppStore.getState().finishRun(tab().id, { result: mongoResult })
     useAppStore.getState().applyResultEdits(tab().id, [{ rowIndex: 0, path: 'addr.city', value: 'Lyon' }])
     expect(tab().result!.documents![0]).toEqual({ _id: 1, addr: { city: 'Lyon', zip: 75001 } })
+    // the table's top-level `addr` cell is rebuilt from the patched doc (table+tree sync)
+    expect(tab().result!.rows[0][1]).toEqual({ city: 'Lyon', zip: 75001 })
   })
 })
 
