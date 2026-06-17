@@ -165,6 +165,16 @@ describe('MongoDriver (integration, requires Docker)', () => {
     expect(after.rows[0][whenCol]).toEqual({ $date: '2020-01-02T03:04:05Z' })
   })
 
+  it('applyEdits writes nested and array-element fields via dotted $set paths', async () => {
+    await driver.runQuery(id, { kind: 'mongo', command: { op: 'insertOne', collection: 'edit_nested', document: { _id: 1, address: { city: 'Paris', zip: 75001 }, tags: ['a', 'b'] } } }, { maxRows: 10, queryId: 'n1', readOnly: false })
+    const r = await driver.applyEdits(id, { table: { schema: 'testdb', name: 'edit_nested' }, rows: [{ key: { _id: 1 }, set: { 'address.city': 'Lyon', 'tags.0': 'z' } }] }, { readOnly: false })
+    expect(r.updated).toBe(1)
+    const after = await driver.runQuery(id, { kind: 'mongo', command: { op: 'find', collection: 'edit_nested', filter: { _id: 1 } } }, { maxRows: 10, queryId: 'n2', readOnly: false })
+    const doc = after.documents![0]
+    expect(doc.address).toEqual({ city: 'Lyon', zip: 75001 }) // nested set; sibling untouched
+    expect(doc.tags).toEqual(['z', 'b']) // array element set
+  })
+
   it('applyEdits refuses on read-only and throws when the document is gone', async () => {
     await expect(driver.applyEdits(id, { table: { schema: 'testdb', name: 'edit_c' }, rows: [{ key: { _id: 1 }, set: { name: 'z' } }] }, { readOnly: true })).rejects.toThrow(/read-only/i)
     await expect(driver.applyEdits(id, { table: { schema: 'testdb', name: 'edit_c' }, rows: [{ key: { _id: 9999 }, set: { name: 'z' } }] }, { readOnly: false })).rejects.toThrow(/matched 0|expected exactly one/i)
