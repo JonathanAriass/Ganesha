@@ -39,6 +39,12 @@ function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+/** A CTE introducer `WITH [RECURSIVE] <name> [(cols…)] AS …` ANYWHERE in the statement
+ *  (not start-anchored, so a leading `;`/`(`/comment can't smuggle one past). Matches the
+ *  CTE form only — `WITH ORDINALITY` and `GROUP BY … WITH ROLLUP` lack the `<name> AS`
+ *  shape, so they aren't refused. */
+const CTE_INTRODUCER = /\bwith\b\s+(?:recursive\s+)?(?:[a-z_$][\w$]*|"[^"]+")\s*(?:\([^)]*\))?\s+as\b/i
+
 /** Whether the SQL provably scans the base table `name` exactly once, so a result row
  *  maps to exactly one base row and a row-key edit can't target the wrong row.
  *
@@ -46,7 +52,7 @@ function escapeRegExp(s: string): string {
  *  result columns all report provenance to the one physical table (pg `tableID`, mysql
  *  `orgTable`), even through a CTE alias or a derived table — yet one result row then
  *  spans two base rows. So this string check, not the metadata, is what catches it:
- *   - **CTE present** (`WITH …`): refuse. A CTE can be self-joined on its alias
+ *   - **CTE present** (`WITH … AS (…)`): refuse. A CTE can be self-joined on its alias
  *     (`FROM c a JOIN c b`), which counting the base-table name can never see.
  *   - otherwise the base table must be referenced exactly once after FROM/JOIN/comma
  *     across the WHOLE statement (subqueries included — a derived-table self-join hides
@@ -57,9 +63,7 @@ export function isSingleTableScan(sql: string, name: string): boolean {
     .replace(/--[^\n]*/g, ' ')
     .replace(/\/\*[\s\S]*?\*\//g, ' ')
     .replace(/'(?:[^']|'')*'/g, "''")
-  // Leading parens too: `(WITH c AS (…) …)` is a valid top-level statement whose outer
-  // FROM references the CTE alias, so a bare `^\s*with` anchor would let it slip through.
-  if (/^[\s(]*with\b/i.test(cleaned)) return false
+  if (CTE_INTRODUCER.test(cleaned)) return false
   // A table reference is the name (optionally schema-qualified / quoted) right after
   // FROM, JOIN or a comma — catching `JOIN t`, comma-style `, t`, and references nested
   // in subqueries (we scan the whole statement, not just the first FROM clause).

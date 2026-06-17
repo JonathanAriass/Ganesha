@@ -68,6 +68,16 @@ describe('isSingleTableScan', () => {
     expect(isSingleTableScan('WITH recent AS (SELECT * FROM t) SELECT * FROM recent', 't')).toBe(false) // over-refuses, safely
     expect(isSingleTableScan('  with x as (select 1) select * from t', 't')).toBe(false)
   })
+  it('is false for a CTE introduced after any lead token (semicolon, paren) or with extras', () => {
+    expect(isSingleTableScan(';WITH c AS (SELECT * FROM t) SELECT a.id, b.val FROM c a JOIN c b ON true', 't')).toBe(false) // leading ;
+    expect(isSingleTableScan('WITH c (a, b) AS (SELECT id, val FROM t) SELECT x.a, y.b FROM c x JOIN c y ON true', 't')).toBe(false) // column list
+    expect(isSingleTableScan('WITH RECURSIVE c AS (SELECT * FROM t) SELECT * FROM c x JOIN c y ON true', 't')).toBe(false) // recursive
+  })
+  it('does not treat non-CTE WITH usages (WITH ROLLUP) as a CTE', () => {
+    // WITH ROLLUP lacks the `<name> AS (` shape, so the CTE guard must not fire; the
+    // single-scan count of `t` is 1, so isSingleTableScan returns true.
+    expect(isSingleTableScan('SELECT id, count(*) FROM t GROUP BY id WITH ROLLUP', 't')).toBe(true)
+  })
   it('is false for a derived-table self-join (reference hidden in a subquery)', () => {
     expect(isSingleTableScan('SELECT x.id, y.val FROM (SELECT * FROM t WHERE id > 0) x JOIN t y ON y.id = x.parent', 't')).toBe(false)
   })

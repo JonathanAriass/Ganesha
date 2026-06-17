@@ -109,6 +109,9 @@ describe('PostgresDriver (integration, requires Docker)', () => {
     // A parenthesis-wrapped CTE is a valid top-level statement — must not bypass the guard.
     const parenCte = await driver.runQuery(id, { kind: 'sql', sql: '(WITH c AS (SELECT * FROM t_edit) SELECT a.id, b.name FROM c a JOIN c b ON b.id = a.id)' }, { maxRows: 10, queryId: 'e3e', readOnly: false })
     expect(parenCte.editable).toBeNull()
+    // A leading semicolon must not smuggle a CTE past a start-anchored guard either.
+    const semiCte = await driver.runQuery(id, { kind: 'sql', sql: ';WITH c AS (SELECT * FROM t_edit) SELECT a.id, b.name FROM c a JOIN c b ON b.id = a.id' }, { maxRows: 10, queryId: 'e3f', readOnly: false })
+    expect(semiCte.editable).toBeNull()
   })
 
   it('applyEdits updates by primary key in a transaction', async () => {
