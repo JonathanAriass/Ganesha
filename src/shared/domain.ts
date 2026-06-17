@@ -30,6 +30,9 @@ export interface ConnectionInput {
   database: string
   ssl: boolean
   readOnly: boolean
+  /** When true, results-grid cell edits stage until an explicit commit instead of
+   *  writing immediately ("prevent fast commit"). Ignored on read-only connections. */
+  requireCommit: boolean
   /** Mongo only: authentication database; '' = driver default (the connection db / admin). */
   authSource: string
   /** Mongo only: replica set name; '' = direct connection. */

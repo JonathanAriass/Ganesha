@@ -91,6 +91,8 @@ export function migrate(db: DB): void {
   addColumnIfMissing(db, 'connections', 'replica_set', "TEXT NOT NULL DEFAULT ''")
   // SSH tunnel config (added later): nullable JSON blob of SshConfig.
   addColumnIfMissing(db, 'connections', 'ssh_json', 'TEXT')
+  // Editable-results commit safety (added later): default ON = require explicit commit.
+  addColumnIfMissing(db, 'connections', 'require_commit', 'INTEGER NOT NULL DEFAULT 1')
   migrateSecretsCompositeKey(db)
 }
 

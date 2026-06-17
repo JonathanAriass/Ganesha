@@ -7,7 +7,7 @@ import type { ConnectionInput, SshConfig } from '../../shared/domain'
 const input: ConnectionInput = {
   type: 'postgres', name: 'prod', color: '#6366f1', host: 'localhost',
   port: 5432, username: 'admin', database: 'app', ssl: true, readOnly: false,
-  authSource: '', replicaSet: '', ssh: null
+  requireCommit: true, authSource: '', replicaSet: '', ssh: null
 }
 
 const ssh: SshConfig = {
@@ -59,6 +59,13 @@ describe('connections service', () => {
     expect(updated).toMatchObject({ authSource: 'admin', replicaSet: 'rs1' })
   })
 
+  it('round-trips requireCommit', () => {
+    const c = createConnection(db, { ...input, requireCommit: false }, 1000)
+    expect(c.requireCommit).toBe(false)
+    expect(getConnection(db, c.id)!.requireCommit).toBe(false)
+    expect(updateConnection(db, c.id, { requireCommit: true }, 2000).requireCommit).toBe(true)
+  })
+
   it('migrates a pre-authSource database by adding the new columns', () => {
     const legacy: DB = new Database(':memory:')
     // The connections schema as it shipped before auth_source/replica_set existed.
@@ -87,7 +94,8 @@ describe('connections service', () => {
     expect(getConnection(legacy, 'old')).toMatchObject({
       name: 'legacy',
       authSource: '',
-      replicaSet: ''
+      replicaSet: '',
+      requireCommit: true // migration default
     })
   })
 })
