@@ -970,8 +970,38 @@ input[type="password"]::placeholder {
 }
 /* A staged (uncommitted) edit — distinct so changes stand out before they're written. */
 .cell-dirty {
+  position: relative;
   background: color-mix(in srgb, var(--warn) 26%, transparent);
   box-shadow: inset 2px 0 0 var(--warn);
+}
+/* Per-cell reset (↺): revert just this cell. Shown on hover/focus of a dirty cell. */
+.cell-reset {
+  position: absolute;
+  top: 50%;
+  right: 2px;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--text-2);
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0;
+}
+.cell-dirty:hover .cell-reset,
+.cell-reset:focus-visible {
+  opacity: 1;
+}
+.cell-reset:hover {
+  color: var(--text);
+  border-color: var(--warn);
 }
 .grid-cell.editing {
   display: flex;

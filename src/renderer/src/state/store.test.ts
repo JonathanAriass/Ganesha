@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import type { SessionTab } from '@shared/domain'
 import { useAppStore } from './store'
 
@@ -223,7 +223,7 @@ describe('hydrateTabs', () => {
     expect(s.tabs[0]).toEqual({
       id: 'a', connectionId: 'c1', title: 'Query 1', text: 'SELECT 1',
       epoch: 0, runOnOpen: false, running: false, queryId: null,
-      result: null, error: null, scriptRun: null
+      result: null, error: null, scriptRun: null, edits: {}, editError: null
     })
     expect(s.activeTabId).toBe('b')
   })
@@ -306,5 +306,78 @@ describe('applyResultEdits', () => {
 
   it('is a no-op for a tab without a result', () => {
     expect(() => useAppStore.getState().applyResultEdits(tab().id, [{ rowIndex: 0, colIndex: 0, value: 9 }])).not.toThrow()
+  })
+})
+
+describe('staged cell edits', () => {
+  beforeEach(() => {
+    useAppStore.setState({ tabs: [], activeTabId: null, _queryCounter: 0 })
+    useAppStore.getState().openQueryTab({ connectionId: 'c1', text: 'select * from t' })
+  })
+  // store.test.ts runs in the node env (no DOM), so stub `window` on globalThis — the
+  // store's commitEdits reaches window.api.edits.apply, which resolves through it.
+  afterEach(() => {
+    delete (globalThis as unknown as { window?: unknown }).window
+  })
+  const tab = () => useAppStore.getState().tabs[0]
+  const s = () => useAppStore.getState()
+  const stubApply = (apply: ReturnType<typeof vi.fn>): void => {
+    ;(globalThis as unknown as { window: { api: { edits: { apply: typeof apply } } } }).window = { api: { edits: { apply } } }
+  }
+
+  it('setCellEdit stages a value; resetCellEdit drops just that cell', () => {
+    s().setCellEdit(tab().id, '0:1', 'X')
+    s().setCellEdit(tab().id, '1:1', 'Y')
+    expect(tab().edits).toEqual({ '0:1': 'X', '1:1': 'Y' })
+    s().resetCellEdit(tab().id, '0:1')
+    expect(tab().edits).toEqual({ '1:1': 'Y' }) // the other stays
+  })
+
+  it('discardEdits clears all staged edits and the error', () => {
+    s().setCellEdit(tab().id, '0:1', 'X')
+    useAppStore.setState({ tabs: s().tabs.map((t) => ({ ...t, editError: 'boom' })) })
+    s().discardEdits(tab().id)
+    expect(tab().edits).toEqual({})
+    expect(tab().editError).toBeNull()
+  })
+
+  it('a new run clears staged edits', () => {
+    s().setCellEdit(tab().id, '0:1', 'X')
+    s().startRun(tab().id, 'q1')
+    expect(tab().edits).toEqual({})
+  })
+
+  it('commitEdits applies via the api, adopts new values, and clears the stage', async () => {
+    const apply = vi.fn().mockResolvedValue({ ok: true, data: { updated: 1 } })
+    stubApply(apply)
+    s().finishRun(tab().id, {
+      result: {
+        columns: [{ name: 'id', dataType: null }, { name: 'name', dataType: null }],
+        rows: [[1, 'a']], rowCount: 1, durationMs: 1, truncated: false, documents: null,
+        editable: { table: { schema: null, name: 't' }, keyColumns: ['id'], columnSources: ['id', 'name'] }
+      }
+    })
+    s().setCellEdit(tab().id, '0:1', 'NEW')
+    await s().commitEdits(tab().id)
+    expect(apply).toHaveBeenCalledWith({ connectionId: 'c1', table: { schema: null, name: 't' }, rows: [{ key: { id: 1 }, set: { name: 'NEW' } }] })
+    expect(tab().result!.rows[0][1]).toBe('NEW') // adopted
+    expect(tab().edits).toEqual({}) // cleared
+    expect(tab().editError).toBeNull()
+  })
+
+  it('commitEdits keeps the stage and records the error on failure', async () => {
+    const apply = vi.fn().mockResolvedValue({ ok: false, error: 'read-only' })
+    stubApply(apply)
+    s().finishRun(tab().id, {
+      result: {
+        columns: [{ name: 'id', dataType: null }, { name: 'name', dataType: null }],
+        rows: [[1, 'a']], rowCount: 1, durationMs: 1, truncated: false, documents: null,
+        editable: { table: { schema: null, name: 't' }, keyColumns: ['id'], columnSources: ['id', 'name'] }
+      }
+    })
+    s().setCellEdit(tab().id, '0:1', 'NEW')
+    await s().commitEdits(tab().id)
+    expect(tab().edits).toEqual({ '0:1': 'NEW' }) // intact for retry
+    expect(tab().editError).toMatch(/read-only/)
   })
 })

@@ -53,12 +53,11 @@ export function useGlobalShortcuts(): void {
         case 'close-tab':
           if (s.activeTabId) s.closeTab(s.activeTabId)
           break
-        case 'save-query': {
-          // Swallowed when there's nothing to save — like ⌘T with no connection.
+        case 'commit-edits': {
+          // ⌘S commits staged results-grid edits (saving a query to favourites is the
+          // ☆ Save button only now). Swallowed when there's nothing staged.
           const tab = s.tabs.find((t) => t.id === s.activeTabId)
-          if (tab && tab.text.trim()) {
-            s.openSaveQueryModal({ mode: 'create', connectionId: tab.connectionId, query: tab.text })
-          }
+          if (tab && Object.keys(tab.edits).length > 0) void s.commitEdits(tab.id)
           break
         }
       }

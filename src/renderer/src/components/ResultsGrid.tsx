@@ -10,9 +10,8 @@ import {
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { ColumnMeta, EditableResult } from '@shared/query'
 import { cellText, cellMatchesFilter } from '../lib/grid-text'
-import { dirtyKey, buildRowEdits } from '../lib/edit-staging'
+import { dirtyKey } from '../lib/edit-staging'
 import { useAppStore } from '../state/store'
-import { unwrap } from '../lib/result'
 import RowInspector from './RowInspector'
 
 interface Props {
@@ -20,12 +19,14 @@ interface Props {
   rows: unknown[][]
   globalFilter: string
   tabId?: string
-  connectionId?: string
   /** When non-null, the result maps to one editable table — its cells can be edited. */
   editable?: EditableResult | null
   readOnly?: boolean
   /** ON → edits stage until an explicit Commit; OFF → Enter writes the cell immediately. */
   requireCommit?: boolean
+  /** Staged edits for this tab (store-owned, keyed `rowId:colIndex`) + last commit error. */
+  edits?: Record<string, unknown>
+  editError?: string | null
 }
 
 /** A cell in edit mode: a text input over the cell. Commits exactly once (Enter, blur,
@@ -87,10 +88,11 @@ export default function ResultsGrid({
   rows,
   globalFilter,
   tabId,
-  connectionId,
   editable,
   readOnly,
   requireCommit,
+  edits = {},
+  editError,
 }: Props): JSX.Element {
   const [sorting, setSorting] = useState<SortingState>([])
 
@@ -102,19 +104,16 @@ export default function ResultsGrid({
   if (sel !== null && sel.rows !== rows) setSel(null)
   const selId = sel !== null && sel.rows === rows ? sel.id : null
 
-  // Staged cell edits keyed `rowId:colIndex`. Like the selection, they belong to the
-  // current rows reference and self-invalidate when a new result (or a committed edit)
-  // replaces it.
-  const [dirty, setDirty] = useState<Map<string, unknown>>(new Map())
+  // Staged edits live in the store (so ⌘S / the commit bar can reach them and they
+  // survive grid churn); `edits` is this tab's map. Only `editing` (which cell is open
+  // for editing) is local; it self-invalidates when a new result replaces `rows`.
   const [editing, setEditing] = useState<{ rowIndex: number; colIndex: number } | null>(null)
-  const [editError, setEditError] = useState<string | null>(null)
-  const dirtyRowsRef = useRef(rows)
-  if (dirtyRowsRef.current !== rows) {
-    dirtyRowsRef.current = rows
-    if (dirty.size) setDirty(new Map())
+  const rowsRef = useRef(rows)
+  if (rowsRef.current !== rows) {
+    rowsRef.current = rows
     if (editing) setEditing(null)
-    if (editError) setEditError(null)
   }
+  const store = useAppStore.getState
 
   // Pending deferred panel-open (see the row onClick); cleared on unmount.
   const selTimer = useRef<number | null>(null)
@@ -164,32 +163,14 @@ export default function ResultsGrid({
     return src !== null && !editable.keyColumns.includes(src)
   }
 
-  async function commit(map: Map<string, unknown>): Promise<void> {
-    if (!editable || !connectionId || !tabId || map.size === 0) return
-    try {
-      await window.api.edits
-        .apply({ connectionId, table: editable.table, rows: buildRowEdits(map, rows, editable) })
-        .then(unwrap)
-      const applied = [...map].map(([k, value]) => {
-        const [rowIndex, colIndex] = k.split(':').map(Number)
-        return { rowIndex, colIndex, value }
-      })
-      useAppStore.getState().applyResultEdits(tabId, applied)
-      setDirty(new Map())
-      setEditError(null)
-    } catch (e) {
-      // Leave the edits staged so the user can retry or discard.
-      setEditError(e instanceof Error ? e.message : String(e))
-    }
+  function stageCell(rowIndex: number, colIndex: number, value: unknown): void {
+    if (!tabId) return
+    store().setCellEdit(tabId, dirtyKey(rowIndex, colIndex), value)
+    setEditing(null)
+    if (!requireCommit) void store().commitEdits(tabId) // fast-commit: write immediately
   }
 
-  function stageCell(rowIndex: number, colIndex: number, value: unknown): void {
-    const next = new Map(dirty)
-    next.set(dirtyKey(rowIndex, colIndex), value)
-    setDirty(next)
-    setEditing(null)
-    if (!requireCommit) void commit(next) // fast-commit: write immediately
-  }
+  const editCount = Object.keys(edits).length
 
   const virtualizer = useVirtualizer({
     count: tableRows.length,
@@ -253,8 +234,8 @@ export default function ResultsGrid({
                   {row.getVisibleCells().map((cell) => {
                     const colIndex = Number(cell.column.id)
                     const dk = dirtyKey(rowIndex, colIndex)
-                    const isDirty = dirty.has(dk)
-                    const raw = isDirty ? dirty.get(dk) : cell.getValue()
+                    const isDirty = Object.prototype.hasOwnProperty.call(edits, dk)
+                    const raw = isDirty ? edits[dk] : cell.getValue()
                     const text = cellText(raw)
                     const isEditing = editing?.rowIndex === rowIndex && editing?.colIndex === colIndex
                     if (isEditing) {
@@ -283,6 +264,19 @@ export default function ResultsGrid({
                         ) : (
                           text
                         )}
+                        {isDirty && tabId && (
+                          // Per-cell reset: revert just this cell to its original value.
+                          <button
+                            className="cell-reset"
+                            title="Reset this cell"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              store().resetCellEdit(tabId, dk)
+                            }}
+                          >
+                            ↺
+                          </button>
+                        )}
                       </div>
                     )
                   })}
@@ -292,21 +286,15 @@ export default function ResultsGrid({
           </div>
         </div>
 
-        {requireCommit && (dirty.size > 0 || editError) && (
+        {requireCommit && (editCount > 0 || editError) && tabId && (
           <div className="edit-bar">
             <span>
-              {dirty.size} pending change{dirty.size === 1 ? '' : 's'}
+              {editCount} pending change{editCount === 1 ? '' : 's'}
             </span>
-            <button className="btn primary" disabled={dirty.size === 0} onClick={() => void commit(dirty)}>
-              Commit
+            <button className="btn primary" disabled={editCount === 0} onClick={() => void store().commitEdits(tabId)}>
+              Commit (⌘S)
             </button>
-            <button
-              className="btn"
-              onClick={() => {
-                setDirty(new Map())
-                setEditError(null)
-              }}
-            >
+            <button className="btn" onClick={() => store().discardEdits(tabId)}>
               Discard
             </button>
             {editError && (

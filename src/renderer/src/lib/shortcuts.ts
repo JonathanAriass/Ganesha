@@ -1,4 +1,4 @@
-export type ShortcutAction = 'palette' | 'new-tab' | 'close-tab' | 'settings' | 'save-query'
+export type ShortcutAction = 'palette' | 'new-tab' | 'close-tab' | 'settings' | 'commit-edits'
 
 export interface KeyChord {
   key: string
@@ -26,7 +26,7 @@ export function resolveShortcut(e: KeyChord): ShortcutAction | null {
     case ',':
       return 'settings'
     case 's':
-      return 'save-query'
+      return 'commit-edits'
     default:
       return null
   }

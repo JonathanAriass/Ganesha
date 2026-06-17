@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import type { SessionTab } from '@shared/domain'
 import type { QueryResult } from '@shared/query'
+import { buildRowEdits } from '../lib/edit-staging'
+import { unwrap } from '../lib/result'
 
 type ConnectionModalState =
   | { mode: 'create' }
@@ -49,6 +51,11 @@ export interface QueryTabData {
   error: string | null
   /** Exactly one of result/error/scriptRun is current — each run path clears the others. */
   scriptRun: ScriptRun | null
+  /** Staged (uncommitted) results-grid cell edits, keyed `rowId:colIndex`. Transient —
+   *  never persisted; cleared whenever a new result lands. */
+  edits: Record<string, unknown>
+  /** Last edit-commit error, shown in the grid's commit bar. */
+  editError: string | null
 }
 
 interface AppState {
@@ -100,6 +107,14 @@ interface AppState {
   finishRun: (id: string, payload: { result: QueryResult } | { error: string }) => void
   /** Rewrite specific cells in a tab's result rows after a committed edit (immutable). */
   applyResultEdits: (id: string, edits: { rowIndex: number; colIndex: number; value: unknown }[]) => void
+  /** Stage one cell edit (keyed `rowId:colIndex`). */
+  setCellEdit: (tabId: string, key: string, value: unknown) => void
+  /** Drop one staged cell edit (per-cell reset). */
+  resetCellEdit: (tabId: string, key: string) => void
+  /** Drop all staged edits for a tab. */
+  discardEdits: (tabId: string) => void
+  /** Write the staged edits to the database (one batch), then adopt the new values. */
+  commitEdits: (tabId: string) => Promise<void>
 
   // ── Run all (script execution) ────────────────────────────────────────────
   startScript: (id: string, total: number, runId: string) => void
@@ -156,6 +171,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         result: null,
         error: null,
         scriptRun: null,
+        edits: {},
+        editError: null,
       }
       return { tabs: [...s.tabs, tab], activeTabId: tab.id, _queryCounter: n }
     }),
@@ -177,6 +194,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         result: null,
         error: null,
         scriptRun: null,
+        edits: {},
+        editError: null,
       }))
       // Bump the counter past restored "Query N" titles so new tabs don't duplicate them.
       const counter = tabs.reduce((max, t) => {
@@ -245,7 +264,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => ({
       tabs: s.tabs.map((t) =>
         // scriptRun cleared: a single run supersedes a previous script's results.
-        t.id === id ? { ...t, running: true, error: null, queryId, runOnOpen: false, scriptRun: null } : t
+        // Staged edits belong to the old result, so they're dropped on a new run.
+        t.id === id ? { ...t, running: true, error: null, queryId, runOnOpen: false, scriptRun: null, edits: {}, editError: null } : t
       ),
     })),
 
@@ -254,8 +274,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       tabs: s.tabs.map((t) => {
         if (t.id !== id) return t
         if ('result' in payload)
-          return { ...t, running: false, queryId: null, result: payload.result, error: null, scriptRun: null }
-        return { ...t, running: false, queryId: null, error: payload.error, result: null, scriptRun: null }
+          return { ...t, running: false, queryId: null, result: payload.result, error: null, scriptRun: null, edits: {}, editError: null }
+        return { ...t, running: false, queryId: null, error: payload.error, result: null, scriptRun: null, edits: {}, editError: null }
       }),
     })),
 
@@ -274,6 +294,44 @@ export const useAppStore = create<AppState>((set, get) => ({
       }),
     })),
 
+  setCellEdit: (tabId, key, value) =>
+    set((s) => ({
+      tabs: s.tabs.map((t) => (t.id === tabId ? { ...t, edits: { ...t.edits, [key]: value }, editError: null } : t)),
+    })),
+
+  resetCellEdit: (tabId, key) =>
+    set((s) => ({
+      tabs: s.tabs.map((t) => {
+        if (t.id !== tabId) return t
+        const edits = { ...t.edits }
+        delete edits[key]
+        return { ...t, edits }
+      }),
+    })),
+
+  discardEdits: (tabId) =>
+    set((s) => ({ tabs: s.tabs.map((t) => (t.id === tabId ? { ...t, edits: {}, editError: null } : t)) })),
+
+  commitEdits: async (tabId) => {
+    const tab = get().tabs.find((t) => t.id === tabId)
+    if (!tab || !tab.result?.editable || Object.keys(tab.edits).length === 0) return
+    const editable = tab.result.editable
+    const rows = tab.result.rows
+    try {
+      const rowEdits = buildRowEdits(tab.edits, rows, editable)
+      await window.api.edits.apply({ connectionId: tab.connectionId, table: editable.table, rows: rowEdits }).then(unwrap)
+      const applied = Object.entries(tab.edits).map(([k, value]) => {
+        const [rowIndex, colIndex] = k.split(':').map(Number)
+        return { rowIndex, colIndex, value }
+      })
+      get().applyResultEdits(tabId, applied)
+      set((s) => ({ tabs: s.tabs.map((t) => (t.id === tabId ? { ...t, edits: {}, editError: null } : t)) }))
+    } catch (e) {
+      // Leave the staged edits intact so the user can retry or reset.
+      set((s) => ({ tabs: s.tabs.map((t) => (t.id === tabId ? { ...t, editError: e instanceof Error ? e.message : String(e) } : t)) }))
+    }
+  },
+
   startScript: (id, total, runId) =>
     set((s) => ({
       tabs: s.tabs.map((t) =>
@@ -286,6 +344,8 @@ export const useAppStore = create<AppState>((set, get) => ({
               queryId: null,
               runOnOpen: false,
               scriptRun: { runId, total, entries: [], stopRequested: false },
+              edits: {},
+              editError: null,
             }
           : t
       ),

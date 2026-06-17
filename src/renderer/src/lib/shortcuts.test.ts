@@ -15,9 +15,9 @@ describe('resolveShortcut', () => {
     expect(resolveShortcut({ ...base, key: ',', ctrlKey: true })).toBe('settings')
   })
 
-  it('maps mod+s to save-query', () => {
-    expect(resolveShortcut({ ...base, key: 's', metaKey: true })).toBe('save-query')
-    expect(resolveShortcut({ ...base, key: 's', ctrlKey: true })).toBe('save-query')
+  it('maps mod+s to commit-edits (table edits; saving a query is the ☆ button only)', () => {
+    expect(resolveShortcut({ ...base, key: 's', metaKey: true })).toBe('commit-edits')
+    expect(resolveShortcut({ ...base, key: 's', ctrlKey: true })).toBe('commit-edits')
   })
 
   it('is case-insensitive on the key', () => {

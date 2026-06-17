@@ -6,7 +6,7 @@ import { makeSessionSaver, toSessionTabs } from './session-save'
 function tab(over: Partial<QueryTabData> & { id: string }): QueryTabData {
   return {
     connectionId: 'c1', title: 'Query 1', text: 'SELECT 1', epoch: 0, runOnOpen: false,
-    running: false, queryId: null, result: null, error: null, scriptRun: null, ...over
+    running: false, queryId: null, result: null, error: null, scriptRun: null, edits: {}, editError: null, ...over
   }
 }
 

@@ -304,7 +304,7 @@ export default function QueryTab({ tab }: Props): JSX.Element {
           onClick={() =>
             openSaveQueryModal({ mode: 'create', connectionId: tab.connectionId, query: tab.text })
           }
-          title={`Save query (${mod}S)`}
+          title="Save query to favourites"
         >
           ☆ Save
         </button>

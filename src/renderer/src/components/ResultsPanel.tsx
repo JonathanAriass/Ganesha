@@ -140,10 +140,11 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
           rows={result.rows}
           globalFilter={filter}
           tabId={tab.id}
-          connectionId={tab.connectionId}
           editable={connection && !connection.readOnly ? result.editable : null}
           readOnly={connection?.readOnly ?? true}
           requireCommit={connection?.requireCommit ?? true}
+          edits={tab.edits}
+          editError={tab.editError}
         />
       ) : (
         <DocumentView documents={result.documents!} />
