@@ -365,6 +365,19 @@ describe('staged cell edits', () => {
     expect(tab().editError).toBeNull()
   })
 
+  it('commitEdits is a no-op (no api call) when nothing is staged', async () => {
+    const apply = vi.fn()
+    stubApply(apply)
+    s().finishRun(tab().id, {
+      result: {
+        columns: [{ name: 'id', dataType: null }], rows: [[1]], rowCount: 1, durationMs: 1, truncated: false, documents: null,
+        editable: { table: { schema: null, name: 't' }, keyColumns: ['id'], columnSources: ['id'] }
+      }
+    })
+    await s().commitEdits(tab().id)
+    expect(apply).not.toHaveBeenCalled()
+  })
+
   it('commitEdits keeps the stage and records the error on failure', async () => {
     const apply = vi.fn().mockResolvedValue({ ok: false, error: 'read-only' })
     stubApply(apply)

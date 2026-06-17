@@ -320,6 +320,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const rowEdits = buildRowEdits(tab.edits, rows, editable)
       await window.api.edits.apply({ connectionId: tab.connectionId, table: editable.table, rows: rowEdits }).then(unwrap)
+      // The write succeeded against the rows the user saw. If a new query for this tab
+      // finished mid-commit, it already replaced the result (and cleared edits) — don't
+      // adopt the values into the fresh result's rows.
+      if (get().tabs.find((t) => t.id === tabId)?.result?.rows !== rows) return
       const applied = Object.entries(tab.edits).map(([k, value]) => {
         const [rowIndex, colIndex] = k.split(':').map(Number)
         return { rowIndex, colIndex, value }
