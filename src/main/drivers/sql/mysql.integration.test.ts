@@ -103,4 +103,35 @@ describe('MySqlDriver (integration, requires Docker)', () => {
     expect(dbs).not.toContain('information_schema')
     expect(dbs).not.toContain('performance_schema')
   })
+
+  it('a single-table SELECT reports an editable descriptor', async () => {
+    await driver.runQuery(id, { kind: 'sql', sql: 'CREATE TABLE t_edit (id INT PRIMARY KEY, name VARCHAR(50))' }, { maxRows: 1000, queryId: 'me0', readOnly: false })
+    await driver.runQuery(id, { kind: 'sql', sql: "INSERT INTO t_edit VALUES (1,'a'),(2,'b')" }, { maxRows: 1000, queryId: 'me1', readOnly: false })
+    const sel = await driver.runQuery(id, { kind: 'sql', sql: 'SELECT id, name FROM t_edit' }, { maxRows: 10, queryId: 'me2', readOnly: false })
+    expect(sel.editable).toEqual({ table: { schema: container.getDatabase(), name: 't_edit' }, keyColumns: ['id'], columnSources: ['id', 'name'] })
+  })
+
+  it('applyEdits updates by primary key', async () => {
+    const r = await driver.applyEdits(id, { table: { schema: container.getDatabase(), name: 't_edit' }, rows: [{ key: { id: 1 }, set: { name: 'A' } }] }, { readOnly: false })
+    expect(r.updated).toBe(1)
+    const after = await driver.runQuery(id, { kind: 'sql', sql: 'SELECT name FROM t_edit WHERE id=1' }, { maxRows: 10, queryId: 'me3', readOnly: false })
+    expect(after.rows).toEqual([['A']])
+  })
+
+  it('applyEdits rolls back when a row key matches nothing', async () => {
+    await expect(
+      driver.applyEdits(id, { table: { schema: container.getDatabase(), name: 't_edit' }, rows: [
+        { key: { id: 2 }, set: { name: 'B' } },
+        { key: { id: 999 }, set: { name: 'X' } }
+      ] }, { readOnly: false })
+    ).rejects.toThrow(/affected 0 rows|expected exactly one/i)
+    const after = await driver.runQuery(id, { kind: 'sql', sql: 'SELECT name FROM t_edit WHERE id=2' }, { maxRows: 10, queryId: 'me4', readOnly: false })
+    expect(after.rows).toEqual([['b']])
+  })
+
+  it('applyEdits refuses on read-only', async () => {
+    await expect(
+      driver.applyEdits(id, { table: { schema: container.getDatabase(), name: 't_edit' }, rows: [{ key: { id: 1 }, set: { name: 'z' } }] }, { readOnly: true })
+    ).rejects.toThrow(/read-only/i)
+  })
 })

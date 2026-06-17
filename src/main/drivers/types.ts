@@ -1,9 +1,15 @@
 import type { ConnectionType } from '../../shared/domain'
 import type { MongoCommand } from './mongo/command'
-import type { ColumnMeta, QueryResult } from '../../shared/query'
+import type { ColumnMeta, QueryResult, EditableResult, RowEdit } from '../../shared/query'
 import type { DbObject, ObjectRef, ColumnInfo } from '../../shared/schema'
-export type { ColumnMeta, QueryResult }
+export type { ColumnMeta, QueryResult, EditableResult, RowEdit }
 export type { DbObject, ObjectRef, ColumnInfo }
+
+/** A batch of row edits against one table, sent from the renderer to a driver. */
+export interface TableEdits {
+  table: { schema: string | null; name: string }
+  rows: RowEdit[]
+}
 
 /** Everything a driver needs to open a connection. Password is resolved by main from the secret store. */
 export interface ConnectParams {
@@ -48,6 +54,9 @@ export interface DatabaseDriver {
   runQuery(id: string, request: QueryRequest, opts: RunOptions): Promise<QueryResult>
   /** Best-effort cancellation of an in-flight query by its RunOptions.queryId. */
   cancel(id: string, queryId: string): Promise<void>
+  /** Apply staged cell edits to one table in a single transaction. Each row's UPDATE
+   *  must affect exactly one row or the whole batch rolls back. Refuses when readOnly. */
+  applyEdits(id: string, edits: TableEdits, opts: { readOnly: boolean }): Promise<{ updated: number }>
   /** List the databases (MySQL) / schemas (Postgres) / databases (Mongo) the
    *  connection can see — names only, for autocomplete. System ones are excluded. */
   listDatabases(id: string): Promise<string[]>

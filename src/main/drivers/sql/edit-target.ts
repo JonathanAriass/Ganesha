@@ -26,5 +26,11 @@ export function buildEditableResult(perColumn: PerColumnSource[], pkColumns: str
   const columnSources = perColumn.map((c) => (c.table && sameTable(c.table, table) ? c.column : null))
   if (!pkColumns.every((pk) => columnSources.includes(pk))) return null
 
+  // A duplicated source column means the same base column is projected twice — the
+  // hallmark of a self-join (`t a, t b`), where one result row spans two base rows and
+  // the key is ambiguous. Refuse (read-only) rather than risk writing the wrong row.
+  const present = columnSources.filter((c): c is string => c !== null)
+  if (new Set(present).size !== present.length) return null
+
   return { table, keyColumns: pkColumns, columnSources }
 }

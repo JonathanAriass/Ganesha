@@ -36,6 +36,15 @@ describe('buildEditableResult', () => {
   it('returns null when a PK column is absent from the result', () => {
     expect(buildEditableResult(cols('name', 'email'), ['id'])).toBeNull()
   })
+  it('returns null when a source column is projected twice (self-join ambiguity)', () => {
+    // SELECT a.id, b.id FROM t a, t b — both columns resolve to the same base column.
+    const dup: PerColumnSource[] = [
+      { table: T, column: 'id' },
+      { table: T, column: 'id' }
+    ]
+    expect(buildEditableResult(dup, ['id'])).toBeNull()
+  })
+
   it('supports a composite primary key', () => {
     expect(buildEditableResult(cols('a', 'b', 'v'), ['a', 'b'])).toEqual({
       table: T,

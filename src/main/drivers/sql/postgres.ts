@@ -1,16 +1,21 @@
 import pg from 'pg'
 import type {
   DatabaseDriver, ConnectParams, RunOptions, QueryRequest, QueryResult, ColumnMeta,
-  DbObject, ObjectRef, ColumnInfo
+  DbObject, ObjectRef, ColumnInfo, EditableResult, TableEdits
 } from '../types'
+import { buildEditableResult, type PerColumnSource } from './edit-target'
+import { buildUpdate } from './update-builder'
 
 const { Pool } = pg
+
+interface PgTableMeta { schema: string; name: string; cols: Map<number, string>; pk: string[] }
 
 /** PostgreSQL driver backed by a per-connection pg.Pool. */
 export class PostgresDriver implements DatabaseDriver {
   readonly type = 'postgres' as const
   private pools = new Map<string, pg.Pool>()
   private running = new Map<string, number>() // queryId -> backend pid
+  private tableMeta = new Map<string, Promise<PgTableMeta | null>>() // `${id}:${oid}` -> table metadata
 
   private poolConfig(p: ConnectParams): pg.PoolConfig {
     // No custom type parsers on purpose: node-postgres defaults return int8 and
@@ -81,7 +86,7 @@ export class PostgresDriver implements DatabaseDriver {
         durationMs: Date.now() - start,
         truncated,
         documents: null,
-        editable: null
+        editable: await this.deriveEditable(id, fields)
       }
     } catch (e) {
       if (opts.readOnly) {
@@ -102,6 +107,81 @@ export class PostgresDriver implements DatabaseDriver {
     const pid = this.running.get(queryId)
     const pool = this.pools.get(id)
     if (pid && pool) await pool.query('SELECT pg_cancel_backend($1)', [pid])
+  }
+
+  async applyEdits(id: string, edits: TableEdits, opts: { readOnly: boolean }): Promise<{ updated: number }> {
+    if (opts.readOnly) throw new Error('Connection is read-only: edits are blocked')
+    const client = await this.requirePool(id).connect()
+    try {
+      await client.query('BEGIN')
+      let updated = 0
+      for (const row of edits.rows) {
+        const { sql, params } = buildUpdate('postgres', edits.table, row)
+        const res = await client.query({ text: sql, values: params })
+        if (res.rowCount !== 1) {
+          throw new Error(`Edit affected ${res.rowCount} rows (expected exactly one) — the row may have changed; refresh and retry`)
+        }
+        updated += res.rowCount
+      }
+      await client.query('COMMIT')
+      return { updated }
+    } catch (e) {
+      try { await client.query('ROLLBACK') } catch { /* already aborted */ }
+      throw e
+    } finally {
+      client.release()
+    }
+  }
+
+  /** Derive the editable descriptor from the result's column metadata: a single source
+   *  table (oid) whose attnum→name + primary key are resolved (and cached) on first use. */
+  private async deriveEditable(id: string, fields: pg.FieldDef[]): Promise<EditableResult | null> {
+    try {
+      const oids = [...new Set(fields.map((f) => f.tableID).filter((t) => t && t > 0))]
+      if (oids.length !== 1) return null
+      const meta = await this.resolvePgTable(id, oids[0])
+      if (!meta) return null
+      const perColumn: PerColumnSource[] = fields.map((f) =>
+        f.tableID === oids[0] && meta.cols.has(f.columnID)
+          ? { table: { schema: meta.schema, name: meta.name }, column: meta.cols.get(f.columnID)! }
+          : { table: null, column: null }
+      )
+      return buildEditableResult(perColumn, meta.pk)
+    } catch {
+      return null
+    }
+  }
+
+  private resolvePgTable(id: string, oid: number): Promise<PgTableMeta | null> {
+    const key = `${id}:${oid}`
+    let p = this.tableMeta.get(key)
+    if (!p) {
+      p = (async (): Promise<PgTableMeta | null> => {
+        const pool = this.requirePool(id)
+        const meta = await pool.query(
+          `SELECT c.relname AS name, n.nspname AS schema FROM pg_class c
+           JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.oid = $1`, [oid])
+        if (meta.rowCount === 0) return null
+        const attrs = await pool.query(
+          `SELECT attnum, attname FROM pg_attribute WHERE attrelid = $1 AND attnum > 0 AND NOT attisdropped`, [oid])
+        const cols = new Map<number, string>(
+          (attrs.rows as { attnum: number; attname: string }[]).map((r) => [r.attnum, r.attname]))
+        const pkRes = await pool.query(
+          `SELECT a.attname FROM pg_index i
+           JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+           WHERE i.indrelid = $1 AND i.indisprimary ORDER BY a.attnum`, [oid])
+        return {
+          name: meta.rows[0].name as string,
+          schema: meta.rows[0].schema as string,
+          cols,
+          pk: (pkRes.rows as { attname: string }[]).map((r) => r.attname)
+        }
+      })()
+      this.tableMeta.set(key, p)
+      // A transient failure must not be cached as a permanent "not editable".
+      p.catch(() => this.tableMeta.delete(key))
+    }
+    return p
   }
 
   private requirePool(id: string): pg.Pool {

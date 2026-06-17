@@ -105,6 +105,12 @@ export class MongoDriver implements DatabaseDriver {
     }
   }
 
+  // Mongo results report editable=null in Phase A, so the UI never calls this; the real
+  // updateOne-by-_id apply lands in Phase B.
+  async applyEdits(): Promise<{ updated: number }> {
+    throw new Error('Editing MongoDB results is not supported yet')
+  }
+
   async runQuery(id: string, request: QueryRequest, opts: RunOptions): Promise<QueryResult> {
     if (request.kind !== 'mongo') throw new Error('MongoDriver handles only Mongo requests')
     const { client, database } = this.require(id)

@@ -88,4 +88,37 @@ describe('PostgresDriver (integration, requires Docker)', () => {
     expect(dbs).not.toContain('pg_catalog')
     expect(dbs).not.toContain('information_schema')
   })
+
+  it('a single-table SELECT * reports an editable descriptor; a join does not', async () => {
+    await driver.runQuery(id, { kind: 'sql', sql: 'CREATE TABLE t_edit (id int PRIMARY KEY, name text)' }, { maxRows: 1000, queryId: 'e0', readOnly: false })
+    await driver.runQuery(id, { kind: 'sql', sql: "INSERT INTO t_edit VALUES (1,'a'),(2,'b')" }, { maxRows: 1000, queryId: 'e1', readOnly: false })
+    const sel = await driver.runQuery(id, { kind: 'sql', sql: 'SELECT * FROM t_edit ORDER BY id' }, { maxRows: 10, queryId: 'e2', readOnly: false })
+    expect(sel.editable).toEqual({ table: { schema: 'public', name: 't_edit' }, keyColumns: ['id'], columnSources: ['id', 'name'] })
+    const join = await driver.runQuery(id, { kind: 'sql', sql: 'SELECT a.id, b.id AS bid FROM t_edit a, t_edit b' }, { maxRows: 10, queryId: 'e3', readOnly: false })
+    expect(join.editable).toBeNull()
+  })
+
+  it('applyEdits updates by primary key in a transaction', async () => {
+    const r = await driver.applyEdits(id, { table: { schema: 'public', name: 't_edit' }, rows: [{ key: { id: 1 }, set: { name: 'A' } }] }, { readOnly: false })
+    expect(r.updated).toBe(1)
+    const after = await driver.runQuery(id, { kind: 'sql', sql: 'SELECT name FROM t_edit WHERE id=1' }, { maxRows: 10, queryId: 'e4', readOnly: false })
+    expect(after.rows).toEqual([['A']])
+  })
+
+  it('applyEdits rolls back the whole batch when a row key matches nothing', async () => {
+    await expect(
+      driver.applyEdits(id, { table: { schema: 'public', name: 't_edit' }, rows: [
+        { key: { id: 2 }, set: { name: 'B' } },
+        { key: { id: 999 }, set: { name: 'X' } }
+      ] }, { readOnly: false })
+    ).rejects.toThrow(/affected 0 rows|expected exactly one/i)
+    const after = await driver.runQuery(id, { kind: 'sql', sql: 'SELECT name FROM t_edit WHERE id=2' }, { maxRows: 10, queryId: 'e5', readOnly: false })
+    expect(after.rows).toEqual([['b']]) // first update rolled back
+  })
+
+  it('applyEdits refuses on a read-only request', async () => {
+    await expect(
+      driver.applyEdits(id, { table: { schema: 'public', name: 't_edit' }, rows: [{ key: { id: 1 }, set: { name: 'z' } }] }, { readOnly: true })
+    ).rejects.toThrow(/read-only/i)
+  })
 })
