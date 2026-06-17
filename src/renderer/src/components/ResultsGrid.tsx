@@ -11,6 +11,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import type { ColumnMeta, EditableResult } from '@shared/query'
 import { cellText, cellMatchesFilter } from '../lib/grid-text'
 import { dirtyKey } from '../lib/edit-staging'
+import { coerceMongoEditValue } from '../lib/mongo-edit-value'
 import { useAppStore } from '../state/store'
 import RowInspector from './RowInspector'
 
@@ -24,6 +25,9 @@ interface Props {
   readOnly?: boolean
   /** ON → edits stage until an explicit Commit; OFF → Enter writes the cell immediately. */
   requireCommit?: boolean
+  /** Mongo connection: edited text is coerced to a typed value (preserving the original
+   *  field's type) before staging, since `$set` would otherwise store the raw string. */
+  isMongo?: boolean
   /** Staged edits for this tab (store-owned, keyed `rowId:colIndex`) + last commit error. */
   edits?: Record<string, unknown>
   editError?: string | null
@@ -91,6 +95,7 @@ export default function ResultsGrid({
   editable,
   readOnly,
   requireCommit,
+  isMongo,
   edits = {},
   editError,
 }: Props): JSX.Element {
@@ -165,7 +170,9 @@ export default function ResultsGrid({
 
   function stageCell(rowIndex: number, colIndex: number, value: unknown): void {
     if (!tabId) return
-    store().setCellEdit(tabId, dirtyKey(rowIndex, colIndex), value)
+    // SQL binds the raw string (the server coerces); Mongo needs a typed value for $set.
+    const stored = isMongo ? coerceMongoEditValue(value as string | null, rows[rowIndex][colIndex]) : value
+    store().setCellEdit(tabId, dirtyKey(rowIndex, colIndex), stored)
     setEditing(null)
     if (!requireCommit) void store().commitEdits(tabId) // fast-commit: write immediately
   }

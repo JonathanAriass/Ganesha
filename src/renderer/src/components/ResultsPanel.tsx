@@ -143,6 +143,7 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
           editable={connection && !connection.readOnly ? result.editable : null}
           readOnly={connection?.readOnly ?? true}
           requireCommit={connection?.requireCommit ?? true}
+          isMongo={connection?.type === 'mongodb'}
           edits={tab.edits}
           editError={tab.editError}
         />
