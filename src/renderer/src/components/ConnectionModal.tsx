@@ -38,6 +38,7 @@ const DEFAULT_INPUT: ConnectionInput = {
   database: '',
   ssl: false,
   readOnly: false,
+  requireCommit: true,
   authSource: '',
   replicaSet: '',
   ssh: null,
@@ -85,6 +86,7 @@ export default function ConnectionModal(): JSX.Element {
         database: existingConn.database,
         ssl: existingConn.ssl,
         readOnly: existingConn.readOnly,
+        requireCommit: existingConn.requireCommit,
         authSource: existingConn.authSource,
         replicaSet: existingConn.replicaSet,
         ssh: existingConn.ssh,
@@ -358,6 +360,18 @@ export default function ConnectionModal(): JSX.Element {
                   onChange={(e) => setField('readOnly', e.target.checked)}
                 />
                 Read-only mode
+              </label>
+            </div>
+            <div className="form-row">
+              <label className="checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={form.requireCommit}
+                  disabled={form.readOnly}
+                  onChange={(e) => setField('requireCommit', e.target.checked)}
+                />
+                Require explicit commit for cell edits
+                <span className="hint"> — prevents fast commit/push; edits stage until you click Commit</span>
               </label>
             </div>
 
