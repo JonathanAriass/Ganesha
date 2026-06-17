@@ -46,6 +46,9 @@ const api: DbClientApi = {
     databases: (connectionId) => invoke('schema.databases', connectionId),
     columns: (connectionId, ref) => invoke('schema.columns', { connectionId, ref })
   },
+  edits: {
+    apply: (req) => invoke('edits.apply', req)
+  },
   clipboard: {
     copy: (text) => invoke('clipboard.copy', text)
   },

@@ -4,7 +4,7 @@ import type {
   SavedQuery, SavedQueryInput, SavedQueryPatch, SessionTab,
   LocalModel, CatalogModel, LlmConversation, LlmMessage
 } from './domain'
-import type { QueryResult } from './query'
+import type { QueryResult, RowEdit } from './query'
 import type { DbObject, ObjectRef, ColumnInfo } from './schema'
 
 export interface PingPayload {
@@ -41,6 +41,10 @@ export interface IpcChannels {
   'schema.objects': { req: string; res: DbObject[] }
   'schema.databases': { req: string; res: string[] }
   'schema.columns': { req: { connectionId: string; ref: ObjectRef }; res: ColumnInfo[] }
+  'edits.apply': {
+    req: { connectionId: string; table: { schema: string | null; name: string }; rows: RowEdit[] }
+    res: { updated: number }
+  }
   'clipboard.copy': { req: string; res: null }
   'dialog.pickDirectory': { req: void; res: string | null }
   'dialog.openFile': { req: { title?: string }; res: string | null }

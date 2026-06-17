@@ -42,6 +42,13 @@ export interface DbClientApi {
     databases(connectionId: string): Promise<IpcResult<'schema.databases'>>
     columns(connectionId: string, ref: ObjectRef): Promise<IpcResult<'schema.columns'>>
   }
+  edits: {
+    apply(req: {
+      connectionId: string
+      table: { schema: string | null; name: string }
+      rows: import('./query').RowEdit[]
+    }): Promise<IpcResult<'edits.apply'>>
+  }
   clipboard: {
     copy(text: string): Promise<IpcResult<'clipboard.copy'>>
   }

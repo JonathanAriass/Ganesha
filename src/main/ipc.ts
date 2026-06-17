@@ -223,6 +223,15 @@ export function registerIpcHandlers(): void {
     await connectStored(driver, c, secrets)
     return ok(await driver.describeObject(c.id, ref))
   })
+  handle('edits.apply', async ({ connectionId, table, rows }) => {
+    const { db, secrets } = store()
+    const c = conns.getConnection(db, connectionId)
+    if (!c) throw new Error(`Connection not found: ${connectionId}`)
+    if (c.readOnly) throw new Error('Connection is read-only: edits are blocked')
+    const driver = drivers.get(c.type)
+    await connectStored(driver, c, secrets)
+    return ok(await driver.applyEdits(c.id, { table, rows }, { readOnly: c.readOnly }))
+  })
 
   // navigator.clipboard is permission-gated in the sandboxed renderer; route via main.
   handle('clipboard.copy', (text) => { clipboard.writeText(text); return ok(null) })
