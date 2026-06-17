@@ -152,6 +152,19 @@ describe('MongoDriver (integration, requires Docker)', () => {
     expect(after.documents![0].tag).toBe('y')
   })
 
+  it('applyEdits round-trips an EJSON wrapper value (Date) to a real BSON type', async () => {
+    await driver.runQuery(id, { kind: 'mongo', command: { op: 'insertOne', collection: 'edit_dt', document: { when: 'placeholder' } } }, { maxRows: 10, queryId: 'd1', readOnly: false })
+    const sel = await driver.runQuery(id, { kind: 'mongo', command: { op: 'find', collection: 'edit_dt' } }, { maxRows: 10, queryId: 'd2', readOnly: false })
+    const oid = sel.rows[0][sel.columns.findIndex((c) => c.name === '_id')]
+    // The renderer coerces the user's `{"$date":…}` JSON text into a plain object; the
+    // driver EJSON-deserializes it to a real Date before $set.
+    await driver.applyEdits(id, { table: { schema: 'testdb', name: 'edit_dt' }, rows: [{ key: { _id: oid }, set: { when: { $date: '2020-01-02T03:04:05.000Z' } } }] }, { readOnly: false })
+    const after = await driver.runQuery(id, { kind: 'mongo', command: { op: 'find', collection: 'edit_dt' } }, { maxRows: 10, queryId: 'd3', readOnly: false })
+    const whenCol = after.columns.findIndex((c) => c.name === 'when')
+    // Re-serialized as an EJSON {$date} wrapper → proves it was stored as a real BSON Date.
+    expect(after.rows[0][whenCol]).toEqual({ $date: '2020-01-02T03:04:05Z' })
+  })
+
   it('applyEdits refuses on read-only and throws when the document is gone', async () => {
     await expect(driver.applyEdits(id, { table: { schema: 'testdb', name: 'edit_c' }, rows: [{ key: { _id: 1 }, set: { name: 'z' } }] }, { readOnly: true })).rejects.toThrow(/read-only/i)
     await expect(driver.applyEdits(id, { table: { schema: 'testdb', name: 'edit_c' }, rows: [{ key: { _id: 9999 }, set: { name: 'z' } }] }, { readOnly: false })).rejects.toThrow(/matched 0|expected exactly one/i)
