@@ -40,9 +40,11 @@ function escapeRegExp(s: string): string {
 }
 
 /** A CTE introducer `WITH [RECURSIVE] <name> [(cols…)] AS …` ANYWHERE in the statement
- *  (not start-anchored, so a leading `;`/`(`/comment can't smuggle one past). Matches the
- *  CTE form only — `WITH ORDINALITY` and `GROUP BY … WITH ROLLUP` lack the `<name> AS`
- *  shape, so they aren't refused. */
+ *  (not start-anchored, so a leading `;`/`(`/comment can't smuggle one past). `GROUP BY …
+ *  WITH ROLLUP` has no `<name> AS` and is not matched. `WITH ORDINALITY AS alias` does
+ *  match — that's fine: it attaches to a set-returning function and multiplies rows, so
+ *  those results are correctly non-editable anyway (do NOT narrow this to require `AS (`,
+ *  which would re-admit row-multiplying results as editable). */
 const CTE_INTRODUCER = /\bwith\b\s+(?:recursive\s+)?(?:[a-z_$][\w$]*|"[^"]+")\s*(?:\([^)]*\))?\s+as\b/i
 
 /** Whether the SQL provably scans the base table `name` exactly once, so a result row
@@ -70,7 +72,9 @@ export function isSingleTableScan(sql: string, name: string): boolean {
   const re = new RegExp(
     String.raw`(?:\bfrom\b|\bjoin\b|,)\s*(?:(?:[\w$]+|"[^"]+"|\`[^\`]+\`)\.)?["\`]?` +
       escapeRegExp(name) +
-      String.raw`["\`]?(?![\w$])`,
+      // A trailing `.` means this is a column/schema qualifier (`, t.id`, `from t.x`), not
+      // a table reference — exclude it so a table-qualified select list isn't miscounted.
+      String.raw`["\`]?(?![\w$.])`,
     'gi'
   )
   return (cleaned.match(re) || []).length === 1

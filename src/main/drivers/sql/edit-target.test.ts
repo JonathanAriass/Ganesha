@@ -92,6 +92,14 @@ describe('isSingleTableScan', () => {
   it('stays true for a subquery over a DIFFERENT table', () => {
     expect(isSingleTableScan('SELECT * FROM t WHERE id IN (SELECT tid FROM other)', 't')).toBe(true)
   })
+  it('stays true when the single table qualifies its own select-list columns', () => {
+    // `, t.id` must not be miscounted as a second `t` table reference.
+    expect(isSingleTableScan('SELECT t.id, t.name FROM t', 't')).toBe(true)
+    expect(isSingleTableScan('SELECT t.id, t.name FROM t AS t', 't')).toBe(true)
+    // …but a real self-join (refs not followed by `.`) is still refused.
+    expect(isSingleTableScan('SELECT a.id, b.name FROM t a JOIN t b ON a.id = b.id', 't')).toBe(false)
+    expect(isSingleTableScan('SELECT t.id FROM public.t a JOIN t b ON true', 't')).toBe(false)
+  })
   it('handles a schema qualifier and quoting', () => {
     expect(isSingleTableScan('SELECT * FROM public.users', 'users')).toBe(true)
     expect(isSingleTableScan('SELECT * FROM "users" a JOIN "users" b', 'users')).toBe(false)
