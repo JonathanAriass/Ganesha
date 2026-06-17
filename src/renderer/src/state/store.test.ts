@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import type { SessionTab } from '@shared/domain'
 import { useAppStore } from './store'
+import { editKey } from '../lib/doc-path'
 
 describe('overlay state invariants', () => {
   beforeEach(() => {
@@ -296,7 +297,7 @@ describe('applyResultEdits', () => {
   it('replaces the given cells and produces a new rows array', () => {
     useAppStore.getState().finishRun(tab().id, { result })
     const before = tab().result!.rows
-    useAppStore.getState().applyResultEdits(tab().id, [{ rowIndex: 1, colIndex: 1, value: 'B' }])
+    useAppStore.getState().applyResultEdits(tab().id, [{ rowIndex: 1, path: 'name', value: 'B' }])
     const after = tab().result!.rows
     expect(after[1][1]).toBe('B')
     expect(after[0][1]).toBe('a') // untouched row unchanged
@@ -305,7 +306,7 @@ describe('applyResultEdits', () => {
   })
 
   it('is a no-op for a tab without a result', () => {
-    expect(() => useAppStore.getState().applyResultEdits(tab().id, [{ rowIndex: 0, colIndex: 0, value: 9 }])).not.toThrow()
+    expect(() => useAppStore.getState().applyResultEdits(tab().id, [{ rowIndex: 0, path: 'id', value: 9 }])).not.toThrow()
   })
 
   it('patches the parallel documents array (Mongo JSON view) by column name', () => {
@@ -318,13 +319,26 @@ describe('applyResultEdits', () => {
     }
     useAppStore.getState().finishRun(tab().id, { result: mongoResult })
     const beforeDocs = tab().result!.documents!
-    useAppStore.getState().applyResultEdits(tab().id, [{ rowIndex: 1, colIndex: 1, value: 'B' }])
+    useAppStore.getState().applyResultEdits(tab().id, [{ rowIndex: 1, path: 'name', value: 'B' }])
     const docs = tab().result!.documents!
-    expect(docs[1]).toEqual({ _id: 2, name: 'B' }) // patched by column name
+    expect(docs[1]).toEqual({ _id: 2, name: 'B' }) // patched by path
     expect(docs[0]).toEqual({ _id: 1, name: 'a' }) // untouched
     expect(docs).not.toBe(beforeDocs) // new array reference
     expect(docs[0]).toBe(beforeDocs[0]) // untouched doc keeps its reference
     expect(tab().result!.rows[1][1]).toBe('B') // and the table cell too
+  })
+
+  it('patches a nested document path (tree edit) without touching the table rows', () => {
+    const mongoResult = {
+      columns: [{ name: '_id', dataType: null }, { name: 'addr', dataType: null }],
+      rows: [[1, { city: 'Paris' }]],
+      rowCount: 1, durationMs: 1, truncated: false,
+      documents: [{ _id: 1, addr: { city: 'Paris', zip: 75001 } }],
+      editable: { table: { schema: 'db', name: 'c' }, keyColumns: ['_id'], columnSources: ['_id', 'addr'] }
+    }
+    useAppStore.getState().finishRun(tab().id, { result: mongoResult })
+    useAppStore.getState().applyResultEdits(tab().id, [{ rowIndex: 0, path: 'addr.city', value: 'Lyon' }])
+    expect(tab().result!.documents![0]).toEqual({ _id: 1, addr: { city: 'Lyon', zip: 75001 } })
   })
 })
 
@@ -383,7 +397,7 @@ describe('staged cell edits', () => {
         editable: { table: { schema: null, name: 't' }, keyColumns: ['id'], columnSources: ['id', 'name'] }
       }
     })
-    s().setCellEdit(tab().id, '0:1', 'NEW')
+    s().setCellEdit(tab().id, editKey(0, 'name'), 'NEW')
     await s().commitEdits(tab().id)
     expect(apply).toHaveBeenCalledWith({ connectionId: 'c1', table: { schema: null, name: 't' }, rows: [{ key: { id: 1 }, set: { name: 'NEW' } }] })
     expect(tab().result!.rows[0][1]).toBe('NEW') // adopted
@@ -414,9 +428,9 @@ describe('staged cell edits', () => {
         editable: { table: { schema: null, name: 't' }, keyColumns: ['id'], columnSources: ['id', 'name'] }
       }
     })
-    s().setCellEdit(tab().id, '0:1', 'NEW')
+    s().setCellEdit(tab().id, editKey(0, 'name'), 'NEW')
     await s().commitEdits(tab().id)
-    expect(tab().edits).toEqual({ '0:1': 'NEW' }) // intact for retry
+    expect(tab().edits).toEqual({ [editKey(0, 'name')]: 'NEW' }) // intact for retry
     expect(tab().editError).toMatch(/read-only/)
   })
 })

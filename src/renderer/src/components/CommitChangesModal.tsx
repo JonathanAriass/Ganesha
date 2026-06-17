@@ -17,7 +17,9 @@ export default function CommitChangesModal(): JSX.Element | null {
 
   const result = tab?.result
   const changes: EditChange[] =
-    modal && tab && result?.editable ? describeEdits(tab.edits, result.columns, result.rows, result.editable) : []
+    modal && tab && result?.editable
+      ? describeEdits(tab.edits, result.columns, result.rows, result.documents, result.editable)
+      : []
 
   // Nothing left to confirm (all reset, or a new result landed while open) — drop the
   // modal from an effect, never via setState during render.

@@ -10,7 +10,7 @@ import {
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { ColumnMeta, EditableResult } from '@shared/query'
 import { cellText, cellMatchesFilter } from '../lib/grid-text'
-import { dirtyKey } from '../lib/edit-staging'
+import { editKey } from '../lib/doc-path'
 import { coerceMongoEditValue } from '../lib/mongo-edit-value'
 import { useAppStore } from '../state/store'
 import RowInspector from './RowInspector'
@@ -168,11 +168,20 @@ export default function ResultsGrid({
     return src !== null && !editable.keyColumns.includes(src)
   }
 
+  // A table cell's edit path is its column's field name (top-level); null for a
+  // non-editable column (expression/join). Edits are keyed by `row<SEP>path` so the table
+  // and the document tree share one staged change per field.
+  const cellKey = (rowIndex: number, colIndex: number): string | null => {
+    const path = editable?.columnSources[colIndex]
+    return path ? editKey(rowIndex, path) : null
+  }
+
   function stageCell(rowIndex: number, colIndex: number, value: unknown): void {
-    if (!tabId) return
+    const k = tabId && cellKey(rowIndex, colIndex)
+    if (!tabId || !k) return
     // SQL binds the raw string (the server coerces); Mongo needs a typed value for $set.
     const stored = isMongo ? coerceMongoEditValue(value as string | null, rows[rowIndex][colIndex]) : value
-    store().setCellEdit(tabId, dirtyKey(rowIndex, colIndex), stored)
+    store().setCellEdit(tabId, k, stored)
     setEditing(null)
     if (!requireCommit) void store().commitEdits(tabId) // fast-commit: write immediately
   }
@@ -240,9 +249,9 @@ export default function ResultsGrid({
                 >
                   {row.getVisibleCells().map((cell) => {
                     const colIndex = Number(cell.column.id)
-                    const dk = dirtyKey(rowIndex, colIndex)
-                    const isDirty = Object.prototype.hasOwnProperty.call(edits, dk)
-                    const raw = isDirty ? edits[dk] : cell.getValue()
+                    const dk = cellKey(rowIndex, colIndex)
+                    const isDirty = dk !== null && Object.prototype.hasOwnProperty.call(edits, dk)
+                    const raw = isDirty ? edits[dk!] : cell.getValue()
                     const text = cellText(raw)
                     const isEditing = editing?.rowIndex === rowIndex && editing?.colIndex === colIndex
                     if (isEditing) {
@@ -278,7 +287,7 @@ export default function ResultsGrid({
                             title="Reset this cell"
                             onClick={(e) => {
                               e.stopPropagation()
-                              store().resetCellEdit(tabId, dk)
+                              store().resetCellEdit(tabId, dk!)
                             }}
                           >
                             ↺

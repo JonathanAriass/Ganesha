@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { SessionTab } from '@shared/domain'
 import type { QueryResult } from '@shared/query'
 import { buildRowEdits } from '../lib/edit-staging'
+import { parseEditKey, setAtPath } from '../lib/doc-path'
 import { unwrap } from '../lib/result'
 
 type ConnectionModalState =
@@ -110,8 +111,9 @@ interface AppState {
   openOrLoadQuery: (args: { connectionId: string; title: string; text: string }) => void
   startRun: (id: string, queryId: string) => void
   finishRun: (id: string, payload: { result: QueryResult } | { error: string }) => void
-  /** Rewrite specific cells in a tab's result rows after a committed edit (immutable). */
-  applyResultEdits: (id: string, edits: { rowIndex: number; colIndex: number; value: unknown }[]) => void
+  /** After a committed edit, write each value at its field path into the tab's result —
+   *  the row cell (top-level column) and the documents array (nested path). Immutable. */
+  applyResultEdits: (id: string, edits: { rowIndex: number; path: string; value: unknown }[]) => void
   /** Stage one cell edit (keyed `rowId:colIndex`). */
   setCellEdit: (tabId: string, key: string, value: unknown) => void
   /** Drop one staged cell edit (per-cell reset). */
@@ -298,24 +300,28 @@ export const useAppStore = create<AppState>((set, get) => ({
         if (t.id !== id || !t.result) return t
         const result = t.result
         const touched = new Set(edits.map((e) => e.rowIndex))
+        // A top-level path is also a table column — patch the row cell so the grid updates.
         const rows = result.rows.map((row, i) => {
           if (!touched.has(i)) return row
-          const next = row.slice()
-          for (const e of edits) if (e.rowIndex === i) next[e.colIndex] = e.value
+          let next = row
+          for (const e of edits) {
+            if (e.rowIndex !== i) continue
+            const colIndex = result.columns.findIndex((c) => c.name === e.path)
+            if (colIndex >= 0) {
+              if (next === row) next = row.slice()
+              next[colIndex] = e.value
+            }
+          }
           return next
         })
         // Mongo results carry a parallel `documents` array (the JSON/tree view reads it),
-        // index-aligned with rows; patch the same cells by column name so that view
-        // doesn't show stale values after a commit.
+        // index-aligned with rows; patch each edited field by its (possibly nested) path so
+        // that view doesn't show stale values after a commit.
         const documents = result.documents
           ? result.documents.map((doc, i) => {
               if (!touched.has(i)) return doc
-              const next = { ...doc }
-              for (const e of edits) {
-                if (e.rowIndex !== i) continue
-                const field = result.columns[e.colIndex]?.name
-                if (field !== undefined) next[field] = e.value
-              }
+              let next = doc
+              for (const e of edits) if (e.rowIndex === i) next = setAtPath(next, e.path, e.value)
               return next
             })
           : null
@@ -354,8 +360,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       // adopt the values into the fresh result's rows.
       if (get().tabs.find((t) => t.id === tabId)?.result?.rows !== rows) return
       const applied = Object.entries(tab.edits).map(([k, value]) => {
-        const [rowIndex, colIndex] = k.split(':').map(Number)
-        return { rowIndex, colIndex, value }
+        const { rowIndex, path } = parseEditKey(k)
+        return { rowIndex, path, value }
       })
       get().applyResultEdits(tabId, applied)
       set((s) => ({ tabs: s.tabs.map((t) => (t.id === tabId ? { ...t, edits: {}, editError: null } : t)) }))
