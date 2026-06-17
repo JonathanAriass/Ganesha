@@ -125,6 +125,10 @@ export class MongoDriver implements DatabaseDriver {
       )
     }
     const coll = client.db(cmd.database).collection(cmd.collection)
+    // Editable target for a real single-collection read (find/findOne). The effective db
+    // is cmd.database (getSiblingDB) else the connection default — always set here, since
+    // the no-default-db case was refused above.
+    const editTable = { schema: cmd.database ?? database ?? null, name: cmd.collection }
     const start = Date.now()
     const ms = (): number => Date.now() - start
     // Tag every server op with the queryId so cancel() can find it via $currentOp.
@@ -143,11 +147,11 @@ export class MongoDriver implements DatabaseDriver {
           maxTimeMS: 30_000,
           comment
         })
-        return normalizeFind(await cursor.toArray(), opts.maxRows, ms())
+        return normalizeFind(await cursor.toArray(), opts.maxRows, ms(), editTable)
       }
       case 'findOne': {
         const doc = await coll.findOne(cmd.filter as Filter<Document> ?? {}, { projection: cmd.projection, comment })
-        return normalizeFind(doc ? [doc] : [], opts.maxRows, ms())
+        return normalizeFind(doc ? [doc] : [], opts.maxRows, ms(), editTable)
       }
       case 'aggregate':
         return normalizeFind(await coll.aggregate(boundedPipeline(cmd, opts.maxRows), { maxTimeMS: 30_000, comment }).toArray(), opts.maxRows, ms())

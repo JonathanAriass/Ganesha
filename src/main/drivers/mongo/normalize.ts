@@ -1,5 +1,6 @@
 import { EJSON, type Long } from 'bson'
 import type { QueryResult, ColumnMeta } from '../../../shared/query'
+import { mongoEditable } from './edit-target'
 
 /** Exactness first: relaxed EJSON turns Int64 (Long) into a JS double, silently
  *  corrupting values past 2^53 (…993 reads as …992). Convert Longs ourselves —
@@ -31,8 +32,15 @@ function toPlain<T = Record<string, unknown>>(value: unknown): T {
   return EJSON.serialize(exactLongs(value) as object) as T
 }
 
-/** find / findOne / aggregate → flat key-union table + raw EJSON documents. */
-export function normalizeFind(docs: unknown[], maxRows: number, durationMs: number): QueryResult {
+/** find / findOne / aggregate → flat key-union table + raw EJSON documents. `editTable`
+ *  is supplied only for a real single-collection read (find/findOne), making the result
+ *  editable when `_id` is present; aggregate omits it (it can reshape documents). */
+export function normalizeFind(
+  docs: unknown[],
+  maxRows: number,
+  durationMs: number,
+  editTable?: { schema: string | null; name: string }
+): QueryResult {
   const total = docs.length
   const truncated = total > maxRows
   // Serialize only the visible subset — aggregate has no cursor-level limit, so this
@@ -53,7 +61,10 @@ export function normalizeFind(docs: unknown[], maxRows: number, durationMs: numb
   const rows = capped.map((d) => keys.map((k) => (k in d ? d[k] : null)))
   // The fetch is bounded at maxRows+1, so when truncated the true total is unknown —
   // `total` would just be the probe size. Report the shown count; `truncated` says "more".
-  return { columns, rows, rowCount: capped.length, durationMs, truncated, documents: capped, editable: null }
+  return {
+    columns, rows, rowCount: capped.length, durationMs, truncated, documents: capped,
+    editable: editTable ? mongoEditable(columns, editTable) : null
+  }
 }
 
 /** count / countDocuments → single scalar cell. */
