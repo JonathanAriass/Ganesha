@@ -15,7 +15,10 @@ export function useGlobalShortcuts(): void {
 
       if (e.key === 'Escape') {
         // Only intercept when an overlay is up — Monaco needs Escape otherwise.
-        if (s.saveQueryModal) {
+        if (s.commitModal) {
+          e.preventDefault()
+          s.closeCommitModal()
+        } else if (s.saveQueryModal) {
           e.preventDefault()
           s.closeSaveQueryModal()
         } else if (s.paletteOpen) {
@@ -33,7 +36,7 @@ export function useGlobalShortcuts(): void {
 
       // While an overlay is up, only its own toggle applies — ⌘W must not
       // close a tab hidden behind the settings modal.
-      if (s.connectionModal || s.saveQueryModal) return // form owns the keyboard; no chord applies
+      if (s.connectionModal || s.saveQueryModal || s.commitModal) return // overlay owns the keyboard; no chord applies
       if (s.settingsOpen && action !== 'settings') return
       if (s.paletteOpen && action !== 'palette') return
 
@@ -54,10 +57,13 @@ export function useGlobalShortcuts(): void {
           if (s.activeTabId) s.closeTab(s.activeTabId)
           break
         case 'commit-edits': {
-          // ⌘S commits staged results-grid edits (saving a query to favourites is the
-          // ☆ Save button only now). Swallowed when there's nothing staged.
+          // ⌘S reviews+commits staged results-grid edits — it opens the confirmation
+          // modal (the actual write happens on Confirm) rather than committing silently.
+          // Staged edits only exist in the per-connection "require explicit commit" mode,
+          // so this naturally honours that setting. Swallowed when nothing is staged
+          // (saving a query to favourites is the ☆ Save button only now).
           const tab = s.tabs.find((t) => t.id === s.activeTabId)
-          if (tab && Object.keys(tab.edits).length > 0) void s.commitEdits(tab.id)
+          if (tab && Object.keys(tab.edits).length > 0) s.openCommitModal(tab.id)
           break
         }
       }

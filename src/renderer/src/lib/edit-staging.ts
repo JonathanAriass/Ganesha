@@ -1,4 +1,4 @@
-import type { EditableResult, RowEdit } from '@shared/query'
+import type { ColumnMeta, EditableResult, RowEdit } from '@shared/query'
 
 /** Dirty-map key: TanStack row id (original data index) + result-column index. The
  *  row-id basis means a staged edit survives re-sorting/filtering the grid. */
@@ -29,4 +29,39 @@ export function buildRowEdits(
     edit.set[realCol] = value
   }
   return [...byRow.values()]
+}
+
+/** A single staged change, for the commit-confirmation review list. */
+export interface EditChange {
+  /** Display name of the edited table (schema-qualified when there's a schema). */
+  table: string
+  /** Primary-key values identifying the row. */
+  key: Record<string, unknown>
+  /** Edited column (display name). */
+  column: string
+  oldValue: unknown
+  newValue: unknown
+}
+
+/** Describe the staged edits as a reviewable list (one entry per edited cell), ordered by
+ *  row then column. Edits on null-source or key columns are skipped (never editable). */
+export function describeEdits(
+  dirty: Record<string, unknown>,
+  columns: ColumnMeta[],
+  rows: unknown[][],
+  editable: EditableResult
+): EditChange[] {
+  const table = editable.table.schema ? `${editable.table.schema}.${editable.table.name}` : editable.table.name
+  const out: EditChange[] = []
+  for (const [k, newValue] of Object.entries(dirty)) {
+    const [rowIndex, colIndex] = k.split(':').map(Number)
+    const realCol = editable.columnSources[colIndex]
+    if (!realCol || editable.keyColumns.includes(realCol)) continue
+    const row = rows[rowIndex]
+    if (!row) continue
+    const key: Record<string, unknown> = {}
+    for (const kc of editable.keyColumns) key[kc] = row[editable.columnSources.indexOf(kc)]
+    out.push({ table, key, column: columns[colIndex]?.name ?? realCol, oldValue: row[colIndex], newValue })
+  }
+  return out.sort((a, b) => a.column.localeCompare(b.column))
 }

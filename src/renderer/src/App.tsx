@@ -12,6 +12,7 @@ import QueryTab from './components/QueryTab'
 import SavedSection from './components/SavedSection'
 import HistorySection from './components/HistorySection'
 import SaveQueryModal from './components/SaveQueryModal'
+import CommitChangesModal from './components/CommitChangesModal'
 import AssistantPanel from './components/AssistantPanel'
 import ModelManagerModal from './components/ModelManagerModal'
 import { useSettings } from './lib/hooks'
@@ -32,6 +33,7 @@ function AppShell(): JSX.Element {
   const settingsOpen = useAppStore((s) => s.settingsOpen)
   const paletteOpen = useAppStore((s) => s.paletteOpen)
   const saveQueryModal = useAppStore((s) => s.saveQueryModal)
+  const commitModal = useAppStore((s) => s.commitModal)
   const tabs = useAppStore((s) => s.tabs)
   const activeTabId = useAppStore((s) => s.activeTabId)
 
@@ -73,6 +75,7 @@ function AppShell(): JSX.Element {
       {settingsOpen && <SettingsModal />}
       {paletteOpen && <CommandPalette />}
       {saveQueryModal && <SaveQueryModal />}
+      {commitModal && <CommitChangesModal />}
       <ModelManagerModal />
     </div>
   )

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { EditableResult } from '@shared/query'
-import { dirtyKey, buildRowEdits } from './edit-staging'
+import { dirtyKey, buildRowEdits, describeEdits } from './edit-staging'
+import type { ColumnMeta } from '@shared/query'
 
 const editable: EditableResult = {
   table: { schema: 'public', name: 'users' },
@@ -40,5 +41,24 @@ describe('buildRowEdits', () => {
   it('reads a composite key from the row', () => {
     const e3: EditableResult = { table: { schema: null, name: 't' }, keyColumns: ['a', 'b'], columnSources: ['a', 'b', 'v'] }
     expect(buildRowEdits({ [dirtyKey(0, 2)]: 9 }, [[10, 20, 30]], e3)).toEqual([{ key: { a: 10, b: 20 }, set: { v: 9 } }])
+  })
+})
+
+describe('describeEdits', () => {
+  const cols: ColumnMeta[] = [
+    { name: 'id', dataType: 'int' },
+    { name: 'name', dataType: 'text' },
+    { name: 'email', dataType: 'text' }
+  ]
+  it('describes each staged cell with table, key, column, old and new values', () => {
+    const dirty = { [dirtyKey(0, 1)]: 'AA', [dirtyKey(1, 2)]: 'bb@x.io' }
+    expect(describeEdits(dirty, cols, rows, editable)).toEqual([
+      { table: 'public.users', key: { id: 2 }, column: 'email', oldValue: 'b@x.io', newValue: 'bb@x.io' },
+      { table: 'public.users', key: { id: 1 }, column: 'name', oldValue: 'a', newValue: 'AA' }
+    ])
+  })
+  it('omits the schema prefix when there is none', () => {
+    const e: EditableResult = { table: { schema: null, name: 't' }, keyColumns: ['id'], columnSources: ['id', 'name', 'email'] }
+    expect(describeEdits({ [dirtyKey(0, 1)]: 'X' }, cols, rows, e)[0].table).toBe('t')
   })
 })

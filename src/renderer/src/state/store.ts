@@ -64,6 +64,8 @@ interface AppState {
   settingsOpen: boolean
   paletteOpen: boolean
   saveQueryModal: SaveQueryModalState | null
+  /** Tab whose staged edits are pending a commit-confirmation review, or null. */
+  commitModal: { tabId: string } | null
 
   // ── LLM assistant ─────────────────────────────────────────────────────────
   assistantOpen: boolean
@@ -84,6 +86,9 @@ interface AppState {
   setPaletteOpen: (open: boolean) => void
   openSaveQueryModal: (state: SaveQueryModalState) => void
   closeSaveQueryModal: () => void
+  /** Open the commit-confirmation review for a tab's staged edits. */
+  openCommitModal: (tabId: string) => void
+  closeCommitModal: () => void
 
   toggleAssistant: () => void
   setActiveConversation: (id: string | null) => void
@@ -133,6 +138,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   settingsOpen: false,
   paletteOpen: false,
   saveQueryModal: null,
+  commitModal: null,
   assistantOpen: false,
   activeConversationId: null,
   modelManagerOpen: false,
@@ -150,6 +156,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Like openSettings: an overlay opening from the palette must replace it.
   openSaveQueryModal: (state) => set({ saveQueryModal: state, paletteOpen: false }),
   closeSaveQueryModal: () => set({ saveQueryModal: null }),
+
+  openCommitModal: (tabId) => set({ commitModal: { tabId } }),
+  closeCommitModal: () => set({ commitModal: null }),
 
   toggleAssistant: () => set((s) => ({ assistantOpen: !s.assistantOpen })),
   setActiveConversation: (id) => set({ activeConversationId: id }),

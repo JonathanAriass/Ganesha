@@ -291,8 +291,8 @@ export default function ResultsGrid({
             <span>
               {editCount} pending change{editCount === 1 ? '' : 's'}
             </span>
-            <button className="btn primary" disabled={editCount === 0} onClick={() => void store().commitEdits(tabId)}>
-              Commit (⌘S)
+            <button className="btn primary" disabled={editCount === 0} onClick={() => store().openCommitModal(tabId)}>
+              Commit… (⌘S)
             </button>
             <button className="btn" onClick={() => store().discardEdits(tabId)}>
               Discard

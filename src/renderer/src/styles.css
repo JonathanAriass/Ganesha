@@ -1052,6 +1052,41 @@ input[type="password"]::placeholder {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ── Commit-changes confirmation ── */
+.commit-modal {
+  width: 640px;
+}
+.commit-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.commit-table th,
+.commit-table td {
+  text-align: left;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.commit-table th {
+  color: var(--text-2);
+  font-weight: 600;
+}
+.commit-key {
+  color: var(--text-2);
+  font-family: var(--mono, ui-monospace, monospace);
+}
+.commit-old {
+  color: var(--danger-text);
+  text-decoration: line-through;
+}
+.commit-new {
+  color: var(--ok);
+}
 .hint {
   color: var(--text-2);
   font-size: 11px;

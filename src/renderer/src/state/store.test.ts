@@ -347,6 +347,13 @@ describe('staged cell edits', () => {
     expect(tab().edits).toEqual({})
   })
 
+  it('openCommitModal / closeCommitModal toggle the review modal for a tab', () => {
+    s().openCommitModal(tab().id)
+    expect(useAppStore.getState().commitModal).toEqual({ tabId: tab().id })
+    s().closeCommitModal()
+    expect(useAppStore.getState().commitModal).toBeNull()
+  })
+
   it('commitEdits applies via the api, adopts new values, and clears the stage', async () => {
     const apply = vi.fn().mockResolvedValue({ ok: true, data: { updated: 1 } })
     stubApply(apply)
