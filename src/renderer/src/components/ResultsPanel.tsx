@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { QueryTabData } from '../state/store'
+import { useConnections } from '../lib/hooks'
 import ResultsGrid from './ResultsGrid'
 import ScriptResults from './ScriptResults'
 import DocumentView from './DocumentView'
@@ -21,6 +22,8 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
   const [userView, setUserView] = useState<View | null>(null)
   const [filter, setFilter] = useState('')
   const view: View = userView ?? (hasDocuments ? 'documents' : 'table')
+  const { data: connections = [] } = useConnections()
+  const connection = connections.find((c) => c.id === tab.connectionId)
 
   // Before the running spinner: a script renders progressively while it executes.
   if (tab.scriptRun) {
@@ -132,7 +135,16 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
       </div>
 
       {view === 'table' ? (
-        <ResultsGrid columns={result.columns} rows={result.rows} globalFilter={filter} />
+        <ResultsGrid
+          columns={result.columns}
+          rows={result.rows}
+          globalFilter={filter}
+          tabId={tab.id}
+          connectionId={tab.connectionId}
+          editable={connection?.readOnly ? null : result.editable}
+          readOnly={connection?.readOnly ?? true}
+          requireCommit={connection?.requireCommit ?? true}
+        />
       ) : (
         <DocumentView documents={result.documents!} />
       )}
