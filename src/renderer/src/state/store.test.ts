@@ -307,6 +307,25 @@ describe('applyResultEdits', () => {
   it('is a no-op for a tab without a result', () => {
     expect(() => useAppStore.getState().applyResultEdits(tab().id, [{ rowIndex: 0, colIndex: 0, value: 9 }])).not.toThrow()
   })
+
+  it('patches the parallel documents array (Mongo JSON view) by column name', () => {
+    const mongoResult = {
+      columns: [{ name: '_id', dataType: null }, { name: 'name', dataType: null }],
+      rows: [[1, 'a'], [2, 'b']],
+      rowCount: 2, durationMs: 1, truncated: false,
+      documents: [{ _id: 1, name: 'a' }, { _id: 2, name: 'b' }],
+      editable: { table: { schema: 'db', name: 'c' }, keyColumns: ['_id'], columnSources: ['_id', 'name'] }
+    }
+    useAppStore.getState().finishRun(tab().id, { result: mongoResult })
+    const beforeDocs = tab().result!.documents!
+    useAppStore.getState().applyResultEdits(tab().id, [{ rowIndex: 1, colIndex: 1, value: 'B' }])
+    const docs = tab().result!.documents!
+    expect(docs[1]).toEqual({ _id: 2, name: 'B' }) // patched by column name
+    expect(docs[0]).toEqual({ _id: 1, name: 'a' }) // untouched
+    expect(docs).not.toBe(beforeDocs) // new array reference
+    expect(docs[0]).toBe(beforeDocs[0]) // untouched doc keeps its reference
+    expect(tab().result!.rows[1][1]).toBe('B') // and the table cell too
+  })
 })
 
 describe('staged cell edits', () => {

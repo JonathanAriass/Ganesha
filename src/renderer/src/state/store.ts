@@ -296,14 +296,30 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => ({
       tabs: s.tabs.map((t) => {
         if (t.id !== id || !t.result) return t
+        const result = t.result
         const touched = new Set(edits.map((e) => e.rowIndex))
-        const rows = t.result.rows.map((row, i) => {
+        const rows = result.rows.map((row, i) => {
           if (!touched.has(i)) return row
           const next = row.slice()
           for (const e of edits) if (e.rowIndex === i) next[e.colIndex] = e.value
           return next
         })
-        return { ...t, result: { ...t.result, rows } }
+        // Mongo results carry a parallel `documents` array (the JSON/tree view reads it),
+        // index-aligned with rows; patch the same cells by column name so that view
+        // doesn't show stale values after a commit.
+        const documents = result.documents
+          ? result.documents.map((doc, i) => {
+              if (!touched.has(i)) return doc
+              const next = { ...doc }
+              for (const e of edits) {
+                if (e.rowIndex !== i) continue
+                const field = result.columns[e.colIndex]?.name
+                if (field !== undefined) next[field] = e.value
+              }
+              return next
+            })
+          : null
+        return { ...t, result: { ...result, rows, documents } }
       }),
     })),
 
