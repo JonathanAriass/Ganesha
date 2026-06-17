@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { QueryTabData } from '../state/store'
+import { useAppStore, type QueryTabData } from '../state/store'
 import { useConnections } from '../lib/hooks'
 import ResultsGrid from './ResultsGrid'
 import ScriptResults from './ScriptResults'
@@ -145,10 +145,41 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
           requireCommit={connection?.requireCommit ?? true}
           isMongo={connection?.type === 'mongodb'}
           edits={tab.edits}
-          editError={tab.editError}
         />
       ) : (
-        <DocumentView documents={result.documents!} />
+        <DocumentView
+          documents={result.documents!}
+          tabId={tab.id}
+          editable={connection && !connection.readOnly ? result.editable : null}
+          readOnly={connection?.readOnly ?? true}
+          requireCommit={connection?.requireCommit ?? true}
+          edits={tab.edits}
+        />
+      )}
+
+      {/* Pending-edit commit bar — shown for both the table and document views, so an edit
+          staged in either can be reviewed/committed. Only in require-commit mode. */}
+      {connection?.requireCommit && (Object.keys(tab.edits).length > 0 || tab.editError) && (
+        <div className="edit-bar">
+          <span>
+            {Object.keys(tab.edits).length} pending change{Object.keys(tab.edits).length === 1 ? '' : 's'}
+          </span>
+          <button
+            className="btn primary"
+            disabled={Object.keys(tab.edits).length === 0}
+            onClick={() => useAppStore.getState().openCommitModal(tab.id)}
+          >
+            Commit… (⌘S)
+          </button>
+          <button className="btn" onClick={() => useAppStore.getState().discardEdits(tab.id)}>
+            Discard
+          </button>
+          {tab.editError && (
+            <span className="edit-error" role="alert">
+              {tab.editError}
+            </span>
+          )}
+        </div>
       )}
     </div>
   )

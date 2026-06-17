@@ -13,6 +13,7 @@ import { cellText, cellMatchesFilter } from '../lib/grid-text'
 import { editKey } from '../lib/doc-path'
 import { coerceMongoEditValue } from '../lib/mongo-edit-value'
 import { useAppStore } from '../state/store'
+import EditingCell from './EditingCell'
 import RowInspector from './RowInspector'
 
 interface Props {
@@ -28,63 +29,8 @@ interface Props {
   /** Mongo connection: edited text is coerced to a typed value (preserving the original
    *  field's type) before staging, since `$set` would otherwise store the raw string. */
   isMongo?: boolean
-  /** Staged edits for this tab (store-owned, keyed `rowId:colIndex`) + last commit error. */
+  /** Staged edits for this tab (store-owned, keyed `row<SEP>path`). */
   edits?: Record<string, unknown>
-  editError?: string | null
-}
-
-/** A cell in edit mode: a text input over the cell. Commits exactly once (Enter, blur,
- *  or NULL) — the `done` guard stops the Enter→unmount→blur path firing twice. */
-function EditingCell({
-  initial,
-  onCommit,
-  onCancel,
-}: {
-  initial: unknown
-  onCommit: (value: unknown) => void
-  onCancel: () => void
-}): JSX.Element {
-  // Seed with the same projection the grid displays (cellText), so an object/jsonb/array
-  // cell opens as its JSON text — not `[object Object]`, which String() would write back.
-  const [text, setText] = useState(initial === null || initial === undefined ? '' : cellText(initial))
-  const done = useRef(false)
-  const commit = (value: unknown): void => {
-    if (done.current) return
-    done.current = true
-    onCommit(value)
-  }
-  return (
-    <div
-      className="grid-cell editing"
-      onClick={(e) => e.stopPropagation()}
-      onDoubleClick={(e) => e.stopPropagation()}
-    >
-      <input
-        autoFocus
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') commit(text)
-          else if (e.key === 'Escape') {
-            done.current = true // suppress the blur-commit that the unmount triggers
-            onCancel()
-          }
-        }}
-        onBlur={() => commit(text)}
-      />
-      <button
-        className="cell-null-btn"
-        title="Set NULL"
-        // mousedown + preventDefault keeps the input focused so its blur doesn't beat us.
-        onMouseDown={(e) => {
-          e.preventDefault()
-          commit(null)
-        }}
-      >
-        ∅
-      </button>
-    </div>
-  )
 }
 
 export default function ResultsGrid({
@@ -97,7 +43,6 @@ export default function ResultsGrid({
   requireCommit,
   isMongo,
   edits = {},
-  editError,
 }: Props): JSX.Element {
   const [sorting, setSorting] = useState<SortingState>([])
 
@@ -185,8 +130,6 @@ export default function ResultsGrid({
     setEditing(null)
     if (!requireCommit) void store().commitEdits(tabId) // fast-commit: write immediately
   }
-
-  const editCount = Object.keys(edits).length
 
   const virtualizer = useVirtualizer({
     count: tableRows.length,
@@ -301,25 +244,6 @@ export default function ResultsGrid({
             })}
           </div>
         </div>
-
-        {requireCommit && (editCount > 0 || editError) && tabId && (
-          <div className="edit-bar">
-            <span>
-              {editCount} pending change{editCount === 1 ? '' : 's'}
-            </span>
-            <button className="btn primary" disabled={editCount === 0} onClick={() => store().openCommitModal(tabId)}>
-              Commit… (⌘S)
-            </button>
-            <button className="btn" onClick={() => store().discardEdits(tabId)}>
-              Discard
-            </button>
-            {editError && (
-              <span className="edit-error" role="alert">
-                {editError}
-              </span>
-            )}
-          </div>
-        )}
       </div>
 
       {selId !== null && (

@@ -1003,6 +1003,45 @@ input[type="password"]::placeholder {
   color: var(--text);
   border-color: var(--warn);
 }
+
+/* ── Document-tree editing ── */
+.doc-leaf {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 3px;
+}
+.doc-leaf.cell-dirty {
+  box-shadow: inset 2px 0 0 var(--warn);
+}
+.doc-editable {
+  cursor: cell;
+  border-radius: 3px;
+}
+.doc-editable:hover {
+  background: var(--hover-overlay);
+}
+/* The shared reset button is absolute for grid cells; inline it for the tree. */
+.doc-reset {
+  position: static;
+  transform: none;
+  opacity: 0.7;
+}
+.doc-editing {
+  display: inline-flex;
+  align-items: center;
+}
+.doc-editing input {
+  width: 220px;
+  height: 22px;
+  border: 1px solid var(--accent);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  padding: 0 6px;
+  outline: none;
+}
 .grid-cell.editing {
   display: flex;
   align-items: center;
