@@ -279,3 +279,32 @@ describe('hydrateTabs', () => {
     expect(useAppStore.getState().activeConnectionId).toBe('chosen')
   })
 })
+
+describe('applyResultEdits', () => {
+  beforeEach(() => {
+    useAppStore.setState({ tabs: [], activeTabId: null, _queryCounter: 0 })
+    useAppStore.getState().openQueryTab({ connectionId: 'c1', text: 'select * from t' })
+  })
+  const tab = () => useAppStore.getState().tabs[0]
+  const result = {
+    columns: [{ name: 'id', dataType: null }, { name: 'name', dataType: null }],
+    rows: [[1, 'a'], [2, 'b']],
+    rowCount: 2, durationMs: 1, truncated: false, documents: null,
+    editable: { table: { schema: null, name: 't' }, keyColumns: ['id'], columnSources: ['id', 'name'] }
+  }
+
+  it('replaces the given cells and produces a new rows array', () => {
+    useAppStore.getState().finishRun(tab().id, { result })
+    const before = tab().result!.rows
+    useAppStore.getState().applyResultEdits(tab().id, [{ rowIndex: 1, colIndex: 1, value: 'B' }])
+    const after = tab().result!.rows
+    expect(after[1][1]).toBe('B')
+    expect(after[0][1]).toBe('a') // untouched row unchanged
+    expect(after).not.toBe(before) // new array reference
+    expect(after[0]).toBe(before[0]) // untouched row keeps its reference
+  })
+
+  it('is a no-op for a tab without a result', () => {
+    expect(() => useAppStore.getState().applyResultEdits(tab().id, [{ rowIndex: 0, colIndex: 0, value: 9 }])).not.toThrow()
+  })
+})

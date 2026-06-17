@@ -98,6 +98,8 @@ interface AppState {
   openOrLoadQuery: (args: { connectionId: string; title: string; text: string }) => void
   startRun: (id: string, queryId: string) => void
   finishRun: (id: string, payload: { result: QueryResult } | { error: string }) => void
+  /** Rewrite specific cells in a tab's result rows after a committed edit (immutable). */
+  applyResultEdits: (id: string, edits: { rowIndex: number; colIndex: number; value: unknown }[]) => void
 
   // ── Run all (script execution) ────────────────────────────────────────────
   startScript: (id: string, total: number, runId: string) => void
@@ -254,6 +256,21 @@ export const useAppStore = create<AppState>((set, get) => ({
         if ('result' in payload)
           return { ...t, running: false, queryId: null, result: payload.result, error: null, scriptRun: null }
         return { ...t, running: false, queryId: null, error: payload.error, result: null, scriptRun: null }
+      }),
+    })),
+
+  applyResultEdits: (id, edits) =>
+    set((s) => ({
+      tabs: s.tabs.map((t) => {
+        if (t.id !== id || !t.result) return t
+        const touched = new Set(edits.map((e) => e.rowIndex))
+        const rows = t.result.rows.map((row, i) => {
+          if (!touched.has(i)) return row
+          const next = row.slice()
+          for (const e of edits) if (e.rowIndex === i) next[e.colIndex] = e.value
+          return next
+        })
+        return { ...t, result: { ...t.result, rows } }
       }),
     })),
 
