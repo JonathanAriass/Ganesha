@@ -39,29 +39,33 @@ function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-/** How many times `name` appears as a FROM/JOIN source in the SQL (string literals and
- *  comments stripped first). A self-join projecting *different* columns of one table is
- *  metadata-indistinguishable from a plain single-table SELECT — both show one source
- *  table — yet a result row then spans two base rows, so the row key read from the
- *  result can target the wrong row. Editing requires exactly one reference; anything
- *  else (self-join, self-referencing subquery) is refused. Conservative: a false >1
- *  only declines editing, never mis-writes. */
-export function sourceTableReferenceCount(sql: string, name: string): number {
+/** Whether the SQL provably scans the base table `name` exactly once, so a result row
+ *  maps to exactly one base row and a row-key edit can't target the wrong row.
+ *
+ *  A self-join is metadata-indistinguishable from a plain single-table SELECT — the
+ *  result columns all report provenance to the one physical table (pg `tableID`, mysql
+ *  `orgTable`), even through a CTE alias or a derived table — yet one result row then
+ *  spans two base rows. So this string check, not the metadata, is what catches it:
+ *   - **CTE present** (`WITH …`): refuse. A CTE can be self-joined on its alias
+ *     (`FROM c a JOIN c b`), which counting the base-table name can never see.
+ *   - otherwise the base table must be referenced exactly once after FROM/JOIN/comma
+ *     across the WHOLE statement (subqueries included — a derived-table self-join hides
+ *     one reference inside a subquery).
+ *  Conservative by design: it only ever declines editing, never mis-writes. */
+export function isSingleTableScan(sql: string, name: string): boolean {
   const cleaned = sql
     .replace(/--[^\n]*/g, ' ')
     .replace(/\/\*[\s\S]*?\*\//g, ' ')
     .replace(/'(?:[^']|'')*'/g, "''")
-  // Isolate the FROM clause (tables, JOINs and their ON conditions) up to the next
-  // top-level keyword, so SELECT-list / WHERE mentions of the name don't count.
-  const body = /\bfrom\b[\s\S]*?(?=\bwhere\b|\bgroup\s+by\b|\border\s+by\b|\bhaving\b|\blimit\b|\boffset\b|\bunion\b|\bfetch\b|$)/i.exec(cleaned)
-  if (!body) return 0
+  if (/^\s*with\b/i.test(cleaned)) return false
   // A table reference is the name (optionally schema-qualified / quoted) right after
-  // FROM, JOIN or a comma — catching both `JOIN t` and comma-style `, t` self-joins.
+  // FROM, JOIN or a comma — catching `JOIN t`, comma-style `, t`, and references nested
+  // in subqueries (we scan the whole statement, not just the first FROM clause).
   const re = new RegExp(
     String.raw`(?:\bfrom\b|\bjoin\b|,)\s*(?:(?:[\w$]+|"[^"]+"|\`[^\`]+\`)\.)?["\`]?` +
       escapeRegExp(name) +
       String.raw`["\`]?(?![\w$])`,
     'gi'
   )
-  return (body[0].match(re) || []).length
+  return (cleaned.match(re) || []).length === 1
 }

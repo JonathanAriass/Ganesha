@@ -4,7 +4,7 @@ import type {
   DbObject, ObjectRef, ColumnInfo, EditableResult, TableEdits
 } from '../types'
 import type { ConnectionType } from '../../../shared/domain'
-import { buildEditableResult, sourceTableReferenceCount, type PerColumnSource } from './edit-target'
+import { buildEditableResult, isSingleTableScan, type PerColumnSource } from './edit-target'
 import { buildUpdate } from './update-builder'
 
 /** MySQL/MariaDB driver (shared wire protocol) backed by a per-connection mysql2 pool.
@@ -160,8 +160,9 @@ export class MySqlDriver implements DatabaseDriver {
       const fds = fields as unknown as Array<{ orgTable?: string; orgName?: string; db?: string }>
       const tables = [...new Set(fds.map((f) => f.orgTable).filter((t): t is string => !!t))]
       if (tables.length !== 1) return null
-      // A self-join shows one source table but spans two base rows per result row — refuse.
-      if (sourceTableReferenceCount(sql, tables[0]) !== 1) return null
+      // A self-join (incl. via CTE / derived table) shows one source table but spans two
+      // base rows per result row — refuse.
+      if (!isSingleTableScan(sql, tables[0])) return null
       const db = fds.find((f) => f.orgTable === tables[0])?.db ?? ''
       const pk = await this.pkColumns(conn, id, db, tables[0])
       const perColumn: PerColumnSource[] = fds.map((f) =>

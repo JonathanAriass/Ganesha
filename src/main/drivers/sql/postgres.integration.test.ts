@@ -100,6 +100,12 @@ describe('PostgresDriver (integration, requires Docker)', () => {
     // but one result row spans two base rows — must still be refused (no wrong-row write).
     const selfJoin = await driver.runQuery(id, { kind: 'sql', sql: 'SELECT a.id, b.name FROM t_edit a JOIN t_edit b ON b.id = a.id' }, { maxRows: 10, queryId: 'e3b', readOnly: false })
     expect(selfJoin.editable).toBeNull()
+    // pg reports tableID provenance to the base table even through a CTE / derived table,
+    // so these self-joins also look single-table by metadata — must be refused too.
+    const cte = await driver.runQuery(id, { kind: 'sql', sql: 'WITH c AS (SELECT * FROM t_edit) SELECT a.id, b.name FROM c a JOIN c b ON b.id = a.id' }, { maxRows: 10, queryId: 'e3c', readOnly: false })
+    expect(cte.editable).toBeNull()
+    const derived = await driver.runQuery(id, { kind: 'sql', sql: 'SELECT x.id, y.name FROM (SELECT * FROM t_edit WHERE id > 0) x JOIN t_edit y ON y.id = x.id' }, { maxRows: 10, queryId: 'e3d', readOnly: false })
+    expect(derived.editable).toBeNull()
   })
 
   it('applyEdits updates by primary key in a transaction', async () => {

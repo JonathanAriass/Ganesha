@@ -3,7 +3,7 @@ import type {
   DatabaseDriver, ConnectParams, RunOptions, QueryRequest, QueryResult, ColumnMeta,
   DbObject, ObjectRef, ColumnInfo, EditableResult, TableEdits
 } from '../types'
-import { buildEditableResult, sourceTableReferenceCount, type PerColumnSource } from './edit-target'
+import { buildEditableResult, isSingleTableScan, type PerColumnSource } from './edit-target'
 import { buildUpdate } from './update-builder'
 
 const { Pool } = pg
@@ -141,9 +141,10 @@ export class PostgresDriver implements DatabaseDriver {
       if (oids.length !== 1) return null
       const meta = await this.resolvePgTable(id, oids[0])
       if (!meta) return null
-      // A self-join shows one source table in the metadata but spans two base rows per
-      // result row — refuse it (the row key would target the wrong row).
-      if (sourceTableReferenceCount(sql, meta.name) !== 1) return null
+      // A self-join (incl. via CTE / derived table) shows one source table in the
+      // metadata but spans two base rows per result row — refuse it (the row key would
+      // target the wrong row).
+      if (!isSingleTableScan(sql, meta.name)) return null
       const perColumn: PerColumnSource[] = fields.map((f) =>
         f.tableID === oids[0] && meta.cols.has(f.columnID)
           ? { table: { schema: meta.schema, name: meta.name }, column: meta.cols.get(f.columnID)! }
