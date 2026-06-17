@@ -232,7 +232,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         const neighbor = s.tabs[idx + 1] ?? s.tabs[idx - 1] ?? null
         activeTabId = neighbor ? neighbor.id : null
       }
-      return { tabs: next, activeTabId }
+      // Drop a commit modal whose tab is gone, or its overlay guard would silently
+      // swallow every shortcut with nothing visible on screen.
+      const commitModal = next.some((t) => t.id === s.commitModal?.tabId) ? s.commitModal : null
+      return { tabs: next, activeTabId, commitModal }
     }),
 
   closeTabsForConnection: (connectionId) =>
@@ -240,7 +243,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       const next = s.tabs.filter((t) => t.connectionId !== connectionId)
       if (next.length === s.tabs.length) return s
       const stillActive = next.some((t) => t.id === s.activeTabId)
-      return { tabs: next, activeTabId: stillActive ? s.activeTabId : (next[0]?.id ?? null) }
+      const commitModal = next.some((t) => t.id === s.commitModal?.tabId) ? s.commitModal : null
+      return { tabs: next, activeTabId: stillActive ? s.activeTabId : (next[0]?.id ?? null), commitModal }
     }),
 
   setActiveTab: (id) => set({ activeTabId: id }),

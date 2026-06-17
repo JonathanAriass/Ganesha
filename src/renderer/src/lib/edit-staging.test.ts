@@ -50,11 +50,12 @@ describe('describeEdits', () => {
     { name: 'name', dataType: 'text' },
     { name: 'email', dataType: 'text' }
   ]
-  it('describes each staged cell with table, key, column, old and new values', () => {
-    const dirty = { [dirtyKey(0, 1)]: 'AA', [dirtyKey(1, 2)]: 'bb@x.io' }
+  it('describes each staged cell with table, key, column, old and new values, ordered by row then column', () => {
+    const dirty = { [dirtyKey(1, 2)]: 'bb@x.io', [dirtyKey(0, 2)]: 'aa@x.io', [dirtyKey(0, 1)]: 'AA' }
     expect(describeEdits(dirty, cols, rows, editable)).toEqual([
-      { table: 'public.users', key: { id: 2 }, column: 'email', oldValue: 'b@x.io', newValue: 'bb@x.io' },
-      { table: 'public.users', key: { id: 1 }, column: 'name', oldValue: 'a', newValue: 'AA' }
+      { table: 'public.users', key: { id: 1 }, column: 'email', oldValue: 'a@x.io', newValue: 'aa@x.io' }, // row 0
+      { table: 'public.users', key: { id: 1 }, column: 'name', oldValue: 'a', newValue: 'AA' }, // row 0
+      { table: 'public.users', key: { id: 2 }, column: 'email', oldValue: 'b@x.io', newValue: 'bb@x.io' } // row 1
     ])
   })
   it('omits the schema prefix when there is none', () => {

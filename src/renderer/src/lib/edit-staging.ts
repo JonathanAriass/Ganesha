@@ -44,7 +44,9 @@ export interface EditChange {
 }
 
 /** Describe the staged edits as a reviewable list (one entry per edited cell), ordered by
- *  row then column. Edits on null-source or key columns are skipped (never editable). */
+ *  row then column. Edits on null-source or key columns are skipped (never editable).
+ *  `oldValue` reads the current result row — sound because the modal closes on a
+ *  successful commit, so it never shows already-adopted values. */
 export function describeEdits(
   dirty: Record<string, unknown>,
   columns: ColumnMeta[],
@@ -52,7 +54,7 @@ export function describeEdits(
   editable: EditableResult
 ): EditChange[] {
   const table = editable.table.schema ? `${editable.table.schema}.${editable.table.name}` : editable.table.name
-  const out: EditChange[] = []
+  const out: (EditChange & { rowIndex: number })[] = []
   for (const [k, newValue] of Object.entries(dirty)) {
     const [rowIndex, colIndex] = k.split(':').map(Number)
     const realCol = editable.columnSources[colIndex]
@@ -61,7 +63,8 @@ export function describeEdits(
     if (!row) continue
     const key: Record<string, unknown> = {}
     for (const kc of editable.keyColumns) key[kc] = row[editable.columnSources.indexOf(kc)]
-    out.push({ table, key, column: columns[colIndex]?.name ?? realCol, oldValue: row[colIndex], newValue })
+    out.push({ table, key, column: columns[colIndex]?.name ?? realCol, oldValue: row[colIndex], newValue, rowIndex })
   }
-  return out.sort((a, b) => a.column.localeCompare(b.column))
+  out.sort((a, b) => a.rowIndex - b.rowIndex || a.column.localeCompare(b.column))
+  return out.map(({ rowIndex: _rowIndex, ...c }) => c)
 }

@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useAppStore } from '../state/store'
 import { describeEdits, type EditChange } from '../lib/edit-staging'
 import { cellText } from '../lib/grid-text'
@@ -14,16 +15,17 @@ export default function CommitChangesModal(): JSX.Element | null {
 
   useRestoreFocus()
 
-  if (!modal || !tab) return null
-  const result = tab.result
+  const result = tab?.result
   const changes: EditChange[] =
-    result?.editable ? describeEdits(tab.edits, result.columns, result.rows, result.editable) : []
+    modal && tab && result?.editable ? describeEdits(tab.edits, result.columns, result.rows, result.editable) : []
 
-  // Nothing left to confirm (e.g. all reset) — drop the modal.
-  if (changes.length === 0) {
-    close()
-    return null
-  }
+  // Nothing left to confirm (all reset, or a new result landed while open) — drop the
+  // modal from an effect, never via setState during render.
+  useEffect(() => {
+    if (modal && changes.length === 0) close()
+  }, [modal, changes.length, close])
+
+  if (!modal || !tab || changes.length === 0) return null
 
   const tableName = changes[0].table
   const confirm = async (): Promise<void> => {
