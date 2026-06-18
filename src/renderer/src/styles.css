@@ -1004,44 +1004,6 @@ input[type="password"]::placeholder {
   border-color: var(--warn);
 }
 
-/* ── Document-tree editing ── */
-.doc-leaf {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  border-radius: 3px;
-}
-.doc-leaf.cell-dirty {
-  box-shadow: inset 2px 0 0 var(--warn);
-}
-.doc-editable {
-  cursor: cell;
-  border-radius: 3px;
-}
-.doc-editable:hover {
-  background: var(--hover-overlay);
-}
-/* The shared reset button is absolute for grid cells; inline it for the tree. */
-.doc-reset {
-  position: static;
-  transform: none;
-  opacity: 0.7;
-}
-.doc-editing {
-  display: inline-flex;
-  align-items: center;
-}
-.doc-editing input {
-  width: 220px;
-  height: 22px;
-  border: 1px solid var(--accent);
-  background: var(--bg);
-  color: var(--text);
-  font: inherit;
-  font-size: 12px;
-  padding: 0 6px;
-  outline: none;
-}
 .grid-cell.editing {
   display: flex;
   align-items: center;
@@ -1248,20 +1210,30 @@ input[type="password"]::placeholder {
 
 /* ── Document view ── */
 .doc-view {
-  font-family: ui-monospace, 'SF Mono', 'Fira Mono', monospace;
   font-size: 12.5px;
   padding: 10px;
-  line-height: 1.5;
   overflow: auto;
   flex: 1;
+  /* Intermediates so the library's same-named vars can take our themed colors below
+     without a self-referential CSS cycle. */
+  --jv-string: var(--json-string);
+  --jv-number: var(--json-number);
 }
 
-.doc-view details {
-  margin-left: 14px;
+/* react18-json-view themed to the app via its CSS custom properties (which adapt to the
+   active Midnight/Light theme through our --json-* / --text vars). */
+.doc-view .json-view {
+  font-family: ui-monospace, 'SF Mono', 'Fira Mono', monospace;
+  color: var(--text);
+  --json-property: var(--json-key);
+  --json-string: var(--jv-string);
+  --json-number: var(--jv-number);
+  --json-boolean: var(--json-bool);
+  --json-null: var(--text-2);
+  --json-index: var(--text-2);
 }
-
-.doc-view summary {
-  cursor: pointer;
+.doc-view .json-view .jv-button {
+  color: var(--accent);
 }
 
 .json-key {

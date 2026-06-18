@@ -1,10 +1,11 @@
-import { useRef, useState } from 'react'
+import { useMemo } from 'react'
+import JsonView from 'react18-json-view'
+import 'react18-json-view/src/style.css'
 import type { EditableResult } from '@shared/query'
-import { editKey, getAtPath, isEjsonWrapper, isKeyPath } from '../lib/doc-path'
+import { jsonEditTarget, applyPendingEdits } from '../lib/json-edit'
+import { editKey, getAtPath, isKeyPath } from '../lib/doc-path'
 import { coerceMongoEditValue } from '../lib/mongo-edit-value'
-import { cellText } from '../lib/grid-text'
 import { useAppStore } from '../state/store'
-import EditingCell from './EditingCell'
 
 interface Props {
   documents: Record<string, unknown>[]
@@ -16,127 +17,50 @@ interface Props {
   edits?: Record<string, unknown>
 }
 
-/** What recursive JsonNode needs to render and edit leaves. */
-interface EditCtx {
-  tabId?: string
-  editable?: EditableResult | null
-  readOnly?: boolean
-  edits: Record<string, unknown>
-  editing: string | null
-  setEditing: (k: string | null) => void
-  stage: (rowIndex: number, path: string, value: unknown) => void
-  reset: (k: string) => void
+/** react18-json-view's onEdit payload (the bits we use). */
+interface EditParams {
+  newValue: unknown
+  parentPath: (string | number)[]
+  indexOrName: string | number
 }
 
-/** Render a leaf value with the JSON syntax colors (objects/EJSON wrappers via cellText). */
-function leafValueEl(value: unknown): JSX.Element {
-  if (value === null || value === undefined) return <span className="json-null">NULL</span>
-  if (typeof value === 'string') return <span className="json-string">{`"${value}"`}</span>
-  if (typeof value === 'number') return <span className="json-number">{String(value)}</span>
-  if (typeof value === 'boolean') return <span className="json-bool">{String(value)}</span>
-  return <span>{cellText(value)}</span> // EJSON wrapper ({$oid}/{$date}) or other
-}
-
-interface JsonNodeProps {
-  name: string
-  value: unknown
-  depth: number
-  rowIndex: number
-  /** Dotted path from the document root ('' for the document itself). */
-  path: string
-  ctx: EditCtx
-}
-
-function JsonNode({ name, value, depth, rowIndex, path, ctx }: JsonNodeProps): JSX.Element {
-  // A plain object/array is a container; an EJSON wrapper ({$oid}/{$date}) is a leaf value.
-  if (value !== null && typeof value === 'object' && !isEjsonWrapper(value)) {
-    const isArray = Array.isArray(value)
-    const entries = isArray
-      ? (value as unknown[]).map((v, i) => [String(i), v] as [string, unknown])
-      : Object.entries(value as Record<string, unknown>)
-    const hint = isArray ? `[${entries.length}]` : '{…}'
-    return (
-      <details open={depth === 0} style={{ marginLeft: depth > 0 ? 14 : 0 }}>
-        <summary>
-          <span className="json-key">{name}</span>
-          {': '}
-          <span style={{ color: 'var(--text-2)', fontSize: '11px' }}>{hint}</span>
-        </summary>
-        {entries.map(([k, v]) => (
-          <JsonNode key={k} name={k} value={v} depth={depth + 1} rowIndex={rowIndex} path={path ? `${path}.${k}` : k} ctx={ctx} />
-        ))}
-      </details>
-    )
-  }
-
-  // Leaf.
-  const k = editKey(rowIndex, path)
-  const isDirty = Object.prototype.hasOwnProperty.call(ctx.edits, k)
-  const shown = isDirty ? ctx.edits[k] : value
-  const canEdit =
-    !!ctx.editable && !ctx.readOnly && path !== '' && !isKeyPath(path, ctx.editable.keyColumns)
-
-  if (ctx.editing === k) {
-    return (
-      <div style={{ marginLeft: 14 }}>
-        <span className="json-key">{name}</span>
-        {': '}
-        <EditingCell
-          className="doc-editing"
-          initial={shown}
-          onCommit={(v) => ctx.stage(rowIndex, path, v)}
-          onCancel={() => ctx.setEditing(null)}
-        />
-      </div>
-    )
-  }
-
-  return (
-    <div style={{ marginLeft: 14 }} className={isDirty ? 'doc-leaf cell-dirty' : 'doc-leaf'}>
-      <span className="json-key">{name}</span>
-      {': '}
-      <span
-        className={canEdit ? 'doc-editable' : undefined}
-        onDoubleClick={canEdit ? () => ctx.setEditing(k) : undefined}
-      >
-        {leafValueEl(shown)}
-      </span>
-      {isDirty && ctx.tabId && (
-        <button className="cell-reset doc-reset" title="Reset this field" onClick={() => ctx.reset(k)}>
-          ↺
-        </button>
-      )}
-    </div>
-  )
-}
-
+/** Collapsible, syntax-highlighted JSON viewer for Mongo documents (themed to the app via
+ *  CSS vars on `.json-view`). Documents collapse by default on large result sets for speed;
+ *  scalar leaves are editable in place (double-click), staged through the same path-keyed
+ *  pipeline as the table — `_id`, key columns and EJSON-wrapper internals stay read-only. */
 export default function DocumentView({ documents, tabId, editable, readOnly, requireCommit, edits = {} }: Props): JSX.Element {
-  const [editing, setEditing] = useState<string | null>(null)
-  // Drop a stale in-progress edit when a new result replaces the documents.
-  const docsRef = useRef(documents)
-  if (docsRef.current !== documents) {
-    docsRef.current = documents
-    if (editing) setEditing(null)
-  }
+  const canEdit = !!editable && !readOnly && !!tabId
 
-  const stage = (rowIndex: number, path: string, value: unknown): void => {
-    setEditing(null) // close the editor regardless
-    if (!tabId) return
-    const original = getAtPath(documents[rowIndex], path)
-    useAppStore.getState().setCellEdit(tabId, editKey(rowIndex, path), coerceMongoEditValue(value as string | null, original))
+  // The viewer mutates its `src` in place on edit — feed it a fresh deep clone (with staged
+  // edits applied, so pending values show). Memoized: re-clones only when docs/edits change.
+  const src = useMemo(() => applyPendingEdits(structuredClone(documents), edits), [documents, edits])
+
+  const onEdit = (params: EditParams): void => {
+    if (!canEdit || !tabId || !editable) return
+    const target = jsonEditTarget(params.parentPath, params.indexOrName)
+    if (!target || isKeyPath(target.path, editable.keyColumns)) return // _id / key / wrapper internal
+    const original = getAtPath(documents[target.rowIndex], target.path)
+    const value = typeof params.newValue === 'string' ? coerceMongoEditValue(params.newValue, original) : params.newValue
+    useAppStore.getState().setCellEdit(tabId, editKey(target.rowIndex, target.path), value)
     if (!requireCommit) void useAppStore.getState().commitEdits(tabId)
   }
-  const reset = (k: string): void => {
-    if (tabId) useAppStore.getState().resetCellEdit(tabId, k)
-  }
-
-  const ctx: EditCtx = { tabId, editable, readOnly, edits, editing, setEditing, stage, reset }
 
   return (
     <div className="doc-view">
-      {documents.map((doc, i) => (
-        <JsonNode key={i} name={String(i)} value={doc} depth={0} rowIndex={i} path="" ctx={ctx} />
-      ))}
+      <JsonView
+        src={src}
+        // Big result → collapse each document (just headers render, fast); small result →
+        // show fields with nested objects collapsed.
+        collapsed={({ depth }: { depth: number }) => (documents.length > 50 ? depth >= 1 : depth >= 2)}
+        displaySize="collapsed"
+        enableClipboard
+        editable={canEdit ? { edit: true, add: false, delete: false } : false}
+        onEdit={canEdit ? (onEdit as (p: unknown) => void) : undefined}
+        // Belt-and-braces affordance: never offer an edit pencil on a top-level _id.
+        customizeNode={({ indexOrName, depth }: { indexOrName?: string | number; depth: number }) =>
+          depth === 2 && indexOrName === '_id' ? { edit: false } : undefined
+        }
+      />
     </div>
   )
 }
