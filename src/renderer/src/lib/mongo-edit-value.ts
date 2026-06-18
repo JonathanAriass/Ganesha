@@ -13,3 +13,13 @@ export function coerceMongoEditValue(text: string | null, original: unknown): un
     return text
   }
 }
+
+/** Coerce a JSON-viewer edit (react18-json-view hands back an ALREADY-parsed value — e.g.
+ *  editing a string field "42" yields the number 42) back to the original field's type, so
+ *  a string field stays a string. null passes through. Non-strings are re-stringified and
+ *  run through the same original-type-biased coercion. */
+export function coerceLibraryEditValue(newValue: unknown, original: unknown): unknown {
+  if (newValue === null) return null
+  const text = typeof newValue === 'string' ? newValue : JSON.stringify(newValue)
+  return coerceMongoEditValue(text, original)
+}

@@ -4,7 +4,7 @@ import 'react18-json-view/src/style.css'
 import type { EditableResult } from '@shared/query'
 import { jsonEditTarget, applyPendingEdits } from '../lib/json-edit'
 import { editKey, getAtPath, isKeyPath } from '../lib/doc-path'
-import { coerceMongoEditValue } from '../lib/mongo-edit-value'
+import { coerceLibraryEditValue } from '../lib/mongo-edit-value'
 import { useAppStore } from '../state/store'
 
 interface Props {
@@ -40,7 +40,9 @@ export default function DocumentView({ documents, tabId, editable, readOnly, req
     const target = jsonEditTarget(params.parentPath, params.indexOrName)
     if (!target || isKeyPath(target.path, editable.keyColumns)) return // _id / key / wrapper internal
     const original = getAtPath(documents[target.rowIndex], target.path)
-    const value = typeof params.newValue === 'string' ? coerceMongoEditValue(params.newValue, original) : params.newValue
+    // The library hands back an already-parsed value (a string field "42" arrives as 42);
+    // re-bias it to the original field's type so a string stays a string.
+    const value = coerceLibraryEditValue(params.newValue, original)
     useAppStore.getState().setCellEdit(tabId, editKey(target.rowIndex, target.path), value)
     if (!requireCommit) void useAppStore.getState().commitEdits(tabId)
   }
@@ -57,9 +59,10 @@ export default function DocumentView({ documents, tabId, editable, readOnly, req
         enableClipboard
         editable={canEdit ? { edit: true, add: false, delete: false } : false}
         onEdit={canEdit ? (onEdit as (p: unknown) => void) : undefined}
-        // Belt-and-braces affordance: never offer an edit pencil on a top-level _id.
-        customizeNode={({ indexOrName, depth }: { indexOrName?: string | number; depth: number }) =>
-          depth === 2 && indexOrName === '_id' ? { edit: false } : undefined
+        // Belt-and-braces affordance: never offer an edit pencil on an _id field (the
+        // onEdit guard also refuses key columns — this just hides the pencil).
+        customizeNode={({ indexOrName }: { indexOrName?: string | number; depth: number }) =>
+          indexOrName === '_id' ? { edit: false } : undefined
         }
       />
     </div>

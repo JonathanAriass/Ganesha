@@ -1236,27 +1236,6 @@ input[type="password"]::placeholder {
   color: var(--accent);
 }
 
-.json-key {
-  color: var(--json-key);
-}
-
-.json-string {
-  color: var(--json-string);
-}
-
-.json-number {
-  color: var(--json-number);
-}
-
-.json-bool {
-  color: var(--json-bool);
-}
-
-.json-null {
-  color: var(--text-2);
-  font-style: italic;
-}
-
 /* ── Spinner ── */
 @keyframes spin {
   to { transform: rotate(360deg); }

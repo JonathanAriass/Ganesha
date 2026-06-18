@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { editKey, parseEditKey, getAtPath, setAtPath, isEjsonWrapper, isKeyPath } from './doc-path'
+import { editKey, parseEditKey, getAtPath, setAtPath, isKeyPath } from './doc-path'
 
 describe('editKey', () => {
   it('round-trips row index and path (path may contain dots/colons/spaces)', () => {
@@ -47,21 +47,5 @@ describe('isKeyPath', () => {
   })
   it('supports composite keys', () => {
     expect(isKeyPath('b', ['a', 'b'])).toBe(true)
-  })
-})
-
-describe('isEjsonWrapper', () => {
-  it('is true for single $-prefixed-key wrappers', () => {
-    expect(isEjsonWrapper({ $oid: 'x' })).toBe(true)
-    expect(isEjsonWrapper({ $date: 'x' })).toBe(true)
-    expect(isEjsonWrapper({ $numberLong: '1' })).toBe(true)
-  })
-  it('is false for plain objects, multi-key, arrays, scalars, null', () => {
-    expect(isEjsonWrapper({ a: 1 })).toBe(false)
-    expect(isEjsonWrapper({ $oid: 'x', y: 1 })).toBe(false)
-    expect(isEjsonWrapper([1])).toBe(false)
-    expect(isEjsonWrapper('s')).toBe(false)
-    expect(isEjsonWrapper(5)).toBe(false)
-    expect(isEjsonWrapper(null)).toBe(false)
   })
 })

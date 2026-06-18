@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { coerceMongoEditValue } from './mongo-edit-value'
+import { coerceMongoEditValue, coerceLibraryEditValue } from './mongo-edit-value'
 
 describe('coerceMongoEditValue', () => {
   it('keeps a string-typed field a string (no accidental number coercion)', () => {
@@ -19,5 +19,21 @@ describe('coerceMongoEditValue', () => {
   })
   it('passes null through (the NULL control)', () => {
     expect(coerceMongoEditValue(null, 5)).toBeNull()
+  })
+})
+
+describe('coerceLibraryEditValue', () => {
+  it('keeps a string field a string even when the viewer hands back a parsed number', () => {
+    expect(coerceLibraryEditValue(42, 'old')).toBe('42') // string field "42"→stays "42"
+    expect(coerceLibraryEditValue(true, 'flag')).toBe('true')
+  })
+  it('keeps a number field a number', () => {
+    expect(coerceLibraryEditValue(43, 7)).toBe(43)
+  })
+  it('keeps a boolean field a boolean', () => {
+    expect(coerceLibraryEditValue(false, true)).toBe(false)
+  })
+  it('passes null through', () => {
+    expect(coerceLibraryEditValue(null, 5)).toBeNull()
   })
 })
