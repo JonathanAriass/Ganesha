@@ -51,6 +51,8 @@ export default function DocumentView({ documents, tabId, editable, readOnly, req
         src={src}
         // Expanded by default (the user can still fold individual nodes via the chevrons).
         collapsed={false}
+        // Don't chunk the document array into `[0 … 99]` range groups — show the documents.
+        ignoreLargeArray
         displaySize="collapsed"
         enableClipboard
         editable={canEdit ? { edit: true, add: false, delete: false } : false}
