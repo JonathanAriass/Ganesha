@@ -57,7 +57,7 @@ npm run dev        # launch the app with hot reload
 
 ```bash
 npm run typecheck && npm run lint
-npm test                  # 467 unit tests (Vitest, Node ABI)
+npm test                  # 477 unit tests (Vitest, Node ABI)
 npm run test:integration  # 17 tests vs real Postgres/MySQL/Mongo + an SSH tunnel (testcontainers, needs Docker)
 ```
 
