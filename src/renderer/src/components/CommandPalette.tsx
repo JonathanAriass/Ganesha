@@ -10,7 +10,6 @@ export default function CommandPalette(): JSX.Element {
   const setPaletteOpen = useAppStore((s) => s.setPaletteOpen)
   const openSettings = useAppStore((s) => s.openSettings)
   const openQueryTab = useAppStore((s) => s.openQueryTab)
-  const openOrLoadQuery = useAppStore((s) => s.openOrLoadQuery)
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
   const setActiveConnection = useAppStore((s) => s.setActiveConnection)
 
@@ -76,7 +75,13 @@ export default function CommandPalette(): JSX.Element {
                     // id keeps the value unique when two snippets share a name
                     value={`saved ${q.name} ${q.id}`}
                     onSelect={() => {
-                      openOrLoadQuery({ connectionId: activeConn.id, title: q.name, text: q.query })
+                      // Match the sidebar: activating a saved query opens a fresh tab and runs it.
+                      openQueryTab({
+                        connectionId: activeConn.id,
+                        title: q.name,
+                        text: q.query,
+                        runOnOpen: true,
+                      })
                       close()
                     }}
                   >

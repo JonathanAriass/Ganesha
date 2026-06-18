@@ -4,7 +4,7 @@ import { useSavedQueries, useDeleteSavedQuery } from '../lib/hooks'
 
 export default function SavedSection(): JSX.Element | null {
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
-  const openOrLoadQuery = useAppStore((s) => s.openOrLoadQuery)
+  const openQueryTab = useAppStore((s) => s.openQueryTab)
   const openSaveQueryModal = useAppStore((s) => s.openSaveQueryModal)
 
   const { data: snippets, isLoading, isError } = useSavedQueries(activeConnectionId)
@@ -36,8 +36,15 @@ export default function SavedSection(): JSX.Element | null {
             <button
               className="s-open"
               title={q.query}
+              // Clicking a saved query opens a fresh tab and runs it (runOnOpen) — never
+              // clobbers the current tab's draft.
               onClick={() =>
-                openOrLoadQuery({ connectionId: activeConnectionId, title: q.name, text: q.query })
+                openQueryTab({
+                  connectionId: activeConnectionId,
+                  title: q.name,
+                  text: q.query,
+                  runOnOpen: true,
+                })
               }
             >
               <span className="s-name">{q.name}</span>
