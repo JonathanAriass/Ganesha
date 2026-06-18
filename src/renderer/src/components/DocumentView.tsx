@@ -49,9 +49,8 @@ export default function DocumentView({ documents, tabId, editable, readOnly, req
     <div className="doc-view">
       <JsonView
         src={src}
-        // Big result → collapse each document (just headers render, fast); small result →
-        // show fields with nested objects collapsed.
-        collapsed={({ depth }: { depth: number }) => (documents.length > 50 ? depth >= 1 : depth >= 2)}
+        // Expanded by default (the user can still fold individual nodes via the chevrons).
+        collapsed={false}
         displaySize="collapsed"
         enableClipboard
         editable={canEdit ? { edit: true, add: false, delete: false } : false}
