@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { rowCountLabel, truncationLabel } from './result-label'
+import { rowCountLabel, truncationLabel, affectedRowsLabel } from './result-label'
 
 const rows = (n: number): unknown[][] => Array.from({ length: n }, () => [])
 
@@ -28,5 +28,17 @@ describe('result labels', () => {
 
   it('singular for one row', () => {
     expect(rowCountLabel({ rows: rows(1), rowCount: 1, truncated: false })).toBe('1 row')
+  })
+})
+
+describe('affectedRowsLabel (write/command results — no result set)', () => {
+  it('pluralizes the affected count', () => {
+    expect(affectedRowsLabel({ rowCount: 5 })).toBe('5 rows affected')
+  })
+  it('singular for one affected row', () => {
+    expect(affectedRowsLabel({ rowCount: 1 })).toBe('1 row affected')
+  })
+  it('zero matches reads as 0 rows affected (an UPDATE that hit nothing)', () => {
+    expect(affectedRowsLabel({ rowCount: 0 })).toBe('0 rows affected')
   })
 })

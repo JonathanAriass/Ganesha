@@ -7,7 +7,7 @@ import DocumentView from './DocumentView'
 import { toCsv, toJsonText, toJsonObjects, download } from '../lib/export'
 import { rowMatchesFilter } from '../lib/grid-text'
 import { mod } from '../lib/platform'
-import { truncationLabel } from '../lib/result-label'
+import { truncationLabel, affectedRowsLabel } from '../lib/result-label'
 
 interface Props {
   tab: QueryTabData
@@ -73,10 +73,16 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
     return filtering ? result.rows.filter((r) => rowMatchesFilter(r, filter)) : result.rows
   }
 
+  // A result with no columns is a write/command (UPDATE/INSERT/DELETE/DDL), never a
+  // SELECT — a zero-row SELECT still carries its column headers and renders an empty
+  // grid below. So report that it ran and how many rows it affected, not "No rows".
   if (result.columns.length === 0) {
     return (
       <div className="results">
-        <div className="results-empty">No rows</div>
+        <div className="results-empty done">
+          <div className="done-title">✓ Query executed successfully</div>
+          <div className="done-sub">{affectedRowsLabel(result)}</div>
+        </div>
       </div>
     )
   }

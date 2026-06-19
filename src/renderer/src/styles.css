@@ -840,6 +840,18 @@ input[type="password"]::placeholder {
   color: var(--text-2);
   font-size: 13px;
 }
+/* Write/command success (UPDATE/INSERT/DELETE/DDL): a two-line affirmation. */
+.results-empty.done {
+  flex-direction: column;
+  gap: 4px;
+}
+.results-empty.done .done-title {
+  color: var(--text);
+  font-weight: 600;
+}
+.results-empty.done .done-sub {
+  color: var(--text-2);
+}
 
 .qt-error {
   color: var(--danger-text);

@@ -8,7 +8,7 @@ import ResultsPanel from './ResultsPanel'
 import type { ConnectionType } from '@shared/domain'
 import type { ObjectRef } from '@shared/schema'
 import { mod } from '../lib/platform'
-import { rowCountLabel } from '../lib/result-label'
+import { rowCountLabel, affectedRowsLabel } from '../lib/result-label'
 import { unwrap } from '../lib/result'
 import type { CompletionCtx } from '../lib/monaco-completions'
 import {
@@ -270,9 +270,12 @@ export default function QueryTab({ tab }: Props): JSX.Element {
         </span>
       )
   } else if (tab.result) {
+    // No columns = a write/command — label the affected-row count, not "N rows".
+    const label =
+      tab.result.columns.length === 0 ? affectedRowsLabel(tab.result) : rowCountLabel(tab.result)
     statusEl = (
       <span className="qt-status">
-        {rowCountLabel(tab.result)} · {tab.result.durationMs} ms
+        {label} · {tab.result.durationMs} ms
       </span>
     )
   } else if (tab.error) {
