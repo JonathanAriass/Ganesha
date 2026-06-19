@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" fill="none">
+  <!-- Ganesha — original line-art mark for the Ganesha database client. MIT, no third-party art. -->
+  <g stroke="#C49A5E" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Crown / mukut -->
+    <g fill="#FCF6EC">
+      <circle cx="128" cy="30" r="6"/>
+      <ellipse cx="128" cy="48" rx="15" ry="6.5"/>
+      <ellipse cx="128" cy="62" rx="24" ry="8.5"/>
+      <ellipse cx="128" cy="77" rx="18" ry="7"/>
+    </g>
+    <!-- Ears (drooping leaf shapes, behind the face) -->
+    <path fill="#FCF6EC" d="M108 98 C 84 84, 44 88, 29 113 C 19 130, 27 155, 55 156 C 80 157, 102 146, 110 127 Z"/>
+    <path fill="#FCF6EC" d="M148 98 C 172 84, 212 88, 227 113 C 237 130, 229 155, 201 156 C 176 157, 154 146, 146 127 Z"/>
+    <!-- Head / face -->
+    <path fill="#FCF6EC" d="M128 84 C 104 84, 92 102, 92 125 C 92 147, 106 162, 128 163 C 150 162, 164 147, 164 125 C 164 102, 152 84, 128 84 Z"/>
+    <!-- Trunk -->
+    <path fill="#FCF6EC" d="M128 159 C 126 182, 135 200, 144 212 C 151 222, 147 235, 132 237 C 119 239, 111 229, 116 220 C 120 213, 129 215, 127 223"/>
+    <!-- Bindi -->
+    <path fill="#E58A4E" stroke="#E58A4E" d="M128 96 C 123 106, 121 112, 126 116 C 128 118, 128 118, 130 116 C 135 112, 133 106, 128 96 Z"/>
+  </g>
+  <circle cx="114" cy="124" r="3.6" fill="#6B5336"/>
+  <circle cx="142" cy="124" r="3.6" fill="#6B5336"/>
+  <ellipse cx="102" cy="138" rx="7" ry="4.8" fill="#F2C2BE"/>
+  <ellipse cx="154" cy="138" rx="7" ry="4.8" fill="#F2C2BE"/>
+</svg>
