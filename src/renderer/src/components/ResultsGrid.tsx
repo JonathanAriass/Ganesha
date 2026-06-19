@@ -245,6 +245,7 @@ export default function ResultsGrid({
                     onPointerDown={(e) => startResize(e, Number(header.column.id))}
                     onPointerMove={moveResize}
                     onPointerUp={endResize}
+                    onPointerCancel={endResize}
                     onDoubleClick={(e) => {
                       e.stopPropagation()
                       autoFit(Number(header.column.id))
