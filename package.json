@@ -4,6 +4,14 @@
   "description": "Modern, fast, cross-platform database client",
   "author": "JonathanAriass",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JonathanAriass/Ganesha.git"
+  },
+  "homepage": "https://github.com/JonathanAriass/Ganesha#readme",
+  "bugs": {
+    "url": "https://github.com/JonathanAriass/Ganesha/issues"
+  },
   "main": "./out/main/index.js",
   "scripts": {
     "postinstall": "electron-builder install-app-deps",
