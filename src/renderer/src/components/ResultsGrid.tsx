@@ -75,12 +75,24 @@ export default function ResultsGrid({
     setWidths({})
   }
   const measureRef = useRef<CanvasRenderingContext2D | null>(null)
+  const dragRef = useRef<{
+    colIndex: number
+    startW: number
+    startX: number
+    live: Record<number, number>
+    moved: boolean
+  } | null>(null)
 
   // Pending deferred panel-open (see the row onClick); cleared on unmount.
   const selTimer = useRef<number | null>(null)
   useEffect(
     () => () => {
       if (selTimer.current !== null) window.clearTimeout(selTimer.current)
+      // Unmounted mid-drag: restore the body styles the drag set.
+      if (dragRef.current) {
+        document.body.style.userSelect = ''
+        document.body.style.cursor = ''
+      }
     },
     []
   )
@@ -156,32 +168,44 @@ export default function ResultsGrid({
   const minW = gridMinWidth(columns.length, widths)
   const wrapStyle = { '--grid-cols': template, '--grid-min': `${minW}px` } as CSSProperties
 
-  // Drag a header's right edge → set that column's px width. During the drag we write the CSS
-  // vars straight to .grid-wrap (every row follows via CSS, no React render); on pointer-up the
-  // width is committed to state. Mirrors the editor-splitter's direct-DOM-during-drag pattern.
+  // Drag a header's right edge → set that column's px width. Uses pointer capture (like the
+  // editor splitter), so the handle keeps receiving move/up events even outside it AND React
+  // detaches them if the grid unmounts mid-drag — no stray window listeners. The live widths
+  // ride in a ref; each move writes the CSS vars straight to .grid-wrap (every row follows via
+  // CSS, no React render) and pointer-up commits to state. A click without a real drag (≤3px)
+  // never commits — so double-click-to-auto-fit doesn't accidentally lock a column.
   function startResize(e: ReactPointerEvent<HTMLDivElement>, colIndex: number): void {
     e.preventDefault()
     e.stopPropagation()
-    const startW = (e.currentTarget.parentElement as HTMLElement).getBoundingClientRect().width
-    const startX = e.clientX
-    const wrap = parentRef.current
-    const live: Record<number, number> = { ...widths }
+    e.currentTarget.setPointerCapture(e.pointerId)
+    dragRef.current = {
+      colIndex,
+      startW: (e.currentTarget.parentElement as HTMLElement).getBoundingClientRect().width,
+      startX: e.clientX,
+      live: { ...widths },
+      moved: false,
+    }
     document.body.style.userSelect = 'none'
     document.body.style.cursor = 'col-resize'
-    const onMove = (ev: PointerEvent): void => {
-      live[colIndex] = clampColumnWidth(startW + (ev.clientX - startX))
-      wrap?.style.setProperty('--grid-cols', buildGridTemplate(columns.length, live))
-      wrap?.style.setProperty('--grid-min', `${gridMinWidth(columns.length, live)}px`)
-    }
-    const onUp = (): void => {
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
-      document.body.style.userSelect = ''
-      document.body.style.cursor = ''
-      setWidths({ ...live })
-    }
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp)
+  }
+
+  function moveResize(e: ReactPointerEvent<HTMLDivElement>): void {
+    const d = dragRef.current
+    if (!d || Math.abs(e.clientX - d.startX) <= 3) return // ignore hover / click jitter
+    d.moved = true
+    d.live = { ...d.live, [d.colIndex]: clampColumnWidth(d.startW + (e.clientX - d.startX)) }
+    const wrap = parentRef.current
+    wrap?.style.setProperty('--grid-cols', buildGridTemplate(columns.length, d.live))
+    wrap?.style.setProperty('--grid-min', `${gridMinWidth(columns.length, d.live)}px`)
+  }
+
+  function endResize(): void {
+    const d = dragRef.current
+    if (!d) return
+    dragRef.current = null
+    document.body.style.userSelect = ''
+    document.body.style.cursor = ''
+    if (d.moved) setWidths({ ...d.live }) // only a real drag commits a width
   }
 
   // Double-click the handle → fit the column to the widest loaded value (header + all loaded
@@ -219,6 +243,8 @@ export default function ResultsGrid({
                     className="col-resizer"
                     title="Drag to resize · double-click to fit"
                     onPointerDown={(e) => startResize(e, Number(header.column.id))}
+                    onPointerMove={moveResize}
+                    onPointerUp={endResize}
                     onDoubleClick={(e) => {
                       e.stopPropagation()
                       autoFit(Number(header.column.id))
