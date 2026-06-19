@@ -57,7 +57,7 @@ Ganesha is a desktop client for the four databases people actually reach for, bu
 
 ### Results
 
-- **Virtualized grid** — TanStack Table + Virtual handles large result sets with instant client-side filtering, a collapsible JSON document view for Mongo, and CSV/JSON export that respects the active filter.
+- **Virtualized grid** — TanStack Table + Virtual handles large result sets with instant client-side filtering, a collapsible JSON document view for Mongo, and CSV/JSON export that respects the active filter. Resize columns by dragging a header's edge, or double-click it to auto-fit.
 - **Honest numbers** — when Mongo can't know the true total, the label says "showing first N (more available)" instead of inventing one. BIGINT/DECIMAL/Mongo Int64 values beyond JavaScript's safe range arrive as exact strings instead of silently rounding, and an explicit `{"$numberLong": "…"}` reaches the server as a true int64 — exact in both directions.
 - **Row inspector** — click a row for every field at full value (JSON pretty-printed, copy keeps the original bytes), with copy-row and prev/next that follow the current sort/filter.
 - **Edit in place** — double-click a cell to edit when the result maps to a single table with a primary key. Changed cells highlight as pending; **↺** reverts one cell. A per-connection *"require explicit commit"* switch stages edits until you confirm them in a review dialog (row, column, old→new) — the write runs as one transaction where each row must match exactly one row or the whole batch rolls back. Works across all four engines, including **nested Mongo values** in the JSON document view (`address.city`, `tags.0`), committed as a `$set` on that field path. Edits never build SQL in the renderer — drivers send parameterized statements.
@@ -113,7 +113,7 @@ npm run dev        # launch the app with hot reload
 
 ```bash
 npm run typecheck && npm run lint
-npm test                  # 480 unit tests (Vitest, Node ABI)
+npm test                  # 487 unit tests (Vitest, Node ABI)
 npm run test:integration  # 33 tests vs real Postgres/MySQL/Mongo + an SSH tunnel (testcontainers, needs Docker)
 ```
 
