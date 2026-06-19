@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
 import {
   useReactTable,
   getCoreRowModel,
@@ -10,6 +10,7 @@ import {
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { ColumnMeta, EditableResult } from '@shared/query'
 import { cellText, cellMatchesFilter } from '../lib/grid-text'
+import { buildGridTemplate, gridMinWidth, clampColumnWidth, autoFitWidth } from '../lib/column-size'
 import { editKey } from '../lib/doc-path'
 import { coerceMongoEditValue } from '../lib/mongo-edit-value'
 import { useAppStore } from '../state/store'
@@ -64,6 +65,16 @@ export default function ResultsGrid({
     if (editing) setEditing(null)
   }
   const store = useAppStore.getState
+
+  // Per-column pixel widths for columns the user has resized/auto-fit; untouched columns keep
+  // the flexible fill. Reset whenever the columns change (a new query → default layout).
+  const [widths, setWidths] = useState<Record<number, number>>({})
+  const colsRef = useRef(columns)
+  if (colsRef.current !== columns) {
+    colsRef.current = columns
+    setWidths({})
+  }
+  const measureRef = useRef<CanvasRenderingContext2D | null>(null)
 
   // Pending deferred panel-open (see the row onClick); cleared on unmount.
   const selTimer = useRef<number | null>(null)
@@ -138,15 +149,61 @@ export default function ResultsGrid({
     overscan: 10,
   })
 
-  const gridTemplateColumns = `repeat(${columns.length}, minmax(140px, 1fr))`
-  const minW = `${columns.length * 140}px`
+  // The grid template + scroll min-width live in CSS variables on .grid-wrap, so the header
+  // and every row pick them up via CSS — a drag updates one property on the node (below)
+  // instead of re-rendering the virtualized grid each frame.
+  const template = buildGridTemplate(columns.length, widths)
+  const minW = gridMinWidth(columns.length, widths)
+  const wrapStyle = { '--grid-cols': template, '--grid-min': `${minW}px` } as CSSProperties
+
+  // Drag a header's right edge → set that column's px width. During the drag we write the CSS
+  // vars straight to .grid-wrap (every row follows via CSS, no React render); on pointer-up the
+  // width is committed to state. Mirrors the editor-splitter's direct-DOM-during-drag pattern.
+  function startResize(e: ReactPointerEvent<HTMLDivElement>, colIndex: number): void {
+    e.preventDefault()
+    e.stopPropagation()
+    const startW = (e.currentTarget.parentElement as HTMLElement).getBoundingClientRect().width
+    const startX = e.clientX
+    const wrap = parentRef.current
+    const live: Record<number, number> = { ...widths }
+    document.body.style.userSelect = 'none'
+    document.body.style.cursor = 'col-resize'
+    const onMove = (ev: PointerEvent): void => {
+      live[colIndex] = clampColumnWidth(startW + (ev.clientX - startX))
+      wrap?.style.setProperty('--grid-cols', buildGridTemplate(columns.length, live))
+      wrap?.style.setProperty('--grid-min', `${gridMinWidth(columns.length, live)}px`)
+    }
+    const onUp = (): void => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      document.body.style.userSelect = ''
+      document.body.style.cursor = ''
+      setWidths({ ...live })
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+  }
+
+  // Double-click the handle → fit the column to the widest loaded value (header + all loaded
+  // rows; only loaded rows exist — the grid is virtualized). Measured with a canvas using the
+  // grid's own font.
+  function autoFit(colIndex: number): void {
+    if (!measureRef.current) measureRef.current = document.createElement('canvas').getContext('2d')
+    const ctx = measureRef.current
+    if (!ctx) return
+    const sample = parentRef.current?.querySelector('.grid-cell') as HTMLElement | null
+    ctx.font = (sample && getComputedStyle(sample).font) || '12.5px sans-serif'
+    const texts = table.getRowModel().rows.map((r) => cellText((r.original as unknown[])[colIndex]))
+    const w = autoFitWidth(columns[colIndex].name, texts, (s) => ctx.measureText(s).width)
+    setWidths((prev) => ({ ...prev, [colIndex]: w }))
+  }
 
   return (
     <div className="grid-area">
       <div className="grid-col">
-        <div className="grid-wrap" ref={parentRef}>
+        <div className="grid-wrap" ref={parentRef} style={wrapStyle}>
           {/* sticky header */}
-          <div className="grid-head" style={{ gridTemplateColumns, minWidth: minW }}>
+          <div className="grid-head">
             {table.getHeaderGroups()[0]?.headers.map((header) => {
               const sorted = header.column.getIsSorted()
               return (
@@ -158,13 +215,23 @@ export default function ResultsGrid({
                 >
                   {header.column.columnDef.header as string}
                   {sorted === 'asc' ? ' ▲' : sorted === 'desc' ? ' ▼' : ''}
+                  <div
+                    className="col-resizer"
+                    title="Drag to resize · double-click to fit"
+                    onPointerDown={(e) => startResize(e, Number(header.column.id))}
+                    onDoubleClick={(e) => {
+                      e.stopPropagation()
+                      autoFit(Number(header.column.id))
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  />
                 </div>
               )
             })}
           </div>
 
           {/* virtualized rows */}
-          <div style={{ height: virtualizer.getTotalSize(), position: 'relative', minWidth: minW }}>
+          <div style={{ height: virtualizer.getTotalSize(), position: 'relative', minWidth: 'var(--grid-min)' }}>
             {virtualizer.getVirtualItems().map((virtualRow) => {
               const row = tableRows[virtualRow.index]
               const rowIndex = Number(row.id)
@@ -172,7 +239,7 @@ export default function ResultsGrid({
                 <div
                   key={row.id}
                   className={`grid-row${virtualRow.index % 2 === 1 ? ' odd' : ''}${row.id === selId ? ' selected' : ''}`}
-                  style={{ gridTemplateColumns, transform: `translateY(${virtualRow.start}px)` }}
+                  style={{ transform: `translateY(${virtualRow.start}px)` }}
                   onClick={(e) => {
                     if (selTimer.current !== null) {
                       window.clearTimeout(selTimer.current)
