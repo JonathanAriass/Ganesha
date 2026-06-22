@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/logo.svg" alt="Ganesha" width="120" height="150" />
+<img src="docs/logo.png" alt="Ganesha" width="120" height="150" />
 
 # Ganesha
 
