@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAppStore } from '../state/store'
 import { useConnections } from '../lib/hooks'
+import TabContextMenu, { type TabCloseAction } from './TabContextMenu'
 
 export default function TabBar(): JSX.Element {
   const tabs = useAppStore((s) => s.tabs)
@@ -9,6 +10,10 @@ export default function TabBar(): JSX.Element {
   const setActiveTab = useAppStore((s) => s.setActiveTab)
   const renameTab = useAppStore((s) => s.renameTab)
   const closeTab = useAppStore((s) => s.closeTab)
+  const closeOtherTabs = useAppStore((s) => s.closeOtherTabs)
+  const closeTabsToRight = useAppStore((s) => s.closeTabsToRight)
+  const closeTabsToLeft = useAppStore((s) => s.closeTabsToLeft)
+  const closeAllTabs = useAppStore((s) => s.closeAllTabs)
   const openQueryTab = useAppStore((s) => s.openQueryTab)
 
   // Inline rename: double-click a tab to edit its title. Enter/click-away
@@ -18,11 +23,23 @@ export default function TabBar(): JSX.Element {
   // (A native blur listener via ref would break this.) Empty commits are
   // rejected by renameTab — the tab keeps its name.
   const [editing, setEditing] = useState<{ id: string; draft: string } | null>(null)
+  const [menu, setMenu] = useState<{ tabId: string; x: number; y: number } | null>(null)
 
   const commit = (): void => {
     if (editing) renameTab(editing.id, editing.draft)
     setEditing(null)
   }
+
+  const runMenu = (action: TabCloseAction): void => {
+    if (!menu) return
+    const id = menu.tabId
+    if (action === 'close') closeTab(id)
+    else if (action === 'others') closeOtherTabs(id)
+    else if (action === 'right') closeTabsToRight(id)
+    else if (action === 'left') closeTabsToLeft(id)
+    else closeAllTabs()
+  }
+  const menuIdx = menu ? tabs.findIndex((t) => t.id === menu.tabId) : -1
 
   const { data: connections = [] } = useConnections()
 
@@ -76,6 +93,10 @@ export default function TabBar(): JSX.Element {
             title="Double-click to rename"
             onClick={() => setActiveTab(tab.id)}
             onDoubleClick={() => setEditing({ id: tab.id, draft: tab.title })}
+            onContextMenu={(e) => {
+              e.preventDefault()
+              setMenu({ tabId: tab.id, x: e.clientX, y: e.clientY })
+            }}
           >
             {dot}
             <span>{tab.title}</span>
@@ -99,6 +120,16 @@ export default function TabBar(): JSX.Element {
       >
         +
       </button>
+      {menu && (
+        <TabContextMenu
+          x={menu.x}
+          y={menu.y}
+          canRight={menuIdx >= 0 && menuIdx < tabs.length - 1}
+          canLeft={menuIdx > 0}
+          onSelect={runMenu}
+          onClose={() => setMenu(null)}
+        />
+      )}
     </div>
   )
 }

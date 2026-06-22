@@ -4,6 +4,7 @@ import type { QueryResult } from '@shared/query'
 import { buildRowEdits } from '../lib/edit-staging'
 import { parseEditKey, setAtPath } from '../lib/doc-path'
 import { unwrap } from '../lib/result'
+import { applyTabClose, type CloseMode } from '../lib/tab-close'
 
 type ConnectionModalState =
   | { mode: 'create' }
@@ -102,6 +103,10 @@ interface AppState {
   hydrateTabs: (sessionTabs: SessionTab[]) => void
   closeTab: (id: string) => void
   closeTabsForConnection: (connectionId: string) => void
+  closeOtherTabs: (id: string) => void
+  closeTabsToRight: (id: string) => void
+  closeTabsToLeft: (id: string) => void
+  closeAllTabs: () => void
   setActiveTab: (id: string) => void
   /** Rename a tab (trimmed). Empty/whitespace titles are rejected — the tab keeps its name. */
   renameTab: (id: string, title: string) => void
@@ -132,6 +137,21 @@ interface AppState {
   scriptStatementStart: (id: string, queryId: string) => void
   scriptStatementDone: (id: string, entry: ScriptStatementResult) => void
   finishScript: (id: string) => void
+}
+
+/** Apply a bulk tab-close to the state and drop a commit modal whose tab no longer survives
+ *  (mirrors the closeTab/closeTabsForConnection invariant). */
+function closeTabsResult(
+  s: AppState,
+  mode: CloseMode,
+  targetId: string
+): Pick<AppState, 'tabs' | 'activeTabId' | 'commitModal'> {
+  const r = applyTabClose(s.tabs, s.activeTabId, mode, targetId)
+  return {
+    tabs: r.tabs,
+    activeTabId: r.activeId,
+    commitModal: r.tabs.some((t) => t.id === s.commitModal?.tabId) ? s.commitModal : null
+  }
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -248,6 +268,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       const commitModal = next.some((t) => t.id === s.commitModal?.tabId) ? s.commitModal : null
       return { tabs: next, activeTabId: stillActive ? s.activeTabId : (next[0]?.id ?? null), commitModal }
     }),
+
+  closeOtherTabs: (id) => set((s) => closeTabsResult(s, 'others', id)),
+  closeTabsToRight: (id) => set((s) => closeTabsResult(s, 'right', id)),
+  closeTabsToLeft: (id) => set((s) => closeTabsResult(s, 'left', id)),
+  closeAllTabs: () => set((s) => closeTabsResult(s, 'all', '')),
 
   setActiveTab: (id) => set({ activeTabId: id }),
 
