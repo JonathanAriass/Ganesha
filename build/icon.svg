@@ -7,6 +7,7 @@
   </defs>
   <rect x="100" y="100" width="824" height="824" rx="186" fill="url(#bg)"/>
   <svg x="256" y="192" width="512" height="640" viewBox="0 0 310 387">
+    <path fill="#FDF2E1" d="M108 100 Q 155 93 202 100 Q 228 130 211 170 Q 192 203 155 208 Q 118 203 99 170 Q 82 130 108 100 Z"/>
     <svg width="310" height="387" viewBox="0 0 930 1162" preserveAspectRatio="none">
 <g transform="translate(0.000000,1161.000000) scale(0.100000,-0.100000)"
 fill="#fdf2e1" stroke="none">
