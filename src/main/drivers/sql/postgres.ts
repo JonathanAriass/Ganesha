@@ -8,6 +8,10 @@ import { buildUpdate } from './update-builder'
 
 const { Pool } = pg
 
+// node-postgres returns these date/time types as JS Date by default; we keep the DB's native
+// text instead (see poolConfig). OIDs: date, time, timestamp, timestamptz, timetz.
+const DATE_TIME_OIDS = new Set([1082, 1083, 1114, 1184, 1266])
+
 interface PgTableMeta { schema: string; name: string; cols: Map<number, string>; pk: string[] }
 
 /** PostgreSQL driver backed by a per-connection pg.Pool. */
@@ -18,9 +22,12 @@ export class PostgresDriver implements DatabaseDriver {
   private tableMeta = new Map<string, Promise<PgTableMeta | null>>() // `${id}:${oid}` -> table metadata
 
   private poolConfig(p: ConnectParams): pg.PoolConfig {
-    // No custom type parsers on purpose: node-postgres defaults return int8 and
-    // numeric as exact strings (never a lossy JS number) — the same contract
-    // MySqlDriver gets from supportBigNumbers. Don't "fix" them into numbers.
+    // Numbers keep the node-postgres defaults: int8 and numeric come back as exact strings
+    // (never a lossy JS number) — the same contract MySqlDriver gets from supportBigNumbers.
+    // Dates are the exception: the defaults return JS Date objects, which the renderer can only
+    // show as quoted ISO ("…Z") — un-editable (the DB rejects the quotes when bound back) and
+    // timezone-ambiguous. Return the DB's native text for date/time types so they display
+    // cleanly and round-trip exactly when edited.
     return {
       host: p.host,
       port: p.port,
@@ -30,7 +37,11 @@ export class PostgresDriver implements DatabaseDriver {
       ssl: p.ssl ? { rejectUnauthorized: false } : undefined,
       max: 4,
       connectionTimeoutMillis: 10_000,
-      idleTimeoutMillis: 30_000
+      idleTimeoutMillis: 30_000,
+      types: {
+        getTypeParser: (oid, format) =>
+          DATE_TIME_OIDS.has(oid) ? (v: string) => v : pg.types.getTypeParser(oid, format)
+      }
     }
   }
 

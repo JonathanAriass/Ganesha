@@ -134,4 +134,20 @@ describe('MySqlDriver (integration, requires Docker)', () => {
       driver.applyEdits(id, { table: { schema: container.getDatabase(), name: 't_edit' }, rows: [{ key: { id: 1 }, set: { name: 'z' } }] }, { readOnly: true })
     ).rejects.toThrow(/read-only/i)
   })
+
+  // The renderer can only display/edit a string; a JS Date renders as quoted ISO, which mysql
+  // rejects ("Incorrect datetime value") when bound back. Timestamps must arrive as strings.
+  it('returns datetimes as strings that round-trip through applyEdits', async () => {
+    const db = container.getDatabase()
+    await driver.runQuery(id, { kind: 'sql', sql: 'CREATE TABLE t_ts (id INT PRIMARY KEY, ts DATETIME, d DATE)' }, { maxRows: 10, queryId: 'mt0', readOnly: false })
+    await driver.runQuery(id, { kind: 'sql', sql: "INSERT INTO t_ts VALUES (1, '2026-06-22 08:30:00', '2026-06-22')" }, { maxRows: 10, queryId: 'mt1', readOnly: false })
+    const got = await driver.runQuery(id, { kind: 'sql', sql: 'SELECT ts, d FROM t_ts WHERE id=1' }, { maxRows: 10, queryId: 'mt2', readOnly: false })
+    const [ts, d] = got.rows[0] as [unknown, unknown]
+    expect(typeof ts).toBe('string')
+    expect(typeof d).toBe('string')
+    const r = await driver.applyEdits(id, { table: { schema: db, name: 't_ts' }, rows: [{ key: { id: 1 }, set: { ts, d } }] }, { readOnly: false })
+    expect(r.updated).toBe(1)
+    const after = await driver.runQuery(id, { kind: 'sql', sql: 'SELECT ts, d FROM t_ts WHERE id=1' }, { maxRows: 10, queryId: 'mt3', readOnly: false })
+    expect(after.rows[0]).toEqual([ts, d])
+  })
 })

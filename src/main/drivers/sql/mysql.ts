@@ -37,6 +37,10 @@ export class MySqlDriver implements DatabaseDriver {
       // that from day one. DECIMAL is exact strings by default; node-postgres
       // gives int8/numeric the same way.
       supportBigNumbers: true,
+      // Return DATE/DATETIME/TIMESTAMP as the DB's native text, not JS Date objects: the
+      // renderer can only edit a string, and a Date would render as quoted ISO that mysql
+      // rejects when bound back. Strings round-trip exactly.
+      dateStrings: true,
       // mysql2 enables CLIENT_FOUND_ROWS by default, so affectedRows reports MATCHED
       // (not just changed) rows — which applyEdits' "exactly one row" guard relies on to
       // tell a missing/changed-underneath row (0 matched) from a no-op edit (same value).
