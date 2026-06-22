@@ -114,7 +114,7 @@ npm run dev        # launch the app with hot reload
 ```bash
 npm run typecheck && npm run lint
 npm test                  # 496 unit tests (Vitest, Node ABI)
-npm run test:integration  # 33 tests vs real Postgres/MySQL/Mongo + an SSH tunnel (testcontainers, needs Docker)
+npm run test:integration  # 35 tests vs real Postgres/MySQL/Mongo + an SSH tunnel (testcontainers, needs Docker)
 ```
 
 CI (GitHub Actions) runs typecheck + lint + unit tests on every push.
