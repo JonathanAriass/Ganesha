@@ -49,7 +49,7 @@ Ganesha is a desktop client for the four databases people actually reach for, bu
 ### Explore & query
 
 - **Schema browser** — tables, views and collections in a sidebar tree; double-click to open a ready-made query tab that runs itself. Filter the tree by name with a substring search box (matches object or schema names, highlights the hit). Leave a Mongo connection's database blank to browse *all* databases, Compass-style.
-- **Query tabs** — Monaco editor with per-engine language (SQL or mongosh-style JavaScript), local workers, and custom Midnight/Daylight themes. Tab state (text, results, running query) survives switching — and the open tabs themselves survive an app restart (text only; nothing re-runs on launch). Double-click a tab to rename it; right-click for close actions (close others / to the right / to the left / all).
+- **Query tabs** — Monaco editor with per-engine language (SQL or mongosh-style JavaScript), local workers, and custom Midnight/Daylight themes. Tab state (text, results, running query) survives switching — and the open tabs themselves survive an app restart (text only; nothing re-runs on launch). Double-click a tab to rename it; right-click for close actions (close others / to the right / to the left / all). With tabs open against more than one server they group into a two-level strip — pick a server, see its tabs.
 - **Schema-aware autocomplete** — SQL tables/views, database/schema names, and the in-scope FROM/JOIN tables' columns (unqualified inside a `WHERE`, or after `alias.`/`table.`); Mongo collections after `db.`, document fields inside a method's argument, database names inside `getSiblingDB("…")`, and operation snippets after `db.coll.`.
 - **Run exactly what you mean** — ⌘↵ runs the selection if there is one, else the statement under the cursor when the tab holds several, else the whole tab. ⌘⇧↵ runs *all* statements top-to-bottom as individual queries with per-statement collapsible results, stopping at the first error.
 - **Saved queries** — name a snippet with ⌘S (or ☆) and it lives in the sidebar and the palette, per connection; click one to open it in a fresh tab and run it.
@@ -113,7 +113,7 @@ npm run dev        # launch the app with hot reload
 
 ```bash
 npm run typecheck && npm run lint
-npm test                  # 496 unit tests (Vitest, Node ABI)
+npm test                  # 514 unit tests (Vitest, Node ABI)
 npm run test:integration  # 35 tests vs real Postgres/MySQL/Mongo + an SSH tunnel (testcontainers, needs Docker)
 ```
 
