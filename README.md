@@ -66,6 +66,7 @@ Ganesha is a desktop client for the four databases people actually reach for, bu
 ### Assist
 
 - **Local AI assistant** — a built-in chat powered by a GGUF model you download and run entirely on your machine (`node-llama-cpp`, no data leaves the app). It's grounded with the active connection's schema, so it recommends queries against your real tables; one click drops a suggestion into a new query tab. Manage models in-app (curated picks or any Hugging Face `hf:` URI); conversations are saved per connection.
+- **Linked-repo context** *(optional)* — point a connection at a local code repo and the assistant pulls the relevant files (ORM models, migrations, entities) into its context for the tables you're asking about, so suggestions match your app's real relationships and conventions — not just the bare schema. Retrieval is question-driven (it matches your message and the open query against the connection's known tables), bounded, and local; a small **📎 context** line shows exactly which files were read. PHP/Laravel naming is tuned (`users` ↔ `User.php` ↔ `…_create_users_table.php`), with a generic fallback.
 
 ### Comfort
 
@@ -113,7 +114,7 @@ npm run dev        # launch the app with hot reload
 
 ```bash
 npm run typecheck && npm run lint
-npm test                  # 514 unit tests (Vitest, Node ABI)
+npm test                  # 531 unit tests (Vitest, Node ABI)
 npm run test:integration  # 35 tests vs real Postgres/MySQL/Mongo + an SSH tunnel (testcontainers, needs Docker)
 ```
 
@@ -134,7 +135,7 @@ src/
 ├── main/            # Electron main process
 │   ├── drivers/     # DatabaseDriver implementations (pg, mysql2, mongodb)
 │   │   └── mongo/   # EJSON/mongosh parsing, command guard, BSON normalization
-│   ├── llm/         # on-device GGUF assistant (node-llama-cpp), schema grounding
+│   ├── llm/         # on-device GGUF assistant (node-llama-cpp), schema + linked-repo grounding
 │   ├── ssh/         # SSH tunnel manager (jump-server chain)
 │   ├── persistence/ # better-sqlite3 store: connections, secrets, history, saved queries, session tabs, settings
 │   ├── query-service.ts  # config + secret + read-only guard + driver + history
