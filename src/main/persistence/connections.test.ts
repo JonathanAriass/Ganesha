@@ -7,7 +7,7 @@ import type { ConnectionInput, SshConfig } from '../../shared/domain'
 const input: ConnectionInput = {
   type: 'postgres', name: 'prod', color: '#6366f1', host: 'localhost',
   port: 5432, username: 'admin', database: 'app', ssl: true, readOnly: false,
-  requireCommit: true, authSource: '', replicaSet: '', ssh: null
+  requireCommit: true, authSource: '', replicaSet: '', ssh: null, repoPath: null
 }
 
 const ssh: SshConfig = {
@@ -113,5 +113,21 @@ describe('ssh config persistence', () => {
     const c = createConnection(db, { ...input, ssh: null }, 1)
     updateConnection(db, c.id, { ssh }, 2)
     expect(getConnection(db, c.id)!.ssh).toEqual(ssh)
+  })
+})
+
+describe('linked repo persistence', () => {
+  it('defaults to null when never set', () => {
+    const c = createConnection(db, { ...input, repoPath: null }, 1)
+    expect(getConnection(db, c.id)!.repoPath).toBeNull()
+  })
+  it('round-trips a repo path through create', () => {
+    const c = createConnection(db, { ...input, repoPath: '/home/me/app' }, 1)
+    expect(getConnection(db, c.id)!.repoPath).toBe('/home/me/app')
+  })
+  it('updates and clears the repo path', () => {
+    const c = createConnection(db, { ...input, repoPath: null }, 1)
+    expect(updateConnection(db, c.id, { repoPath: '/srv/api' }, 2).repoPath).toBe('/srv/api')
+    expect(updateConnection(db, c.id, { repoPath: null }, 3).repoPath).toBeNull()
   })
 })

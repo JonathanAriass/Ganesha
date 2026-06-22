@@ -10,7 +10,7 @@ import type { ConnectionInput } from '../../shared/domain'
 const input: ConnectionInput = {
   type: 'postgres', name: 'p', color: '#000', host: 'h', port: 1,
   username: 'u', database: 'd', ssl: false, readOnly: false, requireCommit: true,
-  authSource: '', replicaSet: '', ssh: null
+  authSource: '', replicaSet: '', ssh: null, repoPath: null
 }
 let db: DB
 beforeEach(() => { db = new Database(':memory:'); migrate(db) })

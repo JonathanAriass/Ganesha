@@ -1,4 +1,4 @@
-import type { IpcResult, LlmTokenEvent, LlmDownloadEvent } from './ipc'
+import type { IpcResult, LlmTokenEvent, LlmDownloadEvent, LlmContextEvent } from './ipc'
 import type { ConnectionInput, HistoryEntryInput, SavedQueryInput, SavedQueryPatch, SessionTab } from './domain'
 import type { ObjectRef } from './schema'
 
@@ -65,9 +65,10 @@ export interface DbClientApi {
     createConversation(connectionId: string, title: string): Promise<IpcResult<'llm.conversations.create'>>
     deleteConversation(id: string): Promise<IpcResult<'llm.conversations.delete'>>
     listMessages(conversationId: string): Promise<IpcResult<'llm.messages.list'>>
-    send(conversationId: string, connectionId: string, prompt: string): Promise<IpcResult<'llm.chat.send'>>
+    send(conversationId: string, connectionId: string, prompt: string, queryText?: string): Promise<IpcResult<'llm.chat.send'>>
     cancel(requestId: string): Promise<IpcResult<'llm.chat.cancel'>>
     onToken(cb: (e: LlmTokenEvent) => void): () => void
+    onContext(cb: (e: LlmContextEvent) => void): () => void
     onDownloadProgress(cb: (e: LlmDownloadEvent) => void): () => void
   }
 }

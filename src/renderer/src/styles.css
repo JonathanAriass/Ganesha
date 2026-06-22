@@ -1596,6 +1596,18 @@ input[type="password"]::placeholder {
   gap: 8px;
 }
 
+/* Linked-repo picker: path input grows, Browse…/✕ buttons stay natural width. */
+.repo-path-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.repo-path-row input {
+  flex: 1;
+  min-width: 0;
+}
+
 .datadir-path {
   flex: 1;
   min-width: 0;
@@ -1739,6 +1751,9 @@ input[type="password"]::placeholder {
 .assistant-block { margin-top: 8px; width: 100%; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg); }
 .assistant-block pre { margin: 0; padding: 10px; overflow: auto; font-size: 12px; font-family: 'SF Mono', 'Fira Mono', 'Consolas', monospace; }
 .assistant-block button { margin: 8px; }
+
+/* Transparency line: which linked-repo files grounded the latest answer. */
+.assistant-context { font-size: 11px; color: var(--text-2); padding: 2px 2px 0; word-break: break-all; line-height: 1.5; }
 
 .assistant-input { display: flex; gap: 6px; padding: 10px; border-top: 1px solid var(--border); flex-shrink: 0; align-items: flex-end; }
 .assistant-input textarea { flex: 1; resize: none; height: 60px; font: inherit; font-size: 13px; line-height: 1.4; padding: 8px 10px; background: var(--bg-3); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius); outline: none; transition: border-color 0.1s, box-shadow 0.1s; }

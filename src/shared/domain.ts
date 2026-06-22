@@ -39,6 +39,8 @@ export interface ConnectionInput {
   replicaSet: string
   /** SSH tunnel; null = never configured. */
   ssh: SshConfig | null
+  /** Absolute path to a local code repo the assistant reads for context; null = not linked. */
+  repoPath: string | null
 }
 
 /** A stored connection (input + identity + timestamps), password excluded. */

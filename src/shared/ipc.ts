@@ -56,7 +56,7 @@ export interface IpcChannels {
   'llm.conversations.create': { req: { connectionId: string; title: string }; res: LlmConversation }
   'llm.conversations.delete': { req: { id: string }; res: null }
   'llm.messages.list': { req: { conversationId: string }; res: LlmMessage[] }
-  'llm.chat.send': { req: { conversationId: string; connectionId: string; prompt: string }; res: { requestId: string } }
+  'llm.chat.send': { req: { conversationId: string; connectionId: string; prompt: string; queryText?: string }; res: { requestId: string } }
   'llm.chat.cancel': { req: { requestId: string }; res: null }
 }
 
@@ -64,6 +64,8 @@ export interface IpcChannels {
 export interface LlmTokenEvent { requestId: string; chunk?: string; done?: boolean; error?: string }
 /** main→renderer push payload for model download progress. */
 export interface LlmDownloadEvent { uri: string; receivedBytes?: number; totalBytes?: number; done?: boolean; error?: string }
+/** main→renderer push payload naming the linked-repo files used to ground one chat turn. */
+export interface LlmContextEvent { requestId: string; files: string[] }
 
 export type ChannelName = keyof IpcChannels
 export type Req<K extends ChannelName> = IpcChannels[K]['req']

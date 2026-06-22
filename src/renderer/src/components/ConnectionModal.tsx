@@ -9,6 +9,7 @@ import {
 } from '../lib/hooks'
 import SshHopEditor from './SshHopEditor'
 import { emptyHop, validateSshConfig } from '../lib/ssh-config'
+import { unwrap } from '../lib/result'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -42,6 +43,7 @@ const DEFAULT_INPUT: ConnectionInput = {
   authSource: '',
   replicaSet: '',
   ssh: null,
+  repoPath: null,
 }
 
 // ── Test status ──────────────────────────────────────────────────────────────
@@ -89,6 +91,7 @@ export default function ConnectionModal(): JSX.Element {
         authSource: existingConn.authSource,
         replicaSet: existingConn.replicaSet,
         ssh: existingConn.ssh,
+        repoPath: existingConn.repoPath,
       })
       setPassword('') // blank = keep current on edit
     } else if (!isEdit) {
@@ -126,6 +129,11 @@ export default function ConnectionModal(): JSX.Element {
     // Enabling with no hops yet seeds one so the editor isn't empty.
     const hops = enabled && cur.hops.length === 0 ? [emptyHop(crypto.randomUUID())] : cur.hops
     setField('ssh', { enabled, hops })
+  }
+
+  async function pickRepo() {
+    const dir = unwrap(await window.api.dialog.pickDirectory())
+    if (dir) setField('repoPath', dir)
   }
 
   function handleTest() {
@@ -396,6 +404,24 @@ export default function ConnectionModal(): JSX.Element {
                 onSecretChange={(hopId, value) => setSshSecrets((prev) => ({ ...prev, [hopId]: value }))}
               />
             )}
+
+            {/* Linked repo — gives the assistant code context (ORM models, migrations) */}
+            <div className="form-row">
+              <label htmlFor="conn-repo">Linked repo <span className="hint">(optional — the assistant reads it for query context)</span></label>
+              <div className="repo-path-row">
+                <input
+                  id="conn-repo"
+                  type="text"
+                  value={form.repoPath ?? ''}
+                  onChange={(e) => setField('repoPath', e.target.value || null)}
+                  placeholder="/path/to/your/backend"
+                />
+                <button type="button" className="btn ghost" onClick={pickRepo}>Browse…</button>
+                {form.repoPath && (
+                  <button type="button" className="btn ghost" onClick={() => setField('repoPath', null)} aria-label="Clear linked repo">✕</button>
+                )}
+              </div>
+            </div>
 
             {/* Test status */}
             {testStatus.kind === 'ok' && (

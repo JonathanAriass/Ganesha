@@ -19,6 +19,12 @@ export default function AssistantPanel(): JSX.Element | null {
   const convId = useAppStore((s) => s.activeConversationId)
   const setConv = useAppStore((s) => s.setActiveConversation)
   const openQueryTab = useAppStore((s) => s.openQueryTab)
+  // The active tab's SQL (when it belongs to this connection) — sharpens repo retrieval to the
+  // tables actually on screen. Empty when the active tab is for another connection.
+  const queryText = useAppStore((s) => {
+    const t = s.tabs.find((tab) => tab.id === s.activeTabId)
+    return t && t.connectionId === s.activeConnectionId ? t.text : ''
+  })
 
   const qc = useQueryClient()
   const { data: models } = useLlmModels()
@@ -28,6 +34,7 @@ export default function AssistantPanel(): JSX.Element | null {
   const [draft, setDraft] = useState('')
   const [live, setLive] = useState<LlmMessage[]>([]) // optimistic user msg + streaming assistant msg
   const [streaming, setStreaming] = useState(false)
+  const [contextFiles, setContextFiles] = useState<string[]>([]) // linked-repo files grounding the latest turn
   const reqRef = useRef<string | null>(null)
   const cidRef = useRef<string | null>(null)
   const threadRef = useRef<HTMLDivElement>(null)
@@ -93,6 +100,11 @@ export default function AssistantPanel(): JSX.Element | null {
     })
   }, [qc])
 
+  // Linked-repo grounding for the current turn. Main emits this during setup, possibly before the
+  // send() call resolves with the requestId, so we don't filter by it — the panel runs one
+  // generation at a time and send() clears the list first.
+  useEffect(() => window.api.llm.onContext((e) => setContextFiles(e.files)), [])
+
   async function ensureConversation(): Promise<string | null> {
     if (convId) return convId
     if (!connectionId) return null
@@ -112,7 +124,8 @@ export default function AssistantPanel(): JSX.Element | null {
     setDraft('')
     setLive([mkMsg(cid, 'user', prompt), mkMsg(cid, 'assistant', '')])
     setStreaming(true)
-    const res = await window.api.llm.send(cid, connectionId, prompt)
+    setContextFiles([]) // clear last turn's grounding; onContext repopulates if the repo matched
+    const res = await window.api.llm.send(cid, connectionId, prompt, queryText)
     if (res.ok) reqRef.current = res.data.requestId
     else { setStreaming(false); setLive((prev) => [...prev, mkMsg(cid, 'assistant', `⚠️ ${res.error}`)]) }
   }
@@ -149,7 +162,7 @@ export default function AssistantPanel(): JSX.Element | null {
           value={convId ?? ''}
           onChange={(e) => {
             if (reqRef.current) void window.api.llm.cancel(reqRef.current) // don't leave a generation running for a hidden chat
-            setConv(e.target.value || null); setLive([]); reqRef.current = null; setStreaming(false)
+            setConv(e.target.value || null); setLive([]); reqRef.current = null; setStreaming(false); setContextFiles([])
           }}
           aria-label="Conversation"
         >
@@ -185,6 +198,11 @@ export default function AssistantPanel(): JSX.Element | null {
             ))}
           </div>
         ))}
+        {contextFiles.length > 0 && (
+          <div className="assistant-context" title="Linked-repo files the assistant read for this answer">
+            📎 context: {contextFiles.join(', ')}
+          </div>
+        )}
       </div>
 
       <div className="assistant-input">

@@ -93,6 +93,8 @@ export function migrate(db: DB): void {
   addColumnIfMissing(db, 'connections', 'ssh_json', 'TEXT')
   // Editable-results commit safety (added later): default ON = require explicit commit.
   addColumnIfMissing(db, 'connections', 'require_commit', 'INTEGER NOT NULL DEFAULT 1')
+  // Assistant code-context: nullable absolute path to a linked local repo.
+  addColumnIfMissing(db, 'connections', 'repo_path', 'TEXT')
   migrateSecretsCompositeKey(db)
 }
 

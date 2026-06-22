@@ -23,9 +23,11 @@ import { LlmEngine } from './llm/engine'
 import { MODEL_CATALOG } from './llm/catalog'
 import { listLocalModels, deleteLocalModel, downloadModel } from './llm/models'
 import { buildSchemaContext } from './llm/schema-context'
+import { relevantTables, rankRepoFiles, buildRepoContext } from './llm/repo-context'
+import { scanRepoFiles, readRepoFile } from './llm/repo-scan'
 import * as llm from './persistence/llm'
 import { getModelsDir } from './persistence/paths'
-import type { LlmTokenEvent, LlmDownloadEvent } from '../shared/ipc'
+import type { LlmTokenEvent, LlmDownloadEvent, LlmContextEvent } from '../shared/ipc'
 
 const drivers = new DriverManager()
 drivers.register(new PostgresDriver())
@@ -280,11 +282,12 @@ export function registerIpcHandlers(): void {
   // Chat: stream tokens, persisting the turn only once generation has actually
   // started — so a failure during setup (no model / bad connection / model load)
   // never leaves an orphaned user message that would double-feed the model next time.
-  ipcMain.handle('llm.chat.send', async (event, { conversationId, connectionId, prompt }: { conversationId: string; connectionId: string; prompt: string }) => {
+  ipcMain.handle('llm.chat.send', async (event, { conversationId, connectionId, prompt, queryText }: { conversationId: string; connectionId: string; prompt: string; queryText?: string }) => {
     const { db, secrets } = store()
     const requestId = randomUUID()
     // The webContents can be torn down mid-stream (window closed) — guard the push.
     const send = (ev: LlmTokenEvent): void => { if (!event.sender.isDestroyed()) event.sender.send('llm:token', ev) }
+    const sendContext = (ev: LlmContextEvent): void => { if (!event.sender.isDestroyed()) event.sender.send('llm:context', ev) }
     try {
       const activeModelId = settings.getSetting(db, 'llm.activeModel')
       const models = listLocalModels(getModelsDir())
@@ -302,10 +305,29 @@ export function registerIpcHandlers(): void {
         object: o,
         columns: await driver.describeObject(config.id, { schema: o.schema, name: o.name }).catch(() => [])
       })))
-      const systemPrompt =
+      let systemPrompt =
         'You are a database query assistant. Recommend correct queries for the user\'s database. ' +
         'Return runnable queries in fenced code blocks (```sql, or ```js for MongoDB). Be concise.\n\n' +
         buildSchemaContext(config.type, withCols)
+
+      // Optionally ground in the linked repo's code (ORM models, migrations) for the tables in play.
+      // Best-effort: any fs/permission failure falls back to schema-only grounding, never blocks.
+      if (config.repoPath) {
+        try {
+          const knownTables = withCols.map((w) => w.object.name)
+          const tables = relevantTables(prompt, queryText ?? '', knownTables)
+          if (tables.length > 0) {
+            const ranked = rankRepoFiles(scanRepoFiles(config.repoPath), tables)
+            const repoCtx = buildRepoContext({ tables, ranked, readFile: (p) => readRepoFile(config.repoPath!, p) })
+            if (repoCtx.text) {
+              systemPrompt += '\n\n' + repoCtx.text
+              sendContext({ requestId, files: repoCtx.usedFiles })
+            }
+          }
+        } catch {
+          // Repo gone / unreadable / permissions — keep the schema-only prompt.
+        }
+      }
 
       // Prior turns BEFORE this one, then load the model. Both happen before we
       // persist anything, so a setup failure leaves the conversation untouched.
