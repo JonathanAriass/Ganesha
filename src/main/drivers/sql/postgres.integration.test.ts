@@ -144,17 +144,18 @@ describe('PostgresDriver (integration, requires Docker)', () => {
 
   // The renderer can only display/edit a string; a JS Date renders as quoted ISO ("…Z"),
   // which the DB rejects when bound back. So timestamps must arrive as round-trippable strings.
-  it('returns timestamps as strings that round-trip through applyEdits', async () => {
-    await driver.runQuery(id, { kind: 'sql', sql: 'CREATE TABLE t_ts (id int PRIMARY KEY, ts timestamp, tz timestamptz)' }, { maxRows: 10, queryId: 't0', readOnly: false })
-    await driver.runQuery(id, { kind: 'sql', sql: "INSERT INTO t_ts VALUES (1, '2026-06-22 08:30:00', '2026-06-22 08:30:00+00')" }, { maxRows: 10, queryId: 't1', readOnly: false })
-    const got = await driver.runQuery(id, { kind: 'sql', sql: 'SELECT ts, tz FROM t_ts WHERE id=1' }, { maxRows: 10, queryId: 't2', readOnly: false })
-    const [ts, tz] = got.rows[0] as [unknown, unknown]
-    expect(typeof ts).toBe('string')
-    expect(typeof tz).toBe('string')
+  it('returns timestamps/intervals as strings that round-trip through applyEdits', async () => {
+    await driver.runQuery(id, { kind: 'sql', sql: 'CREATE TABLE t_ts (id int PRIMARY KEY, ts timestamp, tz timestamptz, iv interval)' }, { maxRows: 10, queryId: 't0', readOnly: false })
+    await driver.runQuery(id, { kind: 'sql', sql: "INSERT INTO t_ts VALUES (1, '2026-06-22 08:30:00', '2026-06-22 08:30:00+00', '1 year 2 mons 3 days')" }, { maxRows: 10, queryId: 't1', readOnly: false })
+    const got = await driver.runQuery(id, { kind: 'sql', sql: 'SELECT ts, tz, iv FROM t_ts WHERE id=1' }, { maxRows: 10, queryId: 't2', readOnly: false })
+    const [ts, tz, iv] = got.rows[0] as [unknown, unknown, unknown]
+    // interval defaults to a PostgresInterval OBJECT — must be returned as text too, else the
+    // renderer JSON-stringifies it and the bind fails just like a Date.
+    expect([typeof ts, typeof tz, typeof iv]).toEqual(['string', 'string', 'string'])
     // Committing the edited (same) displayed value must succeed and persist unchanged.
-    const r = await driver.applyEdits(id, { table: { schema: 'public', name: 't_ts' }, rows: [{ key: { id: 1 }, set: { ts, tz } }] }, { readOnly: false })
+    const r = await driver.applyEdits(id, { table: { schema: 'public', name: 't_ts' }, rows: [{ key: { id: 1 }, set: { ts, tz, iv } }] }, { readOnly: false })
     expect(r.updated).toBe(1)
-    const after = await driver.runQuery(id, { kind: 'sql', sql: 'SELECT ts, tz FROM t_ts WHERE id=1' }, { maxRows: 10, queryId: 't3', readOnly: false })
-    expect(after.rows[0]).toEqual([ts, tz])
+    const after = await driver.runQuery(id, { kind: 'sql', sql: 'SELECT ts, tz, iv FROM t_ts WHERE id=1' }, { maxRows: 10, queryId: 't3', readOnly: false })
+    expect(after.rows[0]).toEqual([ts, tz, iv])
   })
 })

@@ -8,9 +8,10 @@ import { buildUpdate } from './update-builder'
 
 const { Pool } = pg
 
-// node-postgres returns these date/time types as JS Date by default; we keep the DB's native
-// text instead (see poolConfig). OIDs: date, time, timestamp, timestamptz, timetz.
-const DATE_TIME_OIDS = new Set([1082, 1083, 1114, 1184, 1266])
+// node-postgres returns these temporal types as JS Date / PostgresInterval objects by default;
+// we keep the DB's native text instead (see poolConfig) so they display and round-trip as
+// editable strings. OIDs: date, time, timestamp, timestamptz, timetz, interval.
+const DATE_TIME_OIDS = new Set([1082, 1083, 1114, 1184, 1266, 1186])
 
 interface PgTableMeta { schema: string; name: string; cols: Map<number, string>; pk: string[] }
 
