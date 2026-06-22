@@ -60,4 +60,14 @@ describe('applyTabClose', () => {
       activeId: 'a',
     })
   })
+
+  it('self: closes just the target, keeping the active tab when a different one is closed', () => {
+    expect(applyTabClose(tabs('a', 'b', 'c'), 'a', 'self', 'b')).toEqual({
+      tabs: tabs('a', 'c'),
+      activeId: 'a',
+    })
+  })
+  it('self: closing the active tab reselects the first remaining', () => {
+    expect(applyTabClose(tabs('a', 'b', 'c'), 'b', 'self', 'b').activeId).toBe('a')
+  })
 })
