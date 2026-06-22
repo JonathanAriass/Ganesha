@@ -274,10 +274,12 @@ describe('hydrateTabs', () => {
     expect(useAppStore.getState().activeConnectionId).toBe('c2')
   })
 
-  it('keeps an existing sidebar selection', () => {
+  it("sets the active connection to the restored active tab's connection (the active group)", () => {
+    // Grouped tabs unify the active connection with the active tab's group, so a stale
+    // pre-restore sidebar pick is replaced — the restored active tab defines the active group.
     useAppStore.setState({ activeConnectionId: 'chosen' })
-    useAppStore.getState().hydrateTabs([session({ id: 'a', active: true })])
-    expect(useAppStore.getState().activeConnectionId).toBe('chosen')
+    useAppStore.getState().hydrateTabs([session({ id: 'a', connectionId: 'c1', active: true })])
+    expect(useAppStore.getState().activeConnectionId).toBe('c1')
   })
 })
 

@@ -58,7 +58,6 @@ export default function ConnectionModal(): JSX.Element {
   const modal = useAppStore((s) => s.connectionModal)
   const closeModal = useAppStore((s) => s.closeModal)
   const setActiveConnection = useAppStore((s) => s.setActiveConnection)
-  const activeConnectionId = useAppStore((s) => s.activeConnectionId)
 
   const isEdit = modal?.mode === 'edit'
   const editId = isEdit ? (modal as { mode: 'edit'; id: string }).id : undefined
@@ -180,7 +179,9 @@ export default function ConnectionModal(): JSX.Element {
     if (!window.confirm(`Delete connection "${form.name}"? This cannot be undone.`)) return
     del.mutate(editId, {
       onSuccess: () => {
-        if (activeConnectionId === editId) setActiveConnection(null)
+        // Read fresh: closeTabsForConnection (the delete hook) may have already handed the active
+        // connection to a remaining group; only clear it if the deleted one is still active.
+        if (useAppStore.getState().activeConnectionId === editId) setActiveConnection(null)
         closeModal()
       },
     })

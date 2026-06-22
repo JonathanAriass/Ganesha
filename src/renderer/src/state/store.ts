@@ -4,7 +4,8 @@ import type { QueryResult } from '@shared/query'
 import { buildRowEdits } from '../lib/edit-staging'
 import { parseEditKey, setAtPath } from '../lib/doc-path'
 import { unwrap } from '../lib/result'
-import { applyTabClose, type CloseMode } from '../lib/tab-close'
+import { type CloseMode } from '../lib/tab-close'
+import { applyGroupedTabClose, nextActiveForGroup } from '../lib/tab-groups'
 
 type ConnectionModalState =
   | { mode: 'create' }
@@ -77,6 +78,8 @@ interface AppState {
   // ── Tabs ──────────────────────────────────────────────────────────────────
   tabs: QueryTabData[]
   activeTabId: string | null
+  /** Last-active tab per connection — restores your spot when switching back to a server group. */
+  lastActiveByConnection: Record<string, string>
   _queryCounter: number
 
   setActiveConnection: (id: string | null) => void
@@ -106,7 +109,7 @@ interface AppState {
   closeOtherTabs: (id: string) => void
   closeTabsToRight: (id: string) => void
   closeTabsToLeft: (id: string) => void
-  closeAllTabs: () => void
+  closeAllTabs: (id: string) => void
   setActiveTab: (id: string) => void
   /** Rename a tab (trimmed). Empty/whitespace titles are rejected — the tab keeps its name. */
   renameTab: (id: string, title: string) => void
@@ -145,11 +148,16 @@ function closeTabsResult(
   s: AppState,
   mode: CloseMode,
   targetId: string
-): Pick<AppState, 'tabs' | 'activeTabId' | 'commitModal'> {
-  const r = applyTabClose(s.tabs, s.activeTabId, mode, targetId)
+): Pick<AppState, 'tabs' | 'activeTabId' | 'activeConnectionId' | 'commitModal'> {
+  const r = applyGroupedTabClose(s.tabs, s.activeTabId, mode, targetId)
+  // The active connection follows the (possibly new) active tab — keeps the sidebar's group in sync.
+  const activeConnectionId = r.activeId
+    ? (r.tabs.find((t) => t.id === r.activeId)?.connectionId ?? s.activeConnectionId)
+    : s.activeConnectionId
   return {
     tabs: r.tabs,
     activeTabId: r.activeId,
+    activeConnectionId,
     commitModal: r.tabs.some((t) => t.id === s.commitModal?.tabId) ? s.commitModal : null
   }
 }
@@ -166,9 +174,21 @@ export const useAppStore = create<AppState>((set, get) => ({
   modelManagerOpen: false,
   tabs: [],
   activeTabId: null,
+  lastActiveByConnection: {},
   _queryCounter: 0,
 
-  setActiveConnection: (id) => set({ activeConnectionId: id }),
+  setActiveConnection: (id) =>
+    set((s) => {
+      if (id === null) return { activeConnectionId: null, activeTabId: null }
+      // Selecting a connection switches to its tab group, activating its last-active tab (or null
+      // when it has no open tabs → empty subtab row + Welcome).
+      const tabId = nextActiveForGroup(s.tabs, id, s.lastActiveByConnection)
+      return {
+        activeConnectionId: id,
+        activeTabId: tabId,
+        lastActiveByConnection: tabId ? { ...s.lastActiveByConnection, [id]: tabId } : s.lastActiveByConnection
+      }
+    }),
   openModal: (state) => set({ connectionModal: state }),
   closeModal: () => set({ connectionModal: null }),
 
@@ -205,7 +225,13 @@ export const useAppStore = create<AppState>((set, get) => ({
         edits: {},
         editError: null,
       }
-      return { tabs: [...s.tabs, tab], activeTabId: tab.id, _queryCounter: n }
+      return {
+        tabs: [...s.tabs, tab],
+        activeTabId: tab.id,
+        activeConnectionId: connectionId,
+        lastActiveByConnection: { ...s.lastActiveByConnection, [connectionId]: tab.id },
+        _queryCounter: n
+      }
     }),
 
   hydrateTabs: (sessionTabs) =>
@@ -238,43 +264,49 @@ export const useAppStore = create<AppState>((set, get) => ({
         tabs,
         activeTabId: active.id,
         _queryCounter: counter,
-        // Point the sidebar at the restored tab's connection (QueryTab auto-connects it anyway).
-        activeConnectionId: s.activeConnectionId ?? active.connectionId,
+        // The restored active tab's connection is the active group (sidebar follows); seed the
+        // per-group memory so switching back to it restores this tab.
+        activeConnectionId: active.connectionId,
+        lastActiveByConnection: { [active.connectionId]: active.id },
       }
     }),
 
-  closeTab: (id) =>
-    set((s) => {
-      const idx = s.tabs.findIndex((t) => t.id === id)
-      if (idx === -1) return s
-      const next = s.tabs.filter((t) => t.id !== id)
-      let activeTabId = s.activeTabId
-      if (activeTabId === id) {
-        // prefer the tab after, else the one before, else null
-        const neighbor = s.tabs[idx + 1] ?? s.tabs[idx - 1] ?? null
-        activeTabId = neighbor ? neighbor.id : null
-      }
-      // Drop a commit modal whose tab is gone, or its overlay guard would silently
-      // swallow every shortcut with nothing visible on screen.
-      const commitModal = next.some((t) => t.id === s.commitModal?.tabId) ? s.commitModal : null
-      return { tabs: next, activeTabId, commitModal }
-    }),
+  // Single close (× / ⌘W / menu "Close") — group-aware: reselects the adjacent tab in the SAME
+  // group, else another group's first tab, else null. Drops a stale commit modal (its overlay
+  // guard would otherwise swallow every shortcut with nothing on screen).
+  closeTab: (id) => set((s) => closeTabsResult(s, 'self', id)),
 
   closeTabsForConnection: (connectionId) =>
     set((s) => {
       const next = s.tabs.filter((t) => t.connectionId !== connectionId)
       if (next.length === s.tabs.length) return s
       const stillActive = next.some((t) => t.id === s.activeTabId)
+      const activeTabId = stillActive ? s.activeTabId : (next[0]?.id ?? null)
+      // Keep the active connection (the group) in sync with the new active tab — so deleting a
+      // connection hands off to a remaining group instead of a dead empty view.
+      const activeConnectionId = activeTabId
+        ? (next.find((t) => t.id === activeTabId)?.connectionId ?? s.activeConnectionId)
+        : (s.activeConnectionId === connectionId ? null : s.activeConnectionId)
       const commitModal = next.some((t) => t.id === s.commitModal?.tabId) ? s.commitModal : null
-      return { tabs: next, activeTabId: stillActive ? s.activeTabId : (next[0]?.id ?? null), commitModal }
+      return { tabs: next, activeTabId, activeConnectionId, commitModal }
     }),
 
   closeOtherTabs: (id) => set((s) => closeTabsResult(s, 'others', id)),
   closeTabsToRight: (id) => set((s) => closeTabsResult(s, 'right', id)),
   closeTabsToLeft: (id) => set((s) => closeTabsResult(s, 'left', id)),
-  closeAllTabs: () => set((s) => closeTabsResult(s, 'all', '')),
+  closeAllTabs: (id) => set((s) => closeTabsResult(s, 'all', id)),
 
-  setActiveTab: (id) => set({ activeTabId: id }),
+  setActiveTab: (id) =>
+    set((s) => {
+      const tab = s.tabs.find((t) => t.id === id)
+      if (!tab) return s
+      // The active tab's connection becomes the active group/connection (sidebar follows).
+      return {
+        activeTabId: id,
+        activeConnectionId: tab.connectionId,
+        lastActiveByConnection: { ...s.lastActiveByConnection, [tab.connectionId]: id }
+      }
+    }),
 
   renameTab: (id, title) =>
     set((s) => {

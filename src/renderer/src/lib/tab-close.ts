@@ -1,7 +1,7 @@
 /** Bulk tab-close operations, scoped to a right-clicked "target" tab. Pure — the store wraps
  *  this and additionally drops a commit modal whose tab no longer survives. */
 
-export type CloseMode = 'others' | 'right' | 'left' | 'all'
+export type CloseMode = 'self' | 'others' | 'right' | 'left' | 'all'
 
 /** Compute the surviving tabs and the next active id after a close.
  *  - `all` clears every tab; `others` keeps only the target; `right`/`left` keep the target and
@@ -20,6 +20,9 @@ export function applyTabClose<T extends { id: string }>(
 
   let kept: T[]
   switch (mode) {
+    case 'self':
+      kept = tabs.filter((t) => t.id !== targetId)
+      break
     case 'all':
       kept = []
       break
