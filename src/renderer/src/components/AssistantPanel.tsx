@@ -88,7 +88,7 @@ export default function AssistantPanel(): JSX.Element | null {
           return next
         })
       } else if (e.done || e.error) {
-        if (e.error) setLive((prev) => [...prev, mkMsg(cidRef.current ?? '', 'assistant', `⚠️ ${e.error}`)])
+        if (e.error) { setLive((prev) => [...prev, mkMsg(cidRef.current ?? '', 'assistant', `⚠️ ${e.error}`)]); setContextFiles([]) }
         setStreaming(false)
         reqRef.current = null
         // Refetch persisted history (now includes the saved answer), then drop the optimistic copies.
@@ -127,7 +127,7 @@ export default function AssistantPanel(): JSX.Element | null {
     setContextFiles([]) // clear last turn's grounding; onContext repopulates if the repo matched
     const res = await window.api.llm.send(cid, connectionId, prompt, queryText)
     if (res.ok) reqRef.current = res.data.requestId
-    else { setStreaming(false); setLive((prev) => [...prev, mkMsg(cid, 'assistant', `⚠️ ${res.error}`)]) }
+    else { setStreaming(false); setContextFiles([]); setLive((prev) => [...prev, mkMsg(cid, 'assistant', `⚠️ ${res.error}`)]) }
   }
 
   function stop(): void { if (reqRef.current) void window.api.llm.cancel(reqRef.current) }

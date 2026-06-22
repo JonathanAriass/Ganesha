@@ -64,7 +64,10 @@ export function scanRepoFiles(repoPath: string): string[] {
 }
 
 /** Read one repo-relative file as UTF-8 text. Returns null if the path escapes the repo (traversal
- *  guard), the file is missing/too large, or it can't be decoded. */
+ *  guard), the file is missing/too large, or it can't be decoded. The guard is lexical — it stops
+ *  `../` escapes but not a symlink pointing outside the repo. That's sufficient here because the only
+ *  caller feeds it paths from scanRepoFiles, which never emits symlinks; revisit (realpathSync) if it
+ *  ever takes externally-supplied paths. */
 export function readRepoFile(repoPath: string, relPath: string): string | null {
   const root = resolve(repoPath)
   const full = resolve(root, relPath)
