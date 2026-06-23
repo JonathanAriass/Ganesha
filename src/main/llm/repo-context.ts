@@ -143,7 +143,9 @@ export function buildRepoContext(input: RepoContextInput): { text: string; used:
     const content = readFile(path)
     if (content == null) continue
     const snippet = snippetFor(content, tables, perFile)
-    const block = `// ${path}\n${snippet}`
+    // Pin the REAL DB table name to the file: class/model names (e.g. `User`) routinely differ from
+    // the actual table (`02_users`), and the snippet alone would mislead the model into guessing.
+    const block = `// ${path} — DB table: ${table}\n${snippet}`
     if (total + block.length > budget && used.length > 0) break // always keep at least one file
     blocks.push(block)
     used.push({ path, table, snippet })
@@ -151,7 +153,10 @@ export function buildRepoContext(input: RepoContextInput): { text: string; used:
   }
   if (used.length === 0) return { text: '', used: [] }
   const text =
-    'Relevant code from the linked repository (for context; prefer the live schema for exact column names):\n\n' +
+    'Relevant code from the linked repository — use it for relationships, columns, and intent. ' +
+    'The class/model names here are NOT database table names; always use the exact table name labeled ' +
+    'on each file (shown as "DB table: …") and the live schema above. For example a `User` model may ' +
+    'map to a table named `02_users`.\n\n' +
     blocks.join('\n\n')
   return { text, used }
 }

@@ -103,6 +103,13 @@ describe('buildRepoContext', () => {
     expect(out.used[0]).toMatchObject({ path: 'app/Models/User.php', table: 'users' })
     expect(out.used[0].snippet).toContain('fillable') // the exact text the model saw
   })
+  it('labels each file with its REAL db table name and warns class names are not table names', () => {
+    // A Laravel `User` model maps to a prefixed table `02_users`; the snippet alone would mislead.
+    const ranked = rankRepoFiles(['app/Models/User.php'], ['02_users'])
+    const out = buildRepoContext({ tables: ['02_users'], ranked, readFile: reader, budget: 4000 })
+    expect(out.text).toContain('DB table: 02_users') // the real name, pinned next to the class file
+    expect(out.text).toMatch(/not\b.*table name/i) // header tells the model not to derive names from classes
+  })
   it('returns empty when no tables are relevant', () => {
     expect(buildRepoContext({ tables: [], ranked: [], readFile: reader, budget: 4000 })).toEqual({
       text: '',
