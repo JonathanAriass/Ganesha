@@ -102,6 +102,25 @@ export interface Diagram {
   edges: DiagramEdge[]
 }
 
+/** One relationship of a selected table, from its point of view: `references` = this table's FK
+ *  column points OUT to `otherId`; `referenced-by` = `otherId`'s `column` points IN at this table. */
+export interface DiagramRelation {
+  otherId: string
+  column: string
+  origin: 'declared' | 'inferred'
+  direction: 'references' | 'referenced-by'
+}
+
+/** A node's relationships split by direction — the side-panel listing for a selected table. */
+export function nodeRelations(edges: DiagramEdge[], id: string): DiagramRelation[] {
+  const out: DiagramRelation[] = []
+  for (const e of edges) {
+    if (e.from === id) out.push({ otherId: e.to, column: e.fromColumn, origin: e.origin, direction: 'references' })
+    else if (e.to === id) out.push({ otherId: e.from, column: e.fromColumn, origin: e.origin, direction: 'referenced-by' })
+  }
+  return out
+}
+
 /** A selected node plus every node directly joined to it by an edge (either direction) — the set to
  *  keep lit when a table is selected in the diagram. */
 export function neighborNodes(edges: DiagramEdge[], id: string): Set<string> {

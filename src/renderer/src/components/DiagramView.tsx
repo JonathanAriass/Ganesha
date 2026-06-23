@@ -7,6 +7,8 @@ import {
   buildDiagram,
   nodeKey,
   neighborNodes,
+  nodeRelations,
+  type DiagramRelation,
 } from '../lib/schema-diagram'
 import { layoutDiagram, pointsToPath, fitView, HEADER_H, ROW_H, type LaidNode } from '../lib/diagram-layout'
 
@@ -54,6 +56,16 @@ export default function DiagramView({ connectionId }: { connectionId: string }):
     if (!laid || !containerRef.current) return
     const r = containerRef.current.getBoundingClientRect()
     view.current = fitView(laid.width, laid.height, r.width, r.height)
+    applyView()
+  }, [laid, applyView])
+
+  const centerOnId = useCallback((id: string) => {
+    if (!laid || !containerRef.current) return
+    const n = laid.nodes.find((x) => x.id === id)
+    if (!n) return
+    const r = containerRef.current.getBoundingClientRect()
+    const z = view.current.zoom
+    view.current = { x: r.width / 2 - (n.x + n.width / 2) * z, y: r.height / 2 - (n.y + n.height / 2) * z, zoom: z }
     applyView()
   }, [laid, applyView])
 
@@ -127,18 +139,18 @@ export default function DiagramView({ connectionId }: { connectionId: string }):
 
   // Centre the first matching table when the filter changes.
   useEffect(() => {
-    if (!matched || !laid || !containerRef.current) return
+    if (!matched || !laid) return
     const first = laid.nodes.find((n) => matched.has(n.id))
-    if (!first) return
-    const r = containerRef.current.getBoundingClientRect()
-    const z = view.current.zoom
-    view.current = {
-      x: r.width / 2 - (first.x + first.width / 2) * z,
-      y: r.height / 2 - (first.y + first.height / 2) * z,
-      zoom: z,
-    }
-    applyView()
-  }, [matched, laid, applyView])
+    if (first) centerOnId(first.id)
+  }, [matched, laid, centerOnId])
+
+  // The selected table (for the side panel) and its relationships, split by direction.
+  const selectedNode = useMemo(() => laid?.nodes.find((n) => n.id === selected) ?? null, [laid, selected])
+  const relations = useMemo(() => (selected && laid ? nodeRelations(laid.edges, selected) : []), [selected, laid])
+  const nameOf = useCallback(
+    (id: string) => laid?.nodes.find((n) => n.id === id)?.name ?? id,
+    [laid]
+  )
 
   const loading = objectsQ.isLoading || columnsQ.isLoading || relsQ.isLoading
   const error = objectsQ.error || columnsQ.error || relsQ.error
@@ -177,6 +189,7 @@ export default function DiagramView({ connectionId }: { connectionId: string }):
         <button className="btn ghost" onClick={() => zoomBy(1.2)} aria-label="Zoom in">＋</button>
         <button className="btn ghost" onClick={() => zoomBy(1 / 1.2)} aria-label="Zoom out">－</button>
       </div>
+      <div className="diagram-main">
       <div
         className="diagram-canvas"
         ref={containerRef}
@@ -213,6 +226,63 @@ export default function DiagramView({ connectionId }: { connectionId: string }):
             ))}
           </g>
         </svg>
+      </div>
+        {selectedNode && (
+          <DiagramSidePanel
+            node={selectedNode}
+            relations={relations}
+            nameOf={nameOf}
+            onSelect={(id) => { setSelected(id); centerOnId(id) }}
+            onClose={() => setSelected(null)}
+          />
+        )}
+      </div>
+    </div>
+  )
+}
+
+function DiagramSidePanel({
+  node,
+  relations,
+  nameOf,
+  onSelect,
+  onClose,
+}: {
+  node: LaidNode
+  relations: DiagramRelation[]
+  nameOf: (id: string) => string
+  onSelect: (id: string) => void
+  onClose: () => void
+}): JSX.Element {
+  const refs = relations.filter((r) => r.direction === 'references')
+  const refBy = relations.filter((r) => r.direction === 'referenced-by')
+  const row = (r: DiagramRelation, i: number): JSX.Element => (
+    <button key={i} className="ds-row" onClick={() => onSelect(r.otherId)} title={`Go to ${nameOf(r.otherId)}`}>
+      <span className="ds-table">{nameOf(r.otherId)}</span>
+      <span className="ds-col">{r.column}</span>
+      {r.origin === 'inferred' && <span className="ds-inferred" title="Inferred from naming">~</span>}
+    </button>
+  )
+  return (
+    <div className="diagram-side">
+      <div className="ds-head">
+        <span className="ds-title" title={node.name}>{node.name}</span>
+        <button className="btn ghost" onClick={onClose} aria-label="Close panel">×</button>
+      </div>
+      <div className="ds-body">
+        {relations.length === 0 && <div className="ds-empty">No related tables.</div>}
+        {refs.length > 0 && (
+          <div className="ds-section">
+            <div className="ds-section-title">References ({refs.length})</div>
+            {refs.map(row)}
+          </div>
+        )}
+        {refBy.length > 0 && (
+          <div className="ds-section">
+            <div className="ds-section-title">Referenced by ({refBy.length})</div>
+            {refBy.map(row)}
+          </div>
+        )}
       </div>
     </div>
   )

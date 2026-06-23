@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { ColumnInfo, DbObject, Relationship } from '@shared/schema'
-import { inferRelationships, mergeRelationships, buildDiagram, nodeKey, neighborNodes } from './schema-diagram'
+import { inferRelationships, mergeRelationships, buildDiagram, nodeKey, neighborNodes, nodeRelations } from './schema-diagram'
 
 const tbl = (name: string): DbObject => ({ schema: null, name, kind: 'table' })
 const col = (name: string): ColumnInfo => ({ name, dataType: 'int', nullable: true })
@@ -99,5 +99,27 @@ describe('neighborNodes', () => {
   })
   it('returns just the node when it has no relationships', () => {
     expect(neighborNodes([], id('04_roles'))).toEqual(new Set([id('04_roles')]))
+  })
+})
+
+describe('nodeRelations', () => {
+  const rels = mergeRelationships([], inferRelationships(objects, columnsByTable))
+  const { nodes, edges } = buildDiagram(objects, columnsByTable, rels)
+  const id = (name: string): string => nodes.find((n) => n.name === name)!.id
+  const nameOf = (nid: string): string => nodes.find((n) => n.id === nid)!.name
+
+  it('lists outgoing FK columns as "references"', () => {
+    const refs = nodeRelations(edges, id('03_companies_users'))
+      .filter((r) => r.direction === 'references')
+      .map((r) => [r.column, nameOf(r.otherId)])
+    expect(refs).toContainEqual(['company_id', '01_companies'])
+    expect(refs).toContainEqual(['user_id', '02_users'])
+    expect(refs).toContainEqual(['id_role', '04_roles'])
+  })
+  it('lists incoming references as "referenced-by" on the target table', () => {
+    const r = nodeRelations(edges, id('01_companies')) // companies has no FK columns of its own
+    expect(r.every((x) => x.direction === 'referenced-by')).toBe(true)
+    expect(r.map((x) => nameOf(x.otherId))).toContain('03_companies_users')
+    expect(r.map((x) => nameOf(x.otherId))).toContain('02_users')
   })
 })
