@@ -7,17 +7,15 @@ import {
   buildDiagram,
   nodeKey,
   neighborNodes,
-  nodeRelations,
   subDiagram,
   type Diagram,
-  type DiagramRelation,
 } from '../lib/schema-diagram'
-import { layoutDiagram, type LaidNode } from '../lib/diagram-layout'
+import { layoutDiagram } from '../lib/diagram-layout'
 import DiagramCanvas from './DiagramCanvas'
 
 /** Read-only schema diagram for one connection: tables + columns laid out by dagre, declared FKs
- *  (solid) and inferred ones (dashed). Click a table to highlight its relations and list them; the
- *  ⛶ button opens a focused modal of just that table + its related tables. */
+ *  (solid) and inferred ones (dashed). Click a table to highlight its relations on the canvas AND
+ *  open a split panel with the focused sub-diagram (just that table + its related tables). */
 export default function DiagramView({ connectionId }: { connectionId: string }): JSX.Element {
   const objectsQ = useObjects(connectionId)
   const columnsQ = useAllColumns(connectionId)
@@ -27,7 +25,6 @@ export default function DiagramView({ connectionId }: { connectionId: string }):
   const [showInferred, setShowInferred] = useState(true)
   const [selected, setSelected] = useState<string | null>(null)
   const [centerTarget, setCenterTarget] = useState<string | null>(null)
-  const [focusOpen, setFocusOpen] = useState(false)
 
   const columnsByTable = useMemo(() => {
     const m = new Map<string, ColumnInfo[]>()
@@ -60,9 +57,9 @@ export default function DiagramView({ connectionId }: { connectionId: string }):
   }, [matched, laid])
 
   const related = useMemo(() => (selected && laid ? neighborNodes(laid.edges, selected) : null), [selected, laid])
-  const selectedNode = useMemo(() => laid?.nodes.find((n) => n.id === selected) ?? null, [laid, selected])
-  const relations = useMemo(() => (selected && laid ? nodeRelations(laid.edges, selected) : []), [selected, laid])
   const nameOf = useCallback((id: string) => laid?.nodes.find((n) => n.id === id)?.name ?? id, [laid])
+  // A selection that survives a re-layout (filter/inferred toggle) but vanished from the graph is cleared.
+  const selectedValid = selected != null && laid != null && laid.nodes.some((n) => n.id === selected)
 
   const loading = objectsQ.isLoading || columnsQ.isLoading || relsQ.isLoading
   const error = objectsQ.error || columnsQ.error || relsQ.error
@@ -111,112 +108,51 @@ export default function DiagramView({ connectionId }: { connectionId: string }):
           onSelect={(id) => setSelected((cur) => (id && id !== cur ? id : null))}
         />
 
-        {selectedNode && (
-          <DiagramSidePanel
-            node={selectedNode}
-            relations={relations}
+        {selectedValid && selected && (
+          <FocusPanel
+            diagram={diagram}
+            focusId={selected}
             nameOf={nameOf}
-            onSelect={(id) => { setSelected(id); setCenterTarget(id) }}
-            onFocus={() => setFocusOpen(true)}
+            onSelect={(id) => setSelected(id)}
             onClose={() => setSelected(null)}
           />
         )}
       </div>
-
-      {focusOpen && selectedNode && selected && (
-        <FocusDiagramModal diagram={diagram} initialId={selected} nameOf={nameOf} onClose={() => setFocusOpen(false)} />
-      )}
     </div>
   )
 }
 
-function DiagramSidePanel({
-  node,
-  relations,
+/** The split panel: a focused sub-diagram of the selected table + only its related tables. Clicking a
+ *  table inside re-focuses (driving the parent selection, so the main canvas highlight follows). */
+function FocusPanel({
+  diagram,
+  focusId,
   nameOf,
   onSelect,
-  onFocus,
-  onClose,
-}: {
-  node: LaidNode
-  relations: DiagramRelation[]
-  nameOf: (id: string) => string
-  onSelect: (id: string) => void
-  onFocus: () => void
-  onClose: () => void
-}): JSX.Element {
-  const refs = relations.filter((r) => r.direction === 'references')
-  const refBy = relations.filter((r) => r.direction === 'referenced-by')
-  const row = (r: DiagramRelation, i: number): JSX.Element => (
-    <button key={i} className="ds-row" onClick={() => onSelect(r.otherId)} title={`Go to ${nameOf(r.otherId)}`}>
-      <span className="ds-table">{nameOf(r.otherId)}</span>
-      <span className="ds-col">{r.column}</span>
-      {r.origin === 'inferred' && <span className="ds-inferred" title="Inferred from naming">~</span>}
-    </button>
-  )
-  return (
-    <div className="diagram-side">
-      <div className="ds-head">
-        <span className="ds-title" title={node.name}>{node.name}</span>
-        <button className="btn ghost" onClick={onFocus} title="Open focused diagram of related tables" aria-label="Focused diagram">⛶</button>
-        <button className="btn ghost" onClick={onClose} aria-label="Close panel">×</button>
-      </div>
-      <div className="ds-body">
-        {relations.length === 0 && <div className="ds-empty">No related tables.</div>}
-        {refs.length > 0 && (
-          <div className="ds-section">
-            <div className="ds-section-title">References ({refs.length})</div>
-            {refs.map(row)}
-          </div>
-        )}
-        {refBy.length > 0 && (
-          <div className="ds-section">
-            <div className="ds-section-title">Referenced by ({refBy.length})</div>
-            {refBy.map(row)}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function FocusDiagramModal({
-  diagram,
-  initialId,
-  nameOf,
   onClose,
 }: {
   diagram: Diagram
-  initialId: string
+  focusId: string
   nameOf: (id: string) => string
+  onSelect: (id: string) => void
   onClose: () => void
 }): JSX.Element {
-  const [focusId, setFocusId] = useState(initialId)
   const sub = useMemo(() => layoutDiagram(subDiagram(diagram, focusId)), [diagram, focusId])
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
-
+  const count = sub.nodes.length - 1
   return (
-    <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="modal diagram-modal">
-        <div className="modal-header">
-          <h2>◇ {nameOf(focusId)} — related tables</h2>
-          <span className="spacer" style={{ marginLeft: 'auto' }} />
-          <button className="btn ghost" onClick={onClose} aria-label="Close">×</button>
-        </div>
-        <div className="diagram-modal-body">
-          <DiagramCanvas
-            laid={sub}
-            centerId={null}
-            nodeClass={(id) => (id === focusId ? 'selected' : '')}
-            onSelect={(id) => { if (id) setFocusId(id) }}
-          />
-        </div>
+    <div className="diagram-focus">
+      <div className="df-head">
+        <span className="df-title" title={nameOf(focusId)}>◇ {nameOf(focusId)}</span>
+        <span className="df-sub">{count} related table{count === 1 ? '' : 's'}</span>
+        <span style={{ marginLeft: 'auto' }} />
+        <button className="btn ghost" onClick={onClose} aria-label="Close focused view">×</button>
       </div>
+      <DiagramCanvas
+        laid={sub}
+        centerId={null}
+        nodeClass={(id) => (id === focusId ? 'selected' : '')}
+        onSelect={(id) => { if (id) onSelect(id) }}
+      />
     </div>
   )
 }
