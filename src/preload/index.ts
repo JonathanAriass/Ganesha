@@ -104,6 +104,12 @@ const api: DbClientApi = {
       ipcRenderer.on('ssm:status', l)
       return () => ipcRenderer.removeListener('ssm:status', l)
     }
+  },
+  aws: {
+    profiles: () => invoke('aws.profiles', undefined),
+    identity: (profile, region) => invoke('aws.identity', { profile, region }),
+    login: (profile) => invoke('aws.login', { profile }),
+    instances: (profile, region) => invoke('aws.instances', { profile, region })
   }
 }
 

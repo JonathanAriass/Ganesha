@@ -29,6 +29,7 @@ import { scanRepoFiles, readRepoFile } from './llm/repo-scan'
 import * as llm from './persistence/llm'
 import * as ssm from './persistence/ssm-tunnels'
 import { SsmRunner } from './ssm/runner'
+import { runAws, listAwsProfiles, parseArn, parseInstances } from './ssm/aws'
 import { getModelsDir } from './persistence/paths'
 import type { LlmTokenEvent, LlmDownloadEvent, LlmContextEvent } from '../shared/ipc'
 
@@ -321,6 +322,14 @@ export function registerIpcHandlers(): void {
   })
   handle('ssm.stop', (id) => { ssmRunner.stop(id); return ok(null) })
   handle('ssm.running', () => ok(ssmRunner.running()))
+
+  // ── AWS connector (for the tunnel form's profile/login/instance pickers) ──
+  handle('aws.profiles', () => ok(listAwsProfiles()))
+  handle('aws.identity', async ({ profile, region }) =>
+    ok({ arn: parseArn(await runAws(['sts', 'get-caller-identity', '--profile', profile, '--region', region, '--output', 'json'])) }))
+  handle('aws.login', async ({ profile }) => { await runAws(['sso', 'login', '--profile', profile], 180000); return ok(null) })
+  handle('aws.instances', async ({ profile, region }) =>
+    ok(parseInstances(await runAws(['ssm', 'describe-instance-information', '--profile', profile, '--region', region, '--output', 'json']))))
 
   // Download streams progress to the renderer that asked — registered raw for event.sender.
   ipcMain.handle('llm.models.download', async (event, { uri }: { uri: string }) => {

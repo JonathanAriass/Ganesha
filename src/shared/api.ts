@@ -84,4 +84,10 @@ export interface DbClientApi {
     onOutput(cb: (e: SsmOutputEvent) => void): () => void
     onStatus(cb: (e: SsmStatusEvent) => void): () => void
   }
+  aws: {
+    profiles(): Promise<IpcResult<'aws.profiles'>>
+    identity(profile: string, region: string): Promise<IpcResult<'aws.identity'>>
+    login(profile: string): Promise<IpcResult<'aws.login'>>
+    instances(profile: string, region: string): Promise<IpcResult<'aws.instances'>>
+  }
 }

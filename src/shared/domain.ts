@@ -72,6 +72,13 @@ export interface SsmTunnel extends SsmTunnelInput {
   updatedAt: number
 }
 
+/** An SSM-managed EC2 instance, for the tunnel form's instance picker. */
+export interface AwsInstance {
+  instanceId: string
+  name: string
+  ping: string
+}
+
 export interface HistoryEntryInput {
   connectionId: string
   query: string

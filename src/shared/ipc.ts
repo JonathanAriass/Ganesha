@@ -2,7 +2,7 @@ import type { Result } from './result'
 import type {
   ConnectionConfig, ConnectionInput, HistoryEntry, HistoryEntryInput, AppSettings,
   SavedQuery, SavedQueryInput, SavedQueryPatch, SessionTab,
-  LocalModel, CatalogModel, LlmConversation, LlmMessage, SsmTunnel, SsmTunnelInput
+  LocalModel, CatalogModel, LlmConversation, LlmMessage, SsmTunnel, SsmTunnelInput, AwsInstance
 } from './domain'
 import type { QueryResult, RowEdit } from './query'
 import type { DbObject, ObjectRef, ColumnInfo, Relationship, TableColumns } from './schema'
@@ -67,6 +67,10 @@ export interface IpcChannels {
   'ssm.start': { req: string; res: null }
   'ssm.stop': { req: string; res: null }
   'ssm.running': { req: void; res: string[] }
+  'aws.profiles': { req: void; res: string[] }
+  'aws.identity': { req: { profile: string; region: string }; res: { arn: string } }
+  'aws.login': { req: { profile: string }; res: null }
+  'aws.instances': { req: { profile: string; region: string }; res: AwsInstance[] }
 }
 
 /** main→renderer push payload for streamed chat tokens. */

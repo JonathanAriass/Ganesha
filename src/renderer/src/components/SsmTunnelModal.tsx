@@ -1,13 +1,15 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSaveSsmTunnel, useConnections } from '../lib/hooks'
-import type { SsmTunnel, SsmTunnelInput } from '@shared/domain'
+import type { SsmTunnel, SsmTunnelInput, AwsInstance } from '@shared/domain'
 
 const EMPTY: SsmTunnelInput = {
   name: '', profile: '', region: 'eu-west-3', instanceId: '', remotePort: 3306, localPort: 13306, connectionId: null
 }
 
-/** Add/edit an SSM tunnel config. Values (incl. the instance id / profile) are stored only in the
- *  local sqlite — never in committed source. */
+type Auth = { status: 'idle' | 'checking' | 'ok' | 'fail'; arn?: string; error?: string }
+
+/** Add/edit an SSM tunnel. The AWS connector lets you pick a profile, sign in (SSO), and choose the
+ *  target from the live instance list instead of typing an id. Values stay only in the local sqlite. */
 export default function SsmTunnelModal({ tunnel, onClose }: { tunnel: SsmTunnel | null; onClose: () => void }): JSX.Element {
   const { data: connections = [] } = useConnections()
   const save = useSaveSsmTunnel()
@@ -17,20 +19,59 @@ export default function SsmTunnelModal({ tunnel, onClose }: { tunnel: SsmTunnel 
       ? { name: tunnel.name, profile: tunnel.profile, region: tunnel.region, instanceId: tunnel.instanceId, remotePort: tunnel.remotePort, localPort: tunnel.localPort, connectionId: tunnel.connectionId }
       : EMPTY
   )
+
+  // ── AWS connector ──
+  const [profiles, setProfiles] = useState<string[]>([])
+  const [auth, setAuth] = useState<Auth>({ status: 'idle' })
+  const [instances, setInstances] = useState<AwsInstance[]>([])
+  const [loadingInstances, setLoadingInstances] = useState(false)
+  const [loginBusy, setLoginBusy] = useState(false)
+
+  useEffect(() => {
+    window.api.aws.profiles().then((r) => {
+      if (!r.ok) return
+      setProfiles(r.data)
+      setForm((f) => (f.profile || !r.data[0] ? f : { ...f, profile: r.data[0] }))
+    })
+  }, [])
+
   function set<K extends keyof SsmTunnelInput>(k: K, v: SsmTunnelInput[K]): void {
     setForm((f) => ({ ...f, [k]: v }))
     setError(null)
+    if (k === 'profile' || k === 'region') { setAuth({ status: 'idle' }); setInstances([]) }
   }
+
+  async function loadInstances(): Promise<void> {
+    setLoadingInstances(true)
+    const r = await window.api.aws.instances(form.profile, form.region)
+    setLoadingInstances(false)
+    if (r.ok) setInstances(r.data)
+  }
+  async function checkLogin(): Promise<void> {
+    if (!form.profile || !form.region) return
+    setAuth({ status: 'checking' })
+    setInstances([])
+    const r = await window.api.aws.identity(form.profile, form.region)
+    if (r.ok) { setAuth({ status: 'ok', arn: r.data.arn }); void loadInstances() }
+    else setAuth({ status: 'fail', error: r.error })
+  }
+  async function login(): Promise<void> {
+    setLoginBusy(true)
+    const r = await window.api.aws.login(form.profile)
+    setLoginBusy(false)
+    if (r.ok) void checkLogin()
+    else setAuth({ status: 'fail', error: r.error })
+  }
+
   const canSave =
     form.name.trim().length > 0 && form.profile.trim().length > 0 && form.region.trim().length > 0 &&
     form.instanceId.trim().length > 0 && form.localPort > 0 && form.remotePort > 0
-
   function submit(): void {
-    save.mutate(
-      { id: tunnel?.id, input: form },
-      { onSuccess: onClose, onError: (e) => setError(e instanceof Error ? e.message : String(e)) }
-    )
+    save.mutate({ id: tunnel?.id, input: form }, { onSuccess: onClose, onError: (e) => setError(e instanceof Error ? e.message : String(e)) })
   }
+
+  // Editing a tunnel whose profile isn't in ~/.aws should still show it as the selected option.
+  const profileOptions = form.profile && !profiles.includes(form.profile) ? [form.profile, ...profiles] : profiles
 
   return (
     <div className="modal-overlay" role="dialog" aria-modal="true" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
@@ -42,20 +83,60 @@ export default function SsmTunnelModal({ tunnel, onClose }: { tunnel: SsmTunnel 
               <label htmlFor="ssm-name">Name</label>
               <input id="ssm-name" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Swan PROD master" autoFocus />
             </div>
-            <div className="form-row">
-              <label htmlFor="ssm-profile">AWS profile</label>
-              <input id="ssm-profile" value={form.profile} onChange={(e) => set('profile', e.target.value)} placeholder="you@company.com" />
-            </div>
+
             <div className="form-row-2">
+              <div className="form-row">
+                <label htmlFor="ssm-profile">AWS profile</label>
+                {profileOptions.length > 0 ? (
+                  <select id="ssm-profile" value={form.profile} onChange={(e) => set('profile', e.target.value)}>
+                    {profileOptions.map((p) => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                ) : (
+                  <input id="ssm-profile" value={form.profile} onChange={(e) => set('profile', e.target.value)} placeholder="you@company.com" />
+                )}
+              </div>
               <div className="form-row">
                 <label htmlFor="ssm-region">Region</label>
                 <input id="ssm-region" value={form.region} onChange={(e) => set('region', e.target.value)} placeholder="eu-west-3" />
               </div>
-              <div className="form-row">
-                <label htmlFor="ssm-instance">Instance id</label>
-                <input id="ssm-instance" value={form.instanceId} onChange={(e) => set('instanceId', e.target.value)} placeholder="i-0123456789abcdef0" />
-              </div>
             </div>
+
+            <div className="form-row">
+              <label>AWS sign-in</label>
+              <div className="aws-auth">
+                <button type="button" className="btn ghost" onClick={checkLogin} disabled={!form.profile || auth.status === 'checking'}>
+                  {auth.status === 'checking' ? 'Checking…' : 'Check login'}
+                </button>
+                {auth.status === 'ok' && <span className="aws-ok" title={auth.arn}>✓ {auth.arn?.split('/').pop()}</span>}
+                {auth.status === 'fail' && (
+                  <>
+                    <span className="aws-fail">✗ not signed in</span>
+                    <button type="button" className="btn primary xs" onClick={login} disabled={loginBusy}>
+                      {loginBusy ? 'Opening browser…' : 'Log in (SSO)'}
+                    </button>
+                  </>
+                )}
+              </div>
+              {auth.status === 'fail' && auth.error && <div className="aws-error">{auth.error}</div>}
+            </div>
+
+            <div className="form-row">
+              <label htmlFor="ssm-instance">
+                Instance {loadingInstances && <span className="hint">loading…</span>}
+              </label>
+              {instances.length > 0 && (
+                <select className="ssm-instance-select" value={form.instanceId} onChange={(e) => set('instanceId', e.target.value)}>
+                  <option value="">— select an instance —</option>
+                  {instances.map((i) => (
+                    <option key={i.instanceId} value={i.instanceId}>
+                      {i.name} ({i.instanceId}){i.ping && i.ping !== 'Online' ? ` · ${i.ping}` : ''}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <input id="ssm-instance" value={form.instanceId} onChange={(e) => set('instanceId', e.target.value)} placeholder="i-0123456789abcdef0 (or pick above)" />
+            </div>
+
             <div className="form-row-2">
               <div className="form-row">
                 <label htmlFor="ssm-remote">Remote port</label>
@@ -66,6 +147,7 @@ export default function SsmTunnelModal({ tunnel, onClose }: { tunnel: SsmTunnel 
                 <input id="ssm-local" type="number" value={form.localPort} min={1} max={65535} onChange={(e) => set('localPort', Number(e.target.value))} />
               </div>
             </div>
+
             <div className="form-row">
               <label htmlFor="ssm-conn">Linked connection <span className="hint">(optional — warns when this tunnel is down)</span></label>
               <select id="ssm-conn" value={form.connectionId ?? ''} onChange={(e) => set('connectionId', e.target.value || null)}>
@@ -73,6 +155,7 @@ export default function SsmTunnelModal({ tunnel, onClose }: { tunnel: SsmTunnel 
                 {connections.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
+
             {error && <div className="status err" role="alert">{error}</div>}
           </div>
         </div>
