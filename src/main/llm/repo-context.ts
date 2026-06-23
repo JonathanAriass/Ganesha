@@ -70,25 +70,58 @@ const MIGRATION_DIRS = ['/migrations/', '/migrate/']
 
 /** Rank repo file PATHS by relevance to the tables (no reads): a file whose basename contains a
  *  table-name variant scores high, boosted by model/entity (+25) or migration (+20) directories and
- *  a `.php` (+5) / `.sql` (+8) extension. Files with no name hit are dropped. */
+ *  a `.php` (+5) / `.sql` (+8) extension. Files with no name hit are dropped. Each file is attributed
+ *  to its MOST SPECIFIC table — the one whose longest matching variant is longest — so a
+ *  `companies_users` join file maps to `03_companies_users`, not to `02_users`. */
 export function rankRepoFiles(files: string[], tables: string[]): RankedFile[] {
   const tv = tables.map((t) => ({ table: t, variants: tableNameVariants(t).map((v) => v.toLowerCase()) }))
   const ranked: RankedFile[] = []
   for (const path of files) {
     const lower = path.toLowerCase()
     const base = lower.slice(lower.lastIndexOf('/') + 1)
+    let best: { table: string; len: number } | null = null
     for (const { table, variants } of tv) {
-      if (!variants.some((v) => base.includes(v))) continue
-      let score = 100
-      if (MODEL_DIRS.some((d) => lower.includes(d))) score += 25
-      else if (MIGRATION_DIRS.some((d) => lower.includes(d))) score += 20
-      if (base.endsWith('.php')) score += 5
-      else if (base.endsWith('.sql')) score += 8
-      ranked.push({ path, table, score })
-      break // one entry per file (its best table)
+      let longest = 0
+      for (const v of variants) if (base.includes(v) && v.length > longest) longest = v.length
+      if (longest > 0 && (!best || longest > best.len)) best = { table, len: longest }
     }
+    if (!best) continue
+    let score = 100
+    if (MODEL_DIRS.some((d) => lower.includes(d))) score += 25
+    else if (MIGRATION_DIRS.some((d) => lower.includes(d))) score += 20
+    if (base.endsWith('.php')) score += 5
+    else if (base.endsWith('.sql')) score += 8
+    ranked.push({ path, table: best.table, score })
   }
   return ranked.sort((a, b) => b.score - a.score)
+}
+
+/** The entity stems a table contributes (its prefix-stripped tokens + their singulars). */
+function tableStems(name: string): string[] {
+  const out: string[] = []
+  for (const tok of stripOrderingPrefix(name.toLowerCase()).split(/[_-]+/).filter(Boolean)) {
+    out.push(tok, singularize(tok))
+  }
+  return out
+}
+
+/** Pull obvious junction/bridge tables into focus: when ≥2 tables are already in focus, a table whose
+ *  name is composed of ≥2 of their entity stems (e.g. `03_companies_users` for `01_companies` +
+ *  `02_users`) is the relationship table the user is really asking about — even though they never
+ *  named it. Without this, "the relationship between users and companies" never finds the join table
+ *  and the model fabricates a name. Bridges are appended after the named focus tables. */
+export function expandWithJoinTables(focus: string[], knownTables: string[]): string[] {
+  if (focus.length < 2) return focus
+  const stems = new Set(focus.flatMap(tableStems))
+  const inFocus = new Set(focus)
+  const bridges: string[] = []
+  for (const k of knownTables) {
+    if (inFocus.has(k)) continue
+    const tokens = stripOrderingPrefix(k.toLowerCase()).split(/[_-]+/).filter(Boolean)
+    const hits = tokens.filter((tok) => stems.has(tok) || stems.has(singularize(tok))).length
+    if (hits >= 2) bridges.push(k)
+  }
+  return [...focus, ...bridges]
 }
 
 /** A bounded snippet of a file: the whole thing if small, else a window around the first table

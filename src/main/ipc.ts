@@ -24,7 +24,7 @@ import { MODEL_CATALOG } from './llm/catalog'
 import { listLocalModels, deleteLocalModel, downloadModel } from './llm/models'
 import { buildSchemaContext } from './llm/schema-context'
 import { buildSystemPrompt } from './llm/system-prompt'
-import { relevantTables, rankRepoFiles, buildRepoContext } from './llm/repo-context'
+import { relevantTables, rankRepoFiles, buildRepoContext, expandWithJoinTables } from './llm/repo-context'
 import { scanRepoFiles, readRepoFile } from './llm/repo-scan'
 import * as llm from './persistence/llm'
 import { getModelsDir } from './persistence/paths'
@@ -309,7 +309,9 @@ export function registerIpcHandlers(): void {
       // The tables this question targets (named in the message or the open query). They lead the
       // schema (so truncation can't drop them) AND drive repo retrieval — "read the tables first".
       const knownTables = withCols.map((w) => w.object.name)
-      const focusTables = relevantTables(prompt, queryText ?? '', knownTables)
+      // Tables named in the question + any junction table that bridges two of them (e.g. asking about
+      // users↔companies pulls in `03_companies_users`, which the user never named).
+      const focusTables = expandWithJoinTables(relevantTables(prompt, queryText ?? '', knownTables), knownTables)
       const schemaText = buildSchemaContext(config.type, withCols, undefined, focusTables)
 
       // STEP 2 — optionally ground in the linked repo's code (ORM models, migrations) for those tables.

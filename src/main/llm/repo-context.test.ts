@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { relevantTables, tableNameVariants, rankRepoFiles, buildRepoContext } from './repo-context'
+import { relevantTables, tableNameVariants, rankRepoFiles, buildRepoContext, expandWithJoinTables } from './repo-context'
 
 describe('relevantTables', () => {
   const known = ['orders', 'order_items', 'users', 'products']
@@ -83,6 +83,33 @@ describe('rankRepoFiles', () => {
     expect(paths[0]).toBe('app/Models/User.php') // filename hit + Models dir + .php
     expect(paths).toContain('database/migrations/2024_01_01_create_users_table.php')
     expect(paths).not.toContain('public/index.php') // no table-name hit
+  })
+})
+
+describe('rankRepoFiles attribution', () => {
+  it('maps a join-table file to its most specific table, not the first focus table', () => {
+    const r = rankRepoFiles(
+      ['database/migrations/2018_01_01_create_companies_users_table.php'],
+      ['02_users', '01_companies', '03_companies_users']
+    )
+    expect(r[0].table).toBe('03_companies_users') // longest variant match (`companies_users`) wins
+  })
+})
+
+describe('expandWithJoinTables', () => {
+  const known = ['01_companies', '02_users', '03_companies_users', '04_roles', '107_microsoft_users']
+  it('adds the junction table when its name bridges two focus entities', () => {
+    expect(expandWithJoinTables(['02_users', '01_companies'], known)).toContain('03_companies_users')
+  })
+  it('keeps the named focus tables first, bridges appended', () => {
+    expect(expandWithJoinTables(['02_users', '01_companies'], known).slice(0, 2)).toEqual(['02_users', '01_companies'])
+  })
+  it('does not add tables that share only ONE entity stem', () => {
+    // 107_microsoft_users shares only `users`; not a bridge between users and companies.
+    expect(expandWithJoinTables(['02_users', '01_companies'], known)).not.toContain('107_microsoft_users')
+  })
+  it('no-ops with a single focus table', () => {
+    expect(expandWithJoinTables(['02_users'], known)).toEqual(['02_users'])
   })
 })
 

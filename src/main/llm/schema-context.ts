@@ -18,21 +18,40 @@ export function buildSchemaContext(
   // drop them — "read the tables first" only helps if the right tables are present.
   const ordered = orderByPriority(objects, priority)
 
-  const lines: string[] = []
-  for (const { object, columns } of ordered) {
-    const qualified = object.schema && object.schema !== 'public' ? `${object.schema}.${object.name}` : object.name
-    const cols = columns.map((c) => `${c.name} ${c.dataType}${c.nullable ? '' : ' not null'}`).join(', ')
-    lines.push(`${qualified}(${cols})`)
-  }
+  // Complete roster of table NAMES — always present and compact — so the model knows exactly which
+  // tables exist and never fabricates a name (e.g. `01_companies_users`) for one it can't see.
+  const rosterLine = `All tables (${objects.length}): ${capList(ordered.map(({ object }) => qualify(object)), ROSTER_BUDGET)}`
 
+  // Full columns for as many tables as the budget allows (focus tables lead).
   let body = ''
   let truncated = false
-  for (const line of lines) {
-    if (header.length + body.length + line.length + 1 > maxChars) { truncated = true; break }
+  for (const { object, columns } of ordered) {
+    const cols = columns.map((c) => `${c.name} ${c.dataType}${c.nullable ? '' : ' not null'}`).join(', ')
+    const line = `${qualify(object)}(${cols})`
+    if (body.length + line.length + 1 > maxChars) { truncated = true; break }
     body += line + '\n'
   }
-  const marker = truncated ? '… (schema truncated)\n' : ''
-  return `${header}\nTables:\n${body}${marker}`.trimEnd()
+  const marker = truncated ? '… (more table columns omitted — every table name is in the list above)\n' : ''
+  return `${header}\n${rosterLine}\nColumns:\n${body}${marker}`.trimEnd()
+}
+
+function qualify(object: DbObject): string {
+  return object.schema && object.schema !== 'public' ? `${object.schema}.${object.name}` : object.name
+}
+
+const ROSTER_BUDGET = 8000
+
+/** Join `names` with ', ' until `budget` chars, then summarise the remainder as `… +N more`. */
+function capList(names: string[], budget: number): string {
+  const parts: string[] = []
+  let len = 0
+  for (let i = 0; i < names.length; i++) {
+    const add = (parts.length ? 2 : 0) + names[i].length
+    if (len + add > budget) return `${parts.join(', ')}, … +${names.length - i} more`
+    parts.push(names[i])
+    len += add
+  }
+  return parts.join(', ')
 }
 
 /** Move the named tables to the front (preserving their given order), keeping the rest in place. */

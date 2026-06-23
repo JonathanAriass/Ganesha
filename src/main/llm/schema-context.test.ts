@@ -25,11 +25,12 @@ describe('buildSchemaContext', () => {
     expect(out).toMatch(/total[^\n]*not null/i)
   })
 
-  it('truncates to the char budget with a marker rather than dumping everything', () => {
-    const many = Array.from({ length: 200 }, (_, i) => t(`tbl${i}`, [col('c', 'int')]))
+  it('bounds the columns to the char budget but lists every table NAME in the roster', () => {
+    const many = Array.from({ length: 200 }, (_, i) => t(`tbl${i}`, [col('c', 'int'), col('d', 'text')]))
     const out = buildSchemaContext('mysql', many, 500)
-    expect(out.length).toBeLessThanOrEqual(600) // budget + the marker line
-    expect(out).toMatch(/truncated/i)
+    expect(out).toContain('All tables (200)') // complete roster — no table is invisible
+    expect(out).toContain('tbl199') // even the last table's NAME is present
+    expect(out).toMatch(/omitted/i) // the COLUMNS section was bounded
   })
 
   it('handles an empty schema without throwing', () => {
