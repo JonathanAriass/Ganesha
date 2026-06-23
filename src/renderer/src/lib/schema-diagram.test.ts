@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { ColumnInfo, DbObject, Relationship } from '@shared/schema'
-import { inferRelationships, mergeRelationships, buildDiagram, nodeKey } from './schema-diagram'
+import { inferRelationships, mergeRelationships, buildDiagram, nodeKey, neighborNodes } from './schema-diagram'
 
 const tbl = (name: string): DbObject => ({ schema: null, name, kind: 'table' })
 const col = (name: string): ColumnInfo => ({ name, dataType: 'int', nullable: true })
@@ -76,5 +76,28 @@ describe('buildDiagram', () => {
       toSchema: null, toTable: '99_ghost', toColumn: 'id', origin: 'inferred'
     }]
     expect(buildDiagram(objects, columnsByTable, dangling).edges).toHaveLength(0)
+  })
+})
+
+describe('neighborNodes', () => {
+  const rels = mergeRelationships([], inferRelationships(objects, columnsByTable))
+  const { nodes, edges } = buildDiagram(objects, columnsByTable, rels)
+  const id = (name: string): string => nodes.find((n) => n.name === name)!.id
+
+  it('includes the node itself plus everything joined to it in either direction', () => {
+    const set = neighborNodes(edges, id('03_companies_users')) // bridges companies, users, roles
+    expect(set.has(id('03_companies_users'))).toBe(true)
+    expect(set.has(id('01_companies'))).toBe(true)
+    expect(set.has(id('02_users'))).toBe(true)
+    expect(set.has(id('04_roles'))).toBe(true)
+  })
+  it('a table referenced BY another (incoming edge) counts as a neighbor', () => {
+    // 01_companies has no FK columns itself, but 02_users + 03_companies_users point AT it.
+    const set = neighborNodes(edges, id('01_companies'))
+    expect(set.has(id('02_users'))).toBe(true)
+    expect(set.has(id('03_companies_users'))).toBe(true)
+  })
+  it('returns just the node when it has no relationships', () => {
+    expect(neighborNodes([], id('04_roles'))).toEqual(new Set([id('04_roles')]))
   })
 })

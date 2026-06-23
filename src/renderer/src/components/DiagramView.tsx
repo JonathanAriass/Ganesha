@@ -6,6 +6,7 @@ import {
   mergeRelationships,
   buildDiagram,
   nodeKey,
+  neighborNodes,
 } from '../lib/schema-diagram'
 import { layoutDiagram, pointsToPath, fitView, HEADER_H, ROW_H, type LaidNode } from '../lib/diagram-layout'
 
@@ -22,11 +23,12 @@ export default function DiagramView({ connectionId }: { connectionId: string }):
 
   const [filter, setFilter] = useState('')
   const [showInferred, setShowInferred] = useState(true)
+  const [selected, setSelected] = useState<string | null>(null) // selected table → highlight its relations
 
   const containerRef = useRef<HTMLDivElement>(null)
   const gRef = useRef<SVGGElement>(null)
   const view = useRef({ x: 0, y: 0, zoom: 1 })
-  const pan = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null)
+  const pan = useRef<{ x: number; y: number; ox: number; oy: number; nodeId: string | null; moved: boolean } | null>(null)
 
   const columnsByTable = useMemo(() => {
     const m = new Map<string, ColumnInfo[]>()
@@ -93,16 +95,25 @@ export default function DiagramView({ connectionId }: { connectionId: string }):
   function onPointerDown(e: ReactPointerEvent<HTMLDivElement>): void {
     if (e.button !== 0) return
     e.currentTarget.setPointerCapture(e.pointerId)
-    pan.current = { x: e.clientX, y: e.clientY, ox: view.current.x, oy: view.current.y }
+    // Record the table under the pointer NOW — pointer capture redirects later events to the canvas.
+    const nodeEl = (e.target as Element).closest?.('[data-node]')
+    pan.current = {
+      x: e.clientX, y: e.clientY, ox: view.current.x, oy: view.current.y,
+      nodeId: nodeEl?.getAttribute('data-node') ?? null, moved: false
+    }
   }
   function onPointerMove(e: ReactPointerEvent<HTMLDivElement>): void {
     const p = pan.current
     if (!p) return
+    if (!p.moved && Math.hypot(e.clientX - p.x, e.clientY - p.y) > 4) p.moved = true
     view.current = { ...view.current, x: p.ox + (e.clientX - p.x), y: p.oy + (e.clientY - p.y) }
     applyView()
   }
   function endPan(): void {
+    const p = pan.current
     pan.current = null
+    // A click (no real drag) selects the clicked table (toggling), or clears on empty canvas.
+    if (p && !p.moved) setSelected((cur) => (p.nodeId && p.nodeId !== cur ? p.nodeId : null))
   }
 
   const matched = useMemo(() => {
@@ -110,6 +121,9 @@ export default function DiagramView({ connectionId }: { connectionId: string }):
     if (!f || !laid) return null
     return new Set(laid.nodes.filter((n) => n.name.toLowerCase().includes(f)).map((n) => n.id))
   }, [filter, laid])
+
+  // The selected table + its related tables — everything else dims while a table is selected.
+  const related = useMemo(() => (selected && laid ? neighborNodes(laid.edges, selected) : null), [selected, laid])
 
   // Centre the first matching table when the filter changes.
   useEffect(() => {
@@ -178,16 +192,24 @@ export default function DiagramView({ connectionId }: { connectionId: string }):
             </marker>
           </defs>
           <g ref={gRef}>
-            {laid.edges.map((e) => (
-              <path
-                key={e.id}
-                d={pointsToPath(e.points)}
-                className={`diagram-edge ${e.origin}`}
-                markerEnd="url(#diag-arrow)"
-              />
-            ))}
+            {laid.edges.map((e) => {
+              const active = selected != null && (e.from === selected || e.to === selected)
+              return (
+                <path
+                  key={e.id}
+                  d={pointsToPath(e.points)}
+                  className={`diagram-edge ${e.origin}${active ? ' active' : ''}${selected != null && !active ? ' faded' : ''}`}
+                  markerEnd="url(#diag-arrow)"
+                />
+              )
+            })}
             {laid.nodes.map((n) => (
-              <NodeBox key={n.id} node={n} dimmed={matched != null && !matched.has(n.id)} />
+              <NodeBox
+                key={n.id}
+                node={n}
+                selected={n.id === selected}
+                dimmed={(related != null && !related.has(n.id)) || (matched != null && !matched.has(n.id))}
+              />
             ))}
           </g>
         </svg>
@@ -196,9 +218,13 @@ export default function DiagramView({ connectionId }: { connectionId: string }):
   )
 }
 
-function NodeBox({ node, dimmed }: { node: LaidNode; dimmed: boolean }): JSX.Element {
+function NodeBox({ node, selected, dimmed }: { node: LaidNode; selected: boolean; dimmed: boolean }): JSX.Element {
   return (
-    <g transform={`translate(${node.x} ${node.y})`} className={`diagram-node${dimmed ? ' dimmed' : ''}`}>
+    <g
+      data-node={node.id}
+      transform={`translate(${node.x} ${node.y})`}
+      className={`diagram-node${selected ? ' selected' : ''}${dimmed ? ' dimmed' : ''}`}
+    >
       <rect width={node.width} height={node.height} rx={6} className="dn-box" />
       <rect width={node.width} height={HEADER_H} rx={6} className="dn-header" />
       <text x={9} y={HEADER_H / 2} className="dn-title" dominantBaseline="middle">{truncate(node.name)}</text>

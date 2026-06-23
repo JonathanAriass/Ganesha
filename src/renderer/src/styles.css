@@ -1883,3 +1883,8 @@ input[type="password"]::placeholder {
 .diagram-arrow { fill: var(--text-2); }
 .diagram-open-btn { display: block; width: calc(100% - 16px); margin: 8px; padding: 7px 10px; font-size: 12px; color: var(--text); background: var(--bg-3); border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; text-align: left; flex-shrink: 0; }
 .diagram-open-btn:hover { background: var(--hover-overlay); border-color: var(--accent); }
+.diagram-node.selected .dn-box { stroke: var(--accent); stroke-width: 2; }
+.diagram-node.selected .dn-header { fill: var(--accent); stroke: var(--accent); }
+.diagram-node.selected .dn-title { fill: #fff; }
+.diagram-edge.active { stroke: var(--accent); stroke-width: 2; opacity: 1; }
+.diagram-edge.faded { opacity: 0.12; }

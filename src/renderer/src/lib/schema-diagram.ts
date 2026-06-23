@@ -102,6 +102,17 @@ export interface Diagram {
   edges: DiagramEdge[]
 }
 
+/** A selected node plus every node directly joined to it by an edge (either direction) — the set to
+ *  keep lit when a table is selected in the diagram. */
+export function neighborNodes(edges: DiagramEdge[], id: string): Set<string> {
+  const set = new Set<string>([id])
+  for (const e of edges) {
+    if (e.from === id) set.add(e.to)
+    if (e.to === id) set.add(e.from)
+  }
+  return set
+}
+
 /** Build the node/edge model: a node per table (columns marked PK by the `id`/`_id` convention and FK
  *  when they drive a relationship), and an edge per relationship whose BOTH endpoints are known tables
  *  (self-loops and dangling references dropped). */
