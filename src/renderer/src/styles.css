@@ -1928,3 +1928,21 @@ input[type="password"]::placeholder {
 .dm-row { display: block; width: 100%; text-align: left; padding: 5px 8px; border: none; border-radius: var(--radius); background: none; color: var(--text); cursor: pointer; font-size: 12px; font-family: ui-monospace, 'SF Mono', 'Fira Mono', monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dm-row:hover { background: var(--hover-overlay); }
 .dm-row.active { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--text); }
+
+/* ── SSM tunnels panel ── */
+.ssm-panel { width: 360px; flex-shrink: 0; display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--border); background: var(--bg-2); }
+.ssm-head { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+.ssm-list { flex: 0 0 auto; max-height: 45%; overflow-y: auto; padding: 6px; border-bottom: 1px solid var(--border); }
+.ssm-empty { padding: 12px; color: var(--text-2); font-size: 12px; }
+.ssm-row { display: flex; align-items: center; gap: 6px; padding: 5px 6px; border-radius: var(--radius); cursor: pointer; font-size: 12px; }
+.ssm-row:hover { background: var(--hover-overlay); }
+.ssm-row.selected { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.ssm-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-2); flex-shrink: 0; opacity: 0.5; }
+.ssm-dot.on { background: #2ecc71; opacity: 1; box-shadow: 0 0 6px rgba(46,204,113,0.5); }
+.ssm-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.ssm-port { color: var(--text-2); font-family: ui-monospace, 'SF Mono', monospace; font-size: 11px; flex-shrink: 0; }
+.ssm-output { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.ssm-output-head { padding: 6px 10px; font-size: 11px; color: var(--text-2); border-bottom: 1px solid var(--border); }
+.ssm-output-body { flex: 1; min-height: 0; margin: 0; padding: 8px 10px; overflow: auto; font-family: ui-monospace, 'SF Mono', 'Fira Mono', monospace; font-size: 11px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; color: var(--text); }
+.ssm-banner { display: flex; align-items: center; gap: 10px; padding: 6px 14px; background: color-mix(in srgb, var(--warn) 16%, var(--bg-2)); border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text); }
+.ssm-banner .btn { margin-left: auto; }

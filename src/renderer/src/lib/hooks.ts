@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { ConnectionInput, SavedQueryInput, SavedQueryPatch } from '@shared/domain'
+import type { ConnectionInput, SavedQueryInput, SavedQueryPatch, SsmTunnelInput } from '@shared/domain'
 import type { ObjectRef } from '@shared/schema'
 import { unwrap } from './result'
 import type { QueryResult } from '@shared/query'
@@ -70,6 +70,29 @@ export function useRelationships(connectionId: string | null, enabled = true) {
     queryFn: () => window.api.schema.relationships(connectionId!).then(unwrap),
     enabled: enabled && connectionId != null,
     retry: false,
+  })
+}
+
+// ── SSM tunnels ───────────────────────────────────────────────────────────────
+
+export function useSsmTunnels() {
+  return useQuery({ queryKey: ['ssm'], queryFn: () => window.api.ssm.list().then(unwrap), retry: false })
+}
+
+export function useSaveSsmTunnel() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, input }: { id?: string; input: SsmTunnelInput }) =>
+      (id ? window.api.ssm.update(id, input) : window.api.ssm.create(input)).then(unwrap),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['ssm'] }),
+  })
+}
+
+export function useDeleteSsmTunnel() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => window.api.ssm.delete(id).then(unwrap),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['ssm'] }),
   })
 }
 

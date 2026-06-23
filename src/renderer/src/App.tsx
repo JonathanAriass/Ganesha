@@ -10,6 +10,7 @@ import CommandPalette from './components/CommandPalette'
 import TabBar from './components/TabBar'
 import QueryTab from './components/QueryTab'
 import DiagramView from './components/DiagramView'
+import SsmPanel from './components/SsmPanel'
 import SavedSection from './components/SavedSection'
 import HistorySection from './components/HistorySection'
 import SaveQueryModal from './components/SaveQueryModal'
@@ -44,6 +45,14 @@ function AppShell(): JSX.Element {
   useEffect(() => {
     if (settings) applyTheme(settings.theme)
   }, [settings])
+
+  // Keep the running-SSM-tunnel set live for the panel + the connect-time banner.
+  const setSsmRunning = useAppStore((s) => s.setSsmRunning)
+  const markSsm = useAppStore((s) => s.markSsm)
+  useEffect(() => {
+    window.api.ssm.running().then((r) => { if (r.ok) setSsmRunning(r.data) })
+    return window.api.ssm.onStatus((e) => markSsm(e.id, e.running))
+  }, [setSsmRunning, markSsm])
 
   const activeTab = tabs.find((t) => t.id === activeTabId)
 
@@ -86,6 +95,7 @@ function AppShell(): JSX.Element {
           )}
         </main>
         <AssistantPanel />
+        <SsmPanel />
       </div>
       {connectionModal && <ConnectionModal />}
       {settingsOpen && <SettingsModal />}

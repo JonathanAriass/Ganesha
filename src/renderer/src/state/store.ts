@@ -73,6 +73,14 @@ interface AppState {
   /** Tab whose staged edits are pending a commit-confirmation review, or null. */
   commitModal: { tabId: string } | null
 
+  // ── SSM tunnels ───────────────────────────────────────────────────────────
+  ssmOpen: boolean
+  /** Ids of SSM tunnels whose process is running (kept live by the ssm:status subscription). */
+  runningSsm: string[]
+  toggleSsm: () => void
+  setSsmRunning: (ids: string[]) => void
+  markSsm: (id: string, running: boolean) => void
+
   // ── LLM assistant ─────────────────────────────────────────────────────────
   assistantOpen: boolean
   activeConversationId: string | null
@@ -174,6 +182,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   paletteOpen: false,
   saveQueryModal: null,
   commitModal: null,
+  ssmOpen: false,
+  runningSsm: [],
   assistantOpen: false,
   activeConversationId: null,
   modelManagerOpen: false,
@@ -206,6 +216,13 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   openCommitModal: (tabId) => set({ commitModal: { tabId } }),
   closeCommitModal: () => set({ commitModal: null }),
+
+  toggleSsm: () => set((s) => ({ ssmOpen: !s.ssmOpen })),
+  setSsmRunning: (ids) => set({ runningSsm: ids }),
+  markSsm: (id, running) =>
+    set((s) => ({
+      runningSsm: running ? [...new Set([...s.runningSsm, id])] : s.runningSsm.filter((x) => x !== id)
+    })),
 
   toggleAssistant: () => set((s) => ({ assistantOpen: !s.assistantOpen })),
   setActiveConversation: (id) => set({ activeConversationId: id }),

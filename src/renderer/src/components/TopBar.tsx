@@ -1,6 +1,6 @@
 import type { ChangeEvent } from 'react'
 import { useAppStore } from '../state/store'
-import { useConnections } from '../lib/hooks'
+import { useConnections, useSsmTunnels } from '../lib/hooks'
 import { mod } from '../lib/platform'
 
 export default function TopBar(): JSX.Element {
@@ -10,10 +10,18 @@ export default function TopBar(): JSX.Element {
   const openSettings = useAppStore((s) => s.openSettings)
   const toggleAssistant = useAppStore((s) => s.toggleAssistant)
   const assistantOpen = useAppStore((s) => s.assistantOpen)
+  const toggleSsm = useAppStore((s) => s.toggleSsm)
+  const ssmOpen = useAppStore((s) => s.ssmOpen)
+  const runningSsm = useAppStore((s) => s.runningSsm)
 
   const { data: connections = [] } = useConnections()
+  const { data: tunnels = [] } = useSsmTunnels()
 
   const activeConn = connections.find((c) => c.id === activeConnectionId) ?? null
+  // Tunnels linked to the active connection that aren't currently running → offer to start.
+  const downLinked = activeConnectionId
+    ? tunnels.filter((t) => t.connectionId === activeConnectionId && !runningSsm.includes(t.id))
+    : []
 
   function handleSelectChange(e: ChangeEvent<HTMLSelectElement>) {
     const val = e.target.value
@@ -21,6 +29,7 @@ export default function TopBar(): JSX.Element {
   }
 
   return (
+    <>
     <header className="topbar">
       <span className="brand">Ganesha</span>
 
@@ -76,6 +85,16 @@ export default function TopBar(): JSX.Element {
       </button>
 
       <button
+        className={`btn ghost${ssmOpen ? ' active' : ''}`}
+        onClick={toggleSsm}
+        aria-label="Toggle SSM tunnels"
+        aria-pressed={ssmOpen}
+        title="SSM tunnels"
+      >
+        🔌 Tunnels
+      </button>
+
+      <button
         className="btn ghost"
         onClick={openSettings}
         aria-label="Settings"
@@ -84,5 +103,18 @@ export default function TopBar(): JSX.Element {
         ⚙
       </button>
     </header>
+
+    {downLinked.map((t) => (
+      <div className="ssm-banner" key={t.id} role="status">
+        ⚠ Tunnel <strong>{t.name}</strong> (127.0.0.1:{t.localPort}) is not running.
+        <button
+          className="btn xs primary"
+          onClick={() => { void window.api.ssm.start(t.id); if (!ssmOpen) toggleSsm() }}
+        >
+          Start tunnel
+        </button>
+      </div>
+    ))}
+    </>
   )
 }
