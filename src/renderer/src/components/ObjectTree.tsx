@@ -4,6 +4,7 @@ import { useAppStore } from '../state/store'
 import { useObjects, useColumns, useConnections } from '../lib/hooks'
 import { defaultTableQuery } from '../lib/tabquery'
 import { filterObjects, substringMatch } from '../lib/object-filter'
+import { sortObjects, loadSortMode, saveSortMode, type SortMode } from '../lib/object-sort'
 
 // ── ObjectNode ────────────────────────────────────────────────────────────────
 
@@ -115,6 +116,13 @@ export default function ObjectTree(): JSX.Element {
   // Objects differ per connection — a stale filter would hide everything.
   useEffect(() => setQuery(''), [activeConnectionId])
 
+  // Sort order is a global preference (survives connection switches + restarts), not per-connection.
+  const [sortMode, setSortMode] = useState<SortMode>(() => loadSortMode())
+  function changeSort(mode: SortMode): void {
+    setSortMode(mode)
+    saveSortMode(mode)
+  }
+
   function handleDoubleClick(obj: DbObject) {
     if (!activeConnectionId || !activeConn) return
     const ref = { schema: obj.schema, name: obj.name }
@@ -163,7 +171,7 @@ export default function ObjectTree(): JSX.Element {
   // Group by schema: if any object has a non-null schema, group them. Decided from
   // the ORIGINAL objects so the layout doesn't flip between grouped/flat while typing.
   const hasSchemas = objects.some((o) => o.schema !== null)
-  const filtered = filterObjects(objects, query)
+  const filtered = filterObjects(sortObjects(objects, sortMode), query)
 
   const filterBar = (
     <div className="tree-filter">
@@ -183,6 +191,17 @@ export default function ObjectTree(): JSX.Element {
           ×
         </button>
       )}
+      <select
+        className="tree-sort"
+        value={sortMode}
+        onChange={(e) => changeSort(e.target.value as SortMode)}
+        aria-label="Sort tables"
+        title="Sort tables"
+      >
+        <option value="number"># Number</option>
+        <option value="name">A→Z name</option>
+        <option value="full">A→Z full</option>
+      </select>
     </div>
   )
 

@@ -520,6 +520,18 @@ input[type="password"]::placeholder {
   background: var(--bg-3);
   color: var(--text);
 }
+.tree-sort {
+  flex: none;
+  height: 26px;
+  max-width: 96px;
+  padding: 2px 4px;
+  font-size: 11px;
+  color: var(--text);
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
 .tree-match {
   color: var(--accent);
   font-weight: 700;
