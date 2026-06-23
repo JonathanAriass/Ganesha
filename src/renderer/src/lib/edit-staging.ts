@@ -1,7 +1,19 @@
 import type { ColumnMeta, EditableResult, RowEdit } from '@shared/query'
 import { parseEditKey, getAtPath, isKeyPath, editKey } from './doc-path'
+import { cellText } from './grid-text'
 
 export { editKey } from './doc-path'
+
+/** Did the user actually change the value? Compares the editor's output (a typed string, or `null`
+ *  from the ∅ button) against what `EditingCell` SEEDS for the original value — `''` for a
+ *  null/undefined cell, else `cellText(original)`. So opening a field and pressing Enter without
+ *  typing, or editing a value back to its original, is a no-op rather than a staged "change". */
+export function editChangesValue(editorValue: unknown, original: unknown): boolean {
+  const nullish = (v: unknown): boolean => v === null || v === undefined
+  if (nullish(editorValue)) return !nullish(original) // ∅ button: a change only if it wasn't already null
+  const seeded = nullish(original) ? '' : cellText(original)
+  return editorValue !== seeded
+}
 
 /** Whether a result column can be edited: the result maps to one table, the connection isn't
  *  read-only, the column comes from a real table column (not an expression/join), and it isn't a

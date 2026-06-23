@@ -11,7 +11,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import type { ColumnMeta, EditableResult } from '@shared/query'
 import { cellText, cellMatchesFilter } from '../lib/grid-text'
 import { buildGridTemplate, gridMinWidth, clampColumnWidth, autoFitWidth } from '../lib/column-size'
-import { columnEditable, columnEditKey } from '../lib/edit-staging'
+import { columnEditable, columnEditKey, editChangesValue } from '../lib/edit-staging'
 import { coerceMongoEditValue } from '../lib/mongo-edit-value'
 import { useAppStore } from '../state/store'
 import EditingCell from './EditingCell'
@@ -136,10 +136,16 @@ export default function ResultsGrid({
   function stageCell(rowIndex: number, colIndex: number, value: unknown): void {
     const k = tabId && cellKey(rowIndex, colIndex)
     if (!tabId || !k) return
-    // SQL binds the raw string (the server coerces); Mongo needs a typed value for $set.
-    const stored = isMongo ? coerceMongoEditValue(value as string | null, rows[rowIndex][colIndex]) : value
-    store().setCellEdit(tabId, k, stored)
     setEditing(null)
+    const original = rows[rowIndex][colIndex]
+    if (!editChangesValue(value, original)) {
+      // No-op edit (or edited back to the original) — don't stage; drop any prior staged change.
+      if (Object.prototype.hasOwnProperty.call(edits, k)) store().resetCellEdit(tabId, k)
+      return
+    }
+    // SQL binds the raw string (the server coerces); Mongo needs a typed value for $set.
+    const stored = isMongo ? coerceMongoEditValue(value as string | null, original) : value
+    store().setCellEdit(tabId, k, stored)
     if (!requireCommit) void store().commitEdits(tabId) // fast-commit: write immediately
   }
 

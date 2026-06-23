@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { ColumnMeta, EditableResult } from '@shared/query'
 import { fieldView, rowJson, positionLabel } from '../lib/inspect'
-import { columnEditable, columnEditKey } from '../lib/edit-staging'
+import { columnEditable, columnEditKey, editChangesValue } from '../lib/edit-staging'
 import { coerceMongoEditValue } from '../lib/mongo-edit-value'
 import { useAppStore } from '../state/store'
 import EditingCell from './EditingCell'
@@ -68,10 +68,16 @@ export default function RowInspector({
   function stage(i: number, value: unknown): void {
     const key = fields[i].key
     if (!tabId || !key) return
-    // SQL binds the raw string (the server coerces); Mongo needs a typed value for $set.
-    const stored = isMongo ? coerceMongoEditValue(value as string | null, row[i]) : value
-    store().setCellEdit(tabId, key, stored)
     setEditing(null)
+    const original = row[i]
+    if (!editChangesValue(value, original)) {
+      // No-op edit (or edited back to the original) — don't stage; drop any prior staged change.
+      if (Object.prototype.hasOwnProperty.call(edits, key)) store().resetCellEdit(tabId, key)
+      return
+    }
+    // SQL binds the raw string (the server coerces); Mongo needs a typed value for $set.
+    const stored = isMongo ? coerceMongoEditValue(value as string | null, original) : value
+    store().setCellEdit(tabId, key, stored)
     if (!requireCommit) void store().commitEdits(tabId) // fast-commit: write immediately
   }
 

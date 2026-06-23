@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { EditableResult, ColumnMeta } from '@shared/query'
-import { editKey, buildRowEdits, describeEdits, columnEditable, columnEditKey } from './edit-staging'
+import { editKey, buildRowEdits, describeEdits, columnEditable, columnEditKey, editChangesValue } from './edit-staging'
 
 const editable: EditableResult = {
   table: { schema: 'public', name: 'users' },
@@ -62,6 +62,27 @@ describe('columnEditKey', () => {
     const e: EditableResult = { table: { schema: null, name: 't' }, keyColumns: ['id'], columnSources: ['id', null] }
     expect(columnEditKey(e, 0, 1)).toBeNull()
     expect(columnEditKey(null, 0, 1)).toBeNull()
+  })
+})
+
+describe('editChangesValue', () => {
+  it('is false when the committed text equals the original (a no-op open + Enter)', () => {
+    expect(editChangesValue('965', 965)).toBe(false) // number shown as "965", retyped/unchanged
+    expect(editChangesValue('hello', 'hello')).toBe(false)
+    expect(editChangesValue('{"a":1}', { a: 1 })).toBe(false) // object seeded as its JSON text
+  })
+  it('treats a NULL field (seeded empty) committed empty as unchanged', () => {
+    expect(editChangesValue('', null)).toBe(false) // the real bug: NULL renders '', Enter ≠ a change
+    expect(editChangesValue('', undefined)).toBe(false)
+  })
+  it('is true for a real change', () => {
+    expect(editChangesValue('966', 965)).toBe(true)
+    expect(editChangesValue('', 965)).toBe(true) // cleared a value to empty string
+    expect(editChangesValue('x', null)).toBe(true) // typed into a NULL field
+  })
+  it('handles the ∅ NULL button (null editor output)', () => {
+    expect(editChangesValue(null, null)).toBe(false) // NULL → NULL
+    expect(editChangesValue(null, 965)).toBe(true) // set a value to NULL
   })
 })
 
