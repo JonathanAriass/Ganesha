@@ -35,7 +35,9 @@ Appended to the existing schema-grounded system prompt only when `connection.rep
 2. **Find code** — bounded walk of `repoPath` (skip `.git`, `vendor`, `node_modules`, `.env*`,
    binaries, files > ~256 KB; cap total files scanned). Match each table against filenames + content
    using `tableNameVariants(table)` (snake_case ↔ CamelCase, basic singular/plural, so `users` finds
-   `User.php` *and* `..._create_users_table.php`). `rankRepoFiles` ranks: filename hit > model/entity/
+   `User.php` *and* `..._create_users_table.php`; a leading ordering prefix like `02_`/`115_` is
+   stripped so a prefixed table `02_users` still matches an unprefixed `User.php`, and `relevantTables`
+   likewise matches a prefixed table when the message names it without the prefix). `rankRepoFiles` ranks: filename hit > model/entity/
    migration path (`app/Models`, `database/migrations`, `src/Entity`, `Entities/`, `Models/`) >
    content hit; `*.php`/`*.sql` boosted.
 3. **Budget** — read the top files (injected reader), truncate to a code budget (~8000 chars, separate

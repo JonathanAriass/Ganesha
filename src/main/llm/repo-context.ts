@@ -20,13 +20,26 @@ function singularize(s: string): string {
   return s
 }
 
+/** Strip a leading ordering prefix like `02_` / `115_` (migration-number conventions). `02_users` →
+ *  `users`; names without such a prefix (incl. `3d_models`, where digits aren't a `_`/`-`-delimited
+ *  prefix) are returned unchanged. */
+function stripOrderingPrefix(name: string): string {
+  return name.replace(/^\d+[_-]/, '')
+}
+
 /** Name variants a table maps to in code: the raw name, its singular, and CamelCase of both — so
  *  `users` finds the model `User.php` AND the migration `..._create_users_table.php` (Laravel /
- *  Doctrine naming). */
+ *  Doctrine naming). When the table carries an ordering prefix (`02_users`), the prefix-stripped
+ *  forms are added too, so it still matches an unprefixed `User.php` / `..._create_users_table.php`. */
 export function tableNameVariants(table: string): string[] {
   const t = table.toLowerCase()
-  const sing = singularize(t)
-  return [...new Set([t, sing, camelCase(t), camelCase(sing)])]
+  const base = stripOrderingPrefix(t)
+  const out: string[] = []
+  for (const n of base === t ? [t] : [t, base]) {
+    const sing = singularize(n)
+    out.push(n, sing, camelCase(n), camelCase(sing))
+  }
+  return [...new Set(out)]
 }
 
 /** The connection's KNOWN tables that appear (whole-word, case-insensitive) in the user's message
@@ -35,7 +48,13 @@ export function relevantTables(message: string, queryText: string, knownTables: 
   const hay = `${message}\n${queryText}`.toLowerCase()
   const out: string[] = []
   for (const t of knownTables) {
-    if (new RegExp(`\\b${escapeRegex(t.toLowerCase())}\\b`).test(hay)) out.push(t)
+    const lower = t.toLowerCase()
+    const base = stripOrderingPrefix(lower)
+    // Match the raw name (e.g. an open query that says `02_users`) OR the prefix-stripped name (a
+    // user who naturally writes "users"). Singular/plural is intentionally NOT folded here — that
+    // would make "product" match the table `products` and flood retrieval with near-misses.
+    const forms = base === lower ? [lower] : [lower, base]
+    if (forms.some((f) => new RegExp(`\\b${escapeRegex(f)}\\b`).test(hay))) out.push(t)
   }
   return out
 }

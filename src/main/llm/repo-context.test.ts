@@ -30,6 +30,44 @@ describe('tableNameVariants', () => {
   })
 })
 
+describe('numeric ordering prefixes (e.g. 02_users → Laravel User.php)', () => {
+  it('tableNameVariants strips a leading "NN_" prefix so it also matches unprefixed files', () => {
+    const v = tableNameVariants('02_users')
+    expect(v).toContain('02_users') // keeps the prefixed forms (repos that DO use the prefix still match)
+    expect(v).toContain('users') // …and adds the clean forms Laravel/Doctrine actually name files with
+    expect(v).toContain('user')
+    expect(v).toContain('User')
+  })
+
+  it('multi-word prefixed table yields the clean CamelCase model name', () => {
+    const v = tableNameVariants('115_okt_card_funding_mandates')
+    expect(v).toContain('okt_card_funding_mandates')
+    expect(v).toContain('OktCardFundingMandate') // the model class
+  })
+
+  it('relevantTables matches a prefixed table when the message names it WITHOUT the prefix', () => {
+    expect(
+      relevantTables('what can you tell me about users', '', ['02_users', '107_microsoft_users'])
+    ).toEqual(['02_users'])
+  })
+
+  it('relevantTables still matches the prefixed name verbatim (e.g. from the open query tab)', () => {
+    expect(relevantTables('', 'SELECT * FROM `02_users` LIMIT 10', ['02_users'])).toEqual(['02_users'])
+  })
+
+  it('rankRepoFiles finds the unprefixed model + migration for a prefixed table', () => {
+    const files = [
+      'app/Model/User.php',
+      'database/migrations/2018_08_13_064755_create_users_table.php',
+      'public/index.php',
+    ]
+    const paths = rankRepoFiles(files, ['02_users']).map((f) => f.path)
+    expect(paths[0]).toBe('app/Model/User.php') // name hit + /model/ dir + .php
+    expect(paths).toContain('database/migrations/2018_08_13_064755_create_users_table.php')
+    expect(paths).not.toContain('public/index.php')
+  })
+})
+
 describe('rankRepoFiles', () => {
   const files = [
     'app/Models/User.php',
