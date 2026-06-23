@@ -74,7 +74,9 @@ export default function DiagramView({ connectionId }: { connectionId: string }):
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
-  }, [applyView])
+    // `laid` is a trigger, not a value used here: the canvas div only mounts once data arrives, so
+    // re-run when it does to attach the listener (the loading/error states render no canvas).
+  }, [applyView, laid])
 
   function zoomBy(factor: number): void {
     const el = containerRef.current
