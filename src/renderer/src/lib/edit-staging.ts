@@ -1,7 +1,33 @@
 import type { ColumnMeta, EditableResult, RowEdit } from '@shared/query'
-import { parseEditKey, getAtPath, isKeyPath } from './doc-path'
+import { parseEditKey, getAtPath, isKeyPath, editKey } from './doc-path'
 
 export { editKey } from './doc-path'
+
+/** Whether a result column can be edited: the result maps to one table, the connection isn't
+ *  read-only, the column comes from a real table column (not an expression/join), and it isn't a
+ *  key column — we never edit the PK / `_id`. Shared by the grid and the row inspector so they
+ *  agree on which fields are editable. */
+export function columnEditable(
+  editable: EditableResult | null | undefined,
+  readOnly: boolean | undefined,
+  colIndex: number
+): boolean {
+  if (readOnly || !editable) return false
+  const src = editable.columnSources[colIndex]
+  return src !== null && !editable.keyColumns.includes(src)
+}
+
+/** The staged-edit key for a top-level column edit (`row<SEP>columnName`), or null when the column
+ *  has no editable source. Keyed by field path so the grid, the tree and the inspector share one
+ *  staged change per field. */
+export function columnEditKey(
+  editable: EditableResult | null | undefined,
+  rowIndex: number,
+  colIndex: number
+): string | null {
+  const path = editable?.columnSources[colIndex]
+  return path ? editKey(rowIndex, path) : null
+}
 
 /** Turn the staged edits (keyed `row<SEP>fieldPath`) into per-row edits. The set is keyed
  *  by field path — a flat column name for SQL/top-level, a dotted path for nested Mongo

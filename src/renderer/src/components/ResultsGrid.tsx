@@ -11,7 +11,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import type { ColumnMeta, EditableResult } from '@shared/query'
 import { cellText, cellMatchesFilter } from '../lib/grid-text'
 import { buildGridTemplate, gridMinWidth, clampColumnWidth, autoFitWidth } from '../lib/column-size'
-import { editKey } from '../lib/doc-path'
+import { columnEditable, columnEditKey } from '../lib/edit-staging'
 import { coerceMongoEditValue } from '../lib/mongo-edit-value'
 import { useAppStore } from '../state/store'
 import EditingCell from './EditingCell'
@@ -129,20 +129,9 @@ export default function ResultsGrid({
     if (next) setSel({ rows, id: next.id })
   }
 
-  // ── Editing helpers ──
-  const colEditable = (colIndex: number): boolean => {
-    if (readOnly || !editable) return false
-    const src = editable.columnSources[colIndex]
-    return src !== null && !editable.keyColumns.includes(src)
-  }
-
-  // A table cell's edit path is its column's field name (top-level); null for a
-  // non-editable column (expression/join). Edits are keyed by `row<SEP>path` so the table
-  // and the document tree share one staged change per field.
-  const cellKey = (rowIndex: number, colIndex: number): string | null => {
-    const path = editable?.columnSources[colIndex]
-    return path ? editKey(rowIndex, path) : null
-  }
+  // ── Editing helpers (shared with the row inspector, so they agree on editability) ──
+  const colEditable = (colIndex: number): boolean => columnEditable(editable, readOnly, colIndex)
+  const cellKey = (rowIndex: number, colIndex: number): string | null => columnEditKey(editable, rowIndex, colIndex)
 
   function stageCell(rowIndex: number, colIndex: number, value: unknown): void {
     const k = tabId && cellKey(rowIndex, colIndex)
@@ -345,11 +334,18 @@ export default function ResultsGrid({
           key={selId}
           columns={columns}
           row={rows[Number(selId)]}
+          rowIndex={Number(selId)}
           pos={selPos}
           total={tableRows.length}
           onPrev={() => step(-1)}
           onNext={() => step(1)}
           onClose={() => setSel(null)}
+          tabId={tabId}
+          editable={editable}
+          readOnly={readOnly}
+          requireCommit={requireCommit}
+          isMongo={isMongo}
+          edits={edits}
         />
       )}
     </div>

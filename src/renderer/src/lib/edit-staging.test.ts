@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { EditableResult, ColumnMeta } from '@shared/query'
-import { editKey, buildRowEdits, describeEdits } from './edit-staging'
+import { editKey, buildRowEdits, describeEdits, columnEditable, columnEditKey } from './edit-staging'
 
 const editable: EditableResult = {
   table: { schema: 'public', name: 'users' },
@@ -35,6 +35,33 @@ describe('buildRowEdits', () => {
   it('reads a composite key from the row', () => {
     const e3: EditableResult = { table: { schema: null, name: 't' }, keyColumns: ['a', 'b'], columnSources: ['a', 'b', 'v'] }
     expect(buildRowEdits({ [editKey(0, 'v')]: 9 }, [[10, 20, 30]], e3)).toEqual([{ key: { a: 10, b: 20 }, set: { v: 9 } }])
+  })
+})
+
+describe('columnEditable', () => {
+  it('is true for a non-key table column on a writable editable result', () => {
+    expect(columnEditable(editable, false, 1)).toBe(true) // name
+    expect(columnEditable(editable, false, 2)).toBe(true) // email
+  })
+  it('is false for a key column, a read-only connection, or a non-editable result', () => {
+    expect(columnEditable(editable, false, 0)).toBe(false) // id is the key
+    expect(columnEditable(editable, true, 1)).toBe(false) // read-only
+    expect(columnEditable(null, false, 1)).toBe(false) // result not single-table
+  })
+  it('is false for a column with no table source (expression/join)', () => {
+    const e: EditableResult = { table: { schema: null, name: 't' }, keyColumns: ['id'], columnSources: ['id', null] }
+    expect(columnEditable(e, false, 1)).toBe(false)
+  })
+})
+
+describe('columnEditKey', () => {
+  it('keys an editable column by row + field path', () => {
+    expect(columnEditKey(editable, 3, 1)).toBe(editKey(3, 'name'))
+  })
+  it('is null for a column with no source or a non-editable result', () => {
+    const e: EditableResult = { table: { schema: null, name: 't' }, keyColumns: ['id'], columnSources: ['id', null] }
+    expect(columnEditKey(e, 0, 1)).toBeNull()
+    expect(columnEditKey(null, 0, 1)).toBeNull()
   })
 })
 
