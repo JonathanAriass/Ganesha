@@ -50,6 +50,28 @@ export interface ConnectionConfig extends ConnectionInput {
   updatedAt: number
 }
 
+/** Fields the user supplies for an AWS SSM port-forwarding tunnel. */
+export interface SsmTunnelInput {
+  name: string
+  /** AWS CLI profile (e.g. an SSO profile). */
+  profile: string
+  region: string
+  /** EC2 instance id the session targets. */
+  instanceId: string
+  /** Port on the remote host (e.g. 3306 for MySQL). */
+  remotePort: number
+  /** Local port the tunnel listens on (e.g. 13306). */
+  localPort: number
+  /** DB connection this tunnel serves; null = unlinked. Drives the connect-time "tunnel down" offer. */
+  connectionId: string | null
+}
+
+export interface SsmTunnel extends SsmTunnelInput {
+  id: string
+  createdAt: number
+  updatedAt: number
+}
+
 export interface HistoryEntryInput {
   connectionId: string
   query: string

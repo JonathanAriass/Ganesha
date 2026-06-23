@@ -27,6 +27,8 @@ import { buildSystemPrompt } from './llm/system-prompt'
 import { relevantTables, rankRepoFiles, buildRepoContext, expandWithJoinTables } from './llm/repo-context'
 import { scanRepoFiles, readRepoFile } from './llm/repo-scan'
 import * as llm from './persistence/llm'
+import * as ssm from './persistence/ssm-tunnels'
+import { SsmRunner } from './ssm/runner'
 import { getModelsDir } from './persistence/paths'
 import type { LlmTokenEvent, LlmDownloadEvent, LlmContextEvent } from '../shared/ipc'
 
@@ -42,6 +44,15 @@ const tunnels = new SshTunnelManager({ onDrop: (connId) => void drivers.disconne
 const engine = new LlmEngine()
 const activeGenerations = new Map<string, AbortController>()
 
+// SSM tunnel processes. Output/status are broadcast to every window (they aren't tied to a request).
+const broadcastSsm = (channel: 'ssm:output' | 'ssm:status', payload: unknown): void => {
+  for (const w of BrowserWindow.getAllWindows()) if (!w.webContents.isDestroyed()) w.webContents.send(channel, payload)
+}
+const ssmRunner = new SsmRunner(
+  (id, chunk) => broadcastSsm('ssm:output', { id, chunk }),
+  (id, running, code) => broadcastSsm('ssm:status', { id, running, code })
+)
+
 /** Close every live SSH tunnel — called on app quit. */
 export function closeAllTunnels(): Promise<void> {
   return tunnels.closeAll()
@@ -50,6 +61,11 @@ export function closeAllTunnels(): Promise<void> {
 /** Free the loaded LLM model (native memory) — called on app quit. */
 export function unloadLlm(): Promise<void> {
   return engine.unload()
+}
+
+/** Kill every running SSM tunnel process — called on app quit. */
+export function stopAllSsmTunnels(): void {
+  ssmRunner.stopAll()
 }
 
 /** Persist the SSH secrets the user typed this save, keyed `ssh:<hopId>`. Blank
@@ -291,6 +307,20 @@ export function registerIpcHandlers(): void {
   handle('llm.conversations.delete', ({ id }) => { llm.deleteConversation(store().db, id); return ok(null) })
   handle('llm.messages.list', ({ conversationId }) => ok(llm.listMessages(store().db, conversationId)))
   handle('llm.chat.cancel', ({ requestId }) => { activeGenerations.get(requestId)?.abort(); return ok(null) })
+
+  // ── SSM tunnels ──
+  handle('ssm.list', () => ok(ssm.listSsmTunnels(store().db)))
+  handle('ssm.create', (input) => ok(ssm.createSsmTunnel(store().db, input, now())))
+  handle('ssm.update', ({ id, patch }) => ok(ssm.updateSsmTunnel(store().db, id, patch, now())))
+  handle('ssm.delete', (id) => { ssmRunner.stop(id); ssm.deleteSsmTunnel(store().db, id); return ok(null) })
+  handle('ssm.start', (id) => {
+    const t = ssm.getSsmTunnel(store().db, id)
+    if (!t) throw new Error(`SSM tunnel not found: ${id}`)
+    ssmRunner.start(t)
+    return ok(null)
+  })
+  handle('ssm.stop', (id) => { ssmRunner.stop(id); return ok(null) })
+  handle('ssm.running', () => ok(ssmRunner.running()))
 
   // Download streams progress to the renderer that asked — registered raw for event.sender.
   ipcMain.handle('llm.models.download', async (event, { uri }: { uri: string }) => {

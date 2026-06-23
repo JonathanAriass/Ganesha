@@ -1,5 +1,5 @@
-import type { IpcResult, LlmTokenEvent, LlmDownloadEvent, LlmContextEvent } from './ipc'
-import type { ConnectionInput, HistoryEntryInput, SavedQueryInput, SavedQueryPatch, SessionTab } from './domain'
+import type { IpcResult, LlmTokenEvent, LlmDownloadEvent, LlmContextEvent, SsmOutputEvent, SsmStatusEvent } from './ipc'
+import type { ConnectionInput, HistoryEntryInput, SavedQueryInput, SavedQueryPatch, SessionTab, SsmTunnelInput } from './domain'
 import type { ObjectRef } from './schema'
 
 export interface DbClientApi {
@@ -72,5 +72,16 @@ export interface DbClientApi {
     onToken(cb: (e: LlmTokenEvent) => void): () => void
     onContext(cb: (e: LlmContextEvent) => void): () => void
     onDownloadProgress(cb: (e: LlmDownloadEvent) => void): () => void
+  }
+  ssm: {
+    list(): Promise<IpcResult<'ssm.list'>>
+    create(input: SsmTunnelInput): Promise<IpcResult<'ssm.create'>>
+    update(id: string, patch: Partial<SsmTunnelInput>): Promise<IpcResult<'ssm.update'>>
+    delete(id: string): Promise<IpcResult<'ssm.delete'>>
+    start(id: string): Promise<IpcResult<'ssm.start'>>
+    stop(id: string): Promise<IpcResult<'ssm.stop'>>
+    running(): Promise<IpcResult<'ssm.running'>>
+    onOutput(cb: (e: SsmOutputEvent) => void): () => void
+    onStatus(cb: (e: SsmStatusEvent) => void): () => void
   }
 }

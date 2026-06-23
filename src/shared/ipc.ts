@@ -2,7 +2,7 @@ import type { Result } from './result'
 import type {
   ConnectionConfig, ConnectionInput, HistoryEntry, HistoryEntryInput, AppSettings,
   SavedQuery, SavedQueryInput, SavedQueryPatch, SessionTab,
-  LocalModel, CatalogModel, LlmConversation, LlmMessage
+  LocalModel, CatalogModel, LlmConversation, LlmMessage, SsmTunnel, SsmTunnelInput
 } from './domain'
 import type { QueryResult, RowEdit } from './query'
 import type { DbObject, ObjectRef, ColumnInfo, Relationship, TableColumns } from './schema'
@@ -60,6 +60,13 @@ export interface IpcChannels {
   'llm.messages.list': { req: { conversationId: string }; res: LlmMessage[] }
   'llm.chat.send': { req: { conversationId: string; connectionId: string; prompt: string; queryText?: string }; res: { requestId: string } }
   'llm.chat.cancel': { req: { requestId: string }; res: null }
+  'ssm.list': { req: void; res: SsmTunnel[] }
+  'ssm.create': { req: SsmTunnelInput; res: SsmTunnel }
+  'ssm.update': { req: { id: string; patch: Partial<SsmTunnelInput> }; res: SsmTunnel }
+  'ssm.delete': { req: string; res: null }
+  'ssm.start': { req: string; res: null }
+  'ssm.stop': { req: string; res: null }
+  'ssm.running': { req: void; res: string[] }
 }
 
 /** main→renderer push payload for streamed chat tokens. */
@@ -71,6 +78,9 @@ export interface LlmDownloadEvent { uri: string; receivedBytes?: number; totalBy
 export interface LlmContextFile { path: string; table: string; snippet: string }
 /** main→renderer push payload listing the linked-repo files used to ground one chat turn. */
 export interface LlmContextEvent { requestId: string; files: LlmContextFile[] }
+/** main->renderer push payloads for SSM tunnel processes. */
+export interface SsmOutputEvent { id: string; chunk: string }
+export interface SsmStatusEvent { id: string; running: boolean; code: number | null }
 
 export type ChannelName = keyof IpcChannels
 export type Req<K extends ChannelName> = IpcChannels[K]['req']

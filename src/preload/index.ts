@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { ChannelName, Req, IpcResult, LlmTokenEvent, LlmDownloadEvent, LlmContextEvent } from '../shared/ipc'
+import type { ChannelName, Req, IpcResult, LlmTokenEvent, LlmDownloadEvent, LlmContextEvent, SsmOutputEvent, SsmStatusEvent } from '../shared/ipc'
 import type { DbClientApi } from '../shared/api'
 
 function invoke<K extends ChannelName>(channel: K, req: Req<K>): Promise<IpcResult<K>> {
@@ -84,6 +84,25 @@ const api: DbClientApi = {
       const l = (_e: unknown, payload: LlmDownloadEvent): void => cb(payload)
       ipcRenderer.on('llm:download', l)
       return () => ipcRenderer.removeListener('llm:download', l)
+    }
+  },
+  ssm: {
+    list: () => invoke('ssm.list', undefined),
+    create: (input) => invoke('ssm.create', input),
+    update: (id, patch) => invoke('ssm.update', { id, patch }),
+    delete: (id) => invoke('ssm.delete', id),
+    start: (id) => invoke('ssm.start', id),
+    stop: (id) => invoke('ssm.stop', id),
+    running: () => invoke('ssm.running', undefined),
+    onOutput: (cb) => {
+      const l = (_e: unknown, payload: SsmOutputEvent): void => cb(payload)
+      ipcRenderer.on('ssm:output', l)
+      return () => ipcRenderer.removeListener('ssm:output', l)
+    },
+    onStatus: (cb) => {
+      const l = (_e: unknown, payload: SsmStatusEvent): void => cb(payload)
+      ipcRenderer.on('ssm:status', l)
+      return () => ipcRenderer.removeListener('ssm:status', l)
     }
   }
 }

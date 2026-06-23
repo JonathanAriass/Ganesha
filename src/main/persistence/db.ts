@@ -85,6 +85,18 @@ export function migrate(db: DB): void {
       created_at      INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_llm_msg ON llm_messages(conversation_id, created_at);
+    CREATE TABLE IF NOT EXISTS ssm_tunnels (
+      id            TEXT PRIMARY KEY,
+      name          TEXT NOT NULL,
+      profile       TEXT NOT NULL,
+      region        TEXT NOT NULL,
+      instance_id   TEXT NOT NULL,
+      remote_port   INTEGER NOT NULL,
+      local_port    INTEGER NOT NULL,
+      connection_id TEXT REFERENCES connections(id) ON DELETE SET NULL,
+      created_at    INTEGER NOT NULL,
+      updated_at    INTEGER NOT NULL
+    );
   `)
   // Mongo Atlas / replica-set connectivity (added after first release of the schema).
   addColumnIfMissing(db, 'connections', 'auth_source', "TEXT NOT NULL DEFAULT ''")

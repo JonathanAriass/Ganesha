@@ -1,6 +1,6 @@
 import { app, BrowserWindow } from 'electron'
 import { join } from 'path'
-import { registerIpcHandlers, closeAllTunnels, unloadLlm } from './ipc'
+import { registerIpcHandlers, closeAllTunnels, unloadLlm, stopAllSsmTunnels } from './ipc'
 import { installAppMenu } from './menu'
 import { openDb } from './persistence/db'
 import { getSettings } from './persistence/settings'
@@ -98,4 +98,4 @@ app.on('window-all-closed', () => {
 })
 
 // Tear down live SSH tunnels + the loaded LLM model (native memory) on exit.
-app.on('will-quit', () => { void closeAllTunnels(); void unloadLlm() })
+app.on('will-quit', () => { void closeAllTunnels(); void unloadLlm(); stopAllSsmTunnels() })
