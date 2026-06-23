@@ -116,32 +116,42 @@ export interface RepoContextInput {
   maxFiles?: number
 }
 
-/** Read the top-ranked files (injected `readFile`), window each to the table mention, and assemble a
- *  budgeted, labeled code block for the system prompt. Returns the text plus the files used (for the
- *  transparency line). Empty when no tables/files apply. */
-export function buildRepoContext(input: RepoContextInput): { text: string; usedFiles: string[] } {
-  const { tables, ranked, readFile, budget = 8000, perFile = 2400, maxFiles = 5 } = input
-  if (tables.length === 0 || ranked.length === 0) return { text: '', usedFiles: [] }
+/** One file that made it into the prompt: its repo-relative path, the table that pulled it in, and
+ *  the exact snippet injected (windowed if the file was large). Surfaced to the UI so the user can
+ *  inspect precisely what grounded an answer. */
+export interface UsedFile {
+  path: string
+  table: string
+  snippet: string
+}
 
-  const used: string[] = []
+/** Read the top-ranked files (injected `readFile`), window each to the table mention, and assemble a
+ *  budgeted, labeled code block for the system prompt. Returns the prompt text plus the per-file
+ *  blocks used (for the transparency line + its expandable detail). Empty when no tables/files apply. */
+export function buildRepoContext(input: RepoContextInput): { text: string; used: UsedFile[] } {
+  const { tables, ranked, readFile, budget = 8000, perFile = 2400, maxFiles = 5 } = input
+  if (tables.length === 0 || ranked.length === 0) return { text: '', used: [] }
+
+  const used: UsedFile[] = []
   const blocks: string[] = []
   let total = 0
   const seen = new Set<string>()
-  for (const { path } of ranked) {
+  for (const { path, table } of ranked) {
     if (used.length >= maxFiles || total >= budget) break
     if (seen.has(path)) continue
     seen.add(path)
     const content = readFile(path)
     if (content == null) continue
-    const block = `// ${path}\n${snippetFor(content, tables, perFile)}`
+    const snippet = snippetFor(content, tables, perFile)
+    const block = `// ${path}\n${snippet}`
     if (total + block.length > budget && used.length > 0) break // always keep at least one file
     blocks.push(block)
-    used.push(path)
+    used.push({ path, table, snippet })
     total += block.length
   }
-  if (used.length === 0) return { text: '', usedFiles: [] }
+  if (used.length === 0) return { text: '', used: [] }
   const text =
     'Relevant code from the linked repository (for context; prefer the live schema for exact column names):\n\n' +
     blocks.join('\n\n')
-  return { text, usedFiles: used }
+  return { text, used }
 }

@@ -5,6 +5,7 @@ import { useLlmModels, useLlmConversations, useLlmMessages } from '../lib/hooks'
 import { extractCodeBlocks } from '../lib/llm-blocks'
 import { clampWidth, dragWidth, loadWidth, saveWidth, DEFAULT_WIDTH, MIN_WIDTH, MAX_WIDTH } from '../lib/assistant-width'
 import type { LlmMessage } from '@shared/domain'
+import type { LlmContextFile } from '@shared/ipc'
 
 let liveSeq = 0
 function mkMsg(conversationId: string, role: 'user' | 'assistant', content: string): LlmMessage {
@@ -34,7 +35,8 @@ export default function AssistantPanel(): JSX.Element | null {
   const [draft, setDraft] = useState('')
   const [live, setLive] = useState<LlmMessage[]>([]) // optimistic user msg + streaming assistant msg
   const [streaming, setStreaming] = useState(false)
-  const [contextFiles, setContextFiles] = useState<string[]>([]) // linked-repo files grounding the latest turn
+  const [contextFiles, setContextFiles] = useState<LlmContextFile[]>([]) // linked-repo files grounding the latest turn
+  const [showContext, setShowContext] = useState(false) // 📎 line expanded to show the injected snippets
   const reqRef = useRef<string | null>(null)
   const cidRef = useRef<string | null>(null)
   const threadRef = useRef<HTMLDivElement>(null)
@@ -124,7 +126,7 @@ export default function AssistantPanel(): JSX.Element | null {
     setDraft('')
     setLive([mkMsg(cid, 'user', prompt), mkMsg(cid, 'assistant', '')])
     setStreaming(true)
-    setContextFiles([]) // clear last turn's grounding; onContext repopulates if the repo matched
+    setContextFiles([]); setShowContext(false) // clear last turn's grounding; onContext repopulates if the repo matched
     const res = await window.api.llm.send(cid, connectionId, prompt, queryText)
     if (res.ok) reqRef.current = res.data.requestId
     else { setStreaming(false); setContextFiles([]); setLive((prev) => [...prev, mkMsg(cid, 'assistant', `⚠️ ${res.error}`)]) }
@@ -199,8 +201,29 @@ export default function AssistantPanel(): JSX.Element | null {
           </div>
         ))}
         {contextFiles.length > 0 && (
-          <div className="assistant-context" title="Linked-repo files the assistant read for this answer">
-            📎 context: {contextFiles.join(', ')}
+          <div className="assistant-context">
+            <button
+              type="button"
+              className="assistant-context-toggle"
+              onClick={() => setShowContext((v) => !v)}
+              aria-expanded={showContext}
+              title="Linked-repo code the assistant read for this answer — click to see the exact snippets"
+            >
+              <span className="assistant-context-caret">{showContext ? '▾' : '▸'}</span> 📎 context:{' '}
+              {contextFiles.map((f) => f.path).join(', ')}
+            </button>
+            {showContext && (
+              <div className="assistant-context-detail">
+                {contextFiles.map((f) => (
+                  <div key={f.path} className="assistant-context-file">
+                    <div className="assistant-context-path">
+                      {f.path} <span className="assistant-context-table">· matched {f.table}</span>
+                    </div>
+                    <pre>{f.snippet}</pre>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

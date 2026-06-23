@@ -64,8 +64,11 @@ export interface IpcChannels {
 export interface LlmTokenEvent { requestId: string; chunk?: string; done?: boolean; error?: string }
 /** main→renderer push payload for model download progress. */
 export interface LlmDownloadEvent { uri: string; receivedBytes?: number; totalBytes?: number; done?: boolean; error?: string }
-/** main→renderer push payload naming the linked-repo files used to ground one chat turn. */
-export interface LlmContextEvent { requestId: string; files: string[] }
+/** One linked-repo file that grounded a chat turn: its path, the table that pulled it in, and the
+ *  exact snippet injected into the prompt (so the UI can show what the model actually saw). */
+export interface LlmContextFile { path: string; table: string; snippet: string }
+/** main→renderer push payload listing the linked-repo files used to ground one chat turn. */
+export interface LlmContextEvent { requestId: string; files: LlmContextFile[] }
 
 export type ChannelName = keyof IpcChannels
 export type Req<K extends ChannelName> = IpcChannels[K]['req']

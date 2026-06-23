@@ -321,7 +321,7 @@ export function registerIpcHandlers(): void {
             const repoCtx = buildRepoContext({ tables, ranked, readFile: (p) => readRepoFile(config.repoPath!, p) })
             if (repoCtx.text) {
               systemPrompt += '\n\n' + repoCtx.text
-              sendContext({ requestId, files: repoCtx.usedFiles })
+              sendContext({ requestId, files: repoCtx.used })
             }
           }
         } catch {

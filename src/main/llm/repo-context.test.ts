@@ -93,14 +93,20 @@ describe('buildRepoContext', () => {
   it('reads the top files, formats labeled snippets, reports used files, respects the budget', () => {
     const ranked = rankRepoFiles(['app/Models/User.php'], ['users'])
     const out = buildRepoContext({ tables: ['users'], ranked, readFile: reader, budget: 4000 })
-    expect(out.usedFiles).toEqual(['app/Models/User.php'])
+    expect(out.used.map((u) => u.path)).toEqual(['app/Models/User.php'])
     expect(out.text).toContain('app/Models/User.php')
     expect(out.text).toContain('fillable')
+  })
+  it('reports each used file with the table that pulled it in and the injected snippet', () => {
+    const ranked = rankRepoFiles(['app/Models/User.php'], ['users'])
+    const out = buildRepoContext({ tables: ['users'], ranked, readFile: reader, budget: 4000 })
+    expect(out.used[0]).toMatchObject({ path: 'app/Models/User.php', table: 'users' })
+    expect(out.used[0].snippet).toContain('fillable') // the exact text the model saw
   })
   it('returns empty when no tables are relevant', () => {
     expect(buildRepoContext({ tables: [], ranked: [], readFile: reader, budget: 4000 })).toEqual({
       text: '',
-      usedFiles: [],
+      used: [],
     })
   })
 })

@@ -1752,8 +1752,16 @@ input[type="password"]::placeholder {
 .assistant-block pre { margin: 0; padding: 10px; overflow: auto; font-size: 12px; font-family: 'SF Mono', 'Fira Mono', 'Consolas', monospace; }
 .assistant-block button { margin: 8px; }
 
-/* Transparency line: which linked-repo files grounded the latest answer. */
-.assistant-context { font-size: 11px; color: var(--text-2); padding: 2px 2px 0; word-break: break-all; line-height: 1.5; }
+/* Transparency line: which linked-repo files grounded the latest answer — click to expand snippets. */
+.assistant-context { font-size: 11px; padding: 2px 2px 0; }
+.assistant-context-toggle { display: block; width: 100%; text-align: left; background: none; border: none; padding: 2px 0; color: var(--text-2); font-size: 11px; line-height: 1.5; cursor: pointer; word-break: break-all; }
+.assistant-context-toggle:hover { color: var(--text); }
+.assistant-context-caret { display: inline-block; width: 10px; color: var(--text-3, var(--text-2)); }
+.assistant-context-detail { margin: 4px 0 2px; display: flex; flex-direction: column; gap: 8px; }
+.assistant-context-file { border: 1px solid var(--border); border-radius: 6px; overflow: hidden; background: var(--bg); }
+.assistant-context-path { padding: 4px 8px; background: var(--bg-3); font-family: ui-monospace, 'SF Mono', 'Fira Mono', monospace; font-size: 11px; color: var(--text); word-break: break-all; }
+.assistant-context-table { color: var(--text-2); }
+.assistant-context-detail pre { margin: 0; padding: 8px; max-height: 240px; overflow: auto; font-size: 11px; line-height: 1.45; font-family: 'SF Mono', 'Fira Mono', 'Consolas', monospace; white-space: pre; }
 
 .assistant-input { display: flex; gap: 6px; padding: 10px; border-top: 1px solid var(--border); flex-shrink: 0; align-items: flex-end; }
 .assistant-input textarea { flex: 1; resize: none; height: 60px; font: inherit; font-size: 13px; line-height: 1.4; padding: 8px 10px; background: var(--bg-3); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius); outline: none; transition: border-color 0.1s, box-shadow 0.1s; }
