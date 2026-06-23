@@ -10,7 +10,7 @@ import {
   subDiagram,
   type Diagram,
 } from '../lib/schema-diagram'
-import { layoutDiagram } from '../lib/diagram-layout'
+import { layoutDiagram, type LaidNode } from '../lib/diagram-layout'
 import DiagramCanvas from './DiagramCanvas'
 
 /** Read-only schema diagram for one connection: tables + columns laid out by dagre, declared FKs
@@ -96,10 +96,18 @@ export default function DiagramView({ connectionId }: { connectionId: string }):
       </div>
 
       <div className="diagram-main">
+        {matched != null && (
+          <DiagramMatchList
+            nodes={[...laid.nodes].filter((n) => matched.has(n.id)).sort((a, b) => a.name.localeCompare(b.name))}
+            selected={selected}
+            onPick={(id) => { setCenterTarget(id); setSelected(id) }}
+          />
+        )}
         <DiagramCanvas
           laid={laid}
           centerId={centerTarget}
-          dimNode={(id) => (related != null && !related.has(id)) || (matched != null && !matched.has(id))}
+          // A selection dims by its neighbours; otherwise the filter dims by its matches (one at a time).
+          dimNode={(id) => (related != null ? !related.has(id) : matched != null && !matched.has(id))}
           nodeClass={(id) => (id === selected ? 'selected' : '')}
           edgeClass={(e) => {
             const active = selected != null && (e.from === selected || e.to === selected)
@@ -117,6 +125,36 @@ export default function DiagramView({ connectionId }: { connectionId: string }):
             onClose={() => setSelected(null)}
           />
         )}
+      </div>
+    </div>
+  )
+}
+
+/** The search-results list (left): tables matching the filter. Clicking one centres + selects it. */
+function DiagramMatchList({
+  nodes,
+  selected,
+  onPick,
+}: {
+  nodes: LaidNode[]
+  selected: string | null
+  onPick: (id: string) => void
+}): JSX.Element {
+  return (
+    <div className="diagram-matches">
+      <div className="dm-head">{nodes.length} match{nodes.length === 1 ? '' : 'es'}</div>
+      <div className="dm-body">
+        {nodes.length === 0 && <div className="dm-empty">No tables match.</div>}
+        {nodes.map((n) => (
+          <button
+            key={n.id}
+            className={`dm-row${n.id === selected ? ' active' : ''}`}
+            onClick={() => onPick(n.id)}
+            title={`Go to ${n.name}`}
+          >
+            {n.name}
+          </button>
+        ))}
       </div>
     </div>
   )
