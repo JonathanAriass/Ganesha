@@ -1904,3 +1904,11 @@ input[type="password"]::placeholder {
 .ds-table { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, 'SF Mono', monospace; }
 .ds-col { color: var(--text-2); font-size: 11px; font-family: ui-monospace, 'SF Mono', monospace; flex-shrink: 0; }
 .ds-inferred { color: var(--accent); flex-shrink: 0; opacity: 0.8; }
+
+/* Schema diagram — floating zoom controls + focused-table modal */
+.diagram-canvas { position: relative; }
+.diagram-zoom { position: absolute; right: 12px; bottom: 12px; display: flex; gap: 4px; padding: 3px; background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--radius); }
+.diagram-modal { width: 86vw; max-width: 1400px; height: 84vh; display: flex; flex-direction: column; }
+.diagram-modal .modal-header { display: flex; align-items: center; }
+.diagram-modal-body { flex: 1; min-height: 0; display: flex; }
+.diagram-modal-body .diagram-canvas { flex: 1; }

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { ColumnInfo, DbObject, Relationship } from '@shared/schema'
-import { inferRelationships, mergeRelationships, buildDiagram, nodeKey, neighborNodes, nodeRelations } from './schema-diagram'
+import { inferRelationships, mergeRelationships, buildDiagram, nodeKey, neighborNodes, nodeRelations, subDiagram } from './schema-diagram'
 
 const tbl = (name: string): DbObject => ({ schema: null, name, kind: 'table' })
 const col = (name: string): ColumnInfo => ({ name, dataType: 'int', nullable: true })
@@ -121,5 +121,26 @@ describe('nodeRelations', () => {
     expect(r.every((x) => x.direction === 'referenced-by')).toBe(true)
     expect(r.map((x) => nameOf(x.otherId))).toContain('03_companies_users')
     expect(r.map((x) => nameOf(x.otherId))).toContain('02_users')
+  })
+})
+
+describe('subDiagram', () => {
+  const rels = mergeRelationships([], inferRelationships(objects, columnsByTable))
+  const diagram = buildDiagram(objects, columnsByTable, rels)
+  const id = (name: string): string => diagram.nodes.find((n) => n.name === name)!.id
+  const names = (d: typeof diagram): string[] => d.nodes.map((n) => n.name).sort()
+
+  it('keeps only the table and its related tables', () => {
+    const sub = subDiagram(diagram, id('02_users'))
+    // 02_users → 01_companies (company_id), and 03_companies_users → 02_users (user_id).
+    expect(names(sub)).toEqual(['01_companies', '02_users', '03_companies_users'])
+  })
+  it('includes every neighbour for a hub table', () => {
+    const sub = subDiagram(diagram, id('03_companies_users'))
+    expect(names(sub)).toEqual(['01_companies', '02_users', '03_companies_users', '04_roles'])
+  })
+  it('keeps only edges whose both endpoints survive', () => {
+    const sub = subDiagram(diagram, id('02_users'))
+    expect(sub.edges.every((e) => sub.nodes.some((n) => n.id === e.from) && sub.nodes.some((n) => n.id === e.to))).toBe(true)
   })
 })

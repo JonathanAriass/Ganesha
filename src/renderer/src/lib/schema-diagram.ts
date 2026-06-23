@@ -132,6 +132,16 @@ export function neighborNodes(edges: DiagramEdge[], id: string): Set<string> {
   return set
 }
 
+/** The sub-diagram of just `id` and its directly-related tables, with the edges among that set —
+ *  the focused view rendered in the modal. */
+export function subDiagram(diagram: Diagram, id: string): Diagram {
+  const keep = neighborNodes(diagram.edges, id)
+  return {
+    nodes: diagram.nodes.filter((n) => keep.has(n.id)),
+    edges: diagram.edges.filter((e) => keep.has(e.from) && keep.has(e.to)),
+  }
+}
+
 /** Build the node/edge model: a node per table (columns marked PK by the `id`/`_id` convention and FK
  *  when they drive a relationship), and an edge per relationship whose BOTH endpoints are known tables
  *  (self-loops and dangling references dropped). */
