@@ -25,4 +25,10 @@ describe('buildSystemPrompt', () => {
   it('uses js fences for mongodb', () => {
     expect(buildSystemPrompt('mongodb', 'S', '')).toContain('```js')
   })
+
+  it('nudges SQL toward the fewest joins (filter on a FK column rather than joining to reach it)', () => {
+    const p = buildSystemPrompt('mysql', 'S', '')
+    expect(p).toMatch(/fewest joins/i)
+    expect(p).toMatch(/filter on that column directly/i)
+  })
 })

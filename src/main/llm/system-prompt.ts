@@ -10,9 +10,17 @@ export function buildSystemPrompt(
   focusTables: string[] = []
 ): string {
   const lang = dialect === 'mongodb' ? 'js' : 'sql'
+  // Nudge toward minimal queries — the model tends to over-join (e.g. joining `companies` only to
+  // filter `companies.id = X`, when the junction table's `id_company` already holds that value).
+  const quality =
+    dialect === 'mongodb'
+      ? 'Prefer the simplest query that answers the question.'
+      : 'Prefer the simplest correct query and use the fewest joins necessary: if a table you already ' +
+        'join exposes the value you are filtering on (e.g. a foreign-key column), filter on that column ' +
+        'directly instead of joining the referenced table just to reach it.'
   const intro =
     `You are a database query assistant for a ${dialect} database. ` +
-    `Write correct, runnable queries in fenced code blocks (\`\`\`${lang}). Be concise.`
+    `Write correct, runnable queries in fenced code blocks (\`\`\`${lang}). ${quality} Be concise.`
 
   if (!repoText.trim()) {
     return `${intro}\n\n${schemaText}`
