@@ -132,7 +132,9 @@ export default function DiagramCanvas({ laid, nodeClass, dimNode, edgeClass, onS
           ))}
         </g>
       </svg>
-      <div className="diagram-zoom">
+      {/* Keep button presses off the pan handler: its setPointerCapture would otherwise swallow the
+          pointerup/click (the buttons would never fire, and the canvas would treat it as a deselect). */}
+      <div className="diagram-zoom" onPointerDown={(e) => e.stopPropagation()}>
         <button className="btn ghost" onClick={fit} title="Fit to screen">Fit</button>
         <button className="btn ghost" onClick={() => zoomBy(1.2)} aria-label="Zoom in">＋</button>
         <button className="btn ghost" onClick={() => zoomBy(1 / 1.2)} aria-label="Zoom out">－</button>
