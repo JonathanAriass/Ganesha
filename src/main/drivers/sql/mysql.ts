@@ -1,7 +1,7 @@
 import mysql from 'mysql2/promise'
 import type {
   DatabaseDriver, ConnectParams, RunOptions, QueryRequest, QueryResult, ColumnMeta,
-  DbObject, ObjectRef, ColumnInfo, EditableResult, TableEdits
+  DbObject, ObjectRef, ColumnInfo, EditableResult, TableEdits, Relationship
 } from '../types'
 import type { ConnectionType } from '../../../shared/domain'
 import { buildEditableResult, isSingleTableScan, type PerColumnSource } from './edit-target'
@@ -232,6 +232,20 @@ export class MySqlDriver implements DatabaseDriver {
     )
     return (rows as { name: string; dataType: string; nullable: number }[]).map((r) => ({
       name: r.name, dataType: r.dataType, nullable: !!r.nullable
+    }))
+  }
+
+  async listRelationships(id: string): Promise<Relationship[]> {
+    const [rows] = await this.requirePool(id).query(
+      `SELECT TABLE_NAME AS fromTable, COLUMN_NAME AS fromColumn,
+              REFERENCED_TABLE_NAME AS toTable, REFERENCED_COLUMN_NAME AS toColumn
+       FROM information_schema.KEY_COLUMN_USAGE
+       WHERE TABLE_SCHEMA = DATABASE() AND REFERENCED_TABLE_NAME IS NOT NULL`
+    )
+    // Single-database scope (schema stays null, matching listObjects); cross-db FKs are out of v1.
+    return (rows as { fromTable: string; fromColumn: string; toTable: string; toColumn: string }[]).map((r) => ({
+      fromSchema: null, fromTable: r.fromTable, fromColumn: r.fromColumn,
+      toSchema: null, toTable: r.toTable, toColumn: r.toColumn, origin: 'declared' as const
     }))
   }
 }

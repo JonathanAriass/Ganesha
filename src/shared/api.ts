@@ -41,6 +41,8 @@ export interface DbClientApi {
     objects(connectionId: string): Promise<IpcResult<'schema.objects'>>
     databases(connectionId: string): Promise<IpcResult<'schema.databases'>>
     columns(connectionId: string, ref: ObjectRef): Promise<IpcResult<'schema.columns'>>
+    allColumns(connectionId: string): Promise<IpcResult<'schema.allColumns'>>
+    relationships(connectionId: string): Promise<IpcResult<'schema.relationships'>>
   }
   edits: {
     apply(req: {

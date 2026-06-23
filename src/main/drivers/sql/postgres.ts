@@ -1,7 +1,7 @@
 import pg from 'pg'
 import type {
   DatabaseDriver, ConnectParams, RunOptions, QueryRequest, QueryResult, ColumnMeta,
-  DbObject, ObjectRef, ColumnInfo, EditableResult, TableEdits
+  DbObject, ObjectRef, ColumnInfo, EditableResult, TableEdits, Relationship
 } from '../types'
 import { buildEditableResult, isSingleTableScan, type PerColumnSource } from './edit-target'
 import { buildUpdate } from './update-builder'
@@ -238,5 +238,24 @@ export class PostgresDriver implements DatabaseDriver {
       [ref.schema ?? 'public', ref.name]
     )
     return res.rows as ColumnInfo[]
+  }
+
+  async listRelationships(id: string): Promise<Relationship[]> {
+    // pg_constraint + unnest WITH ORDINALITY pairs each FK column with its referenced column in order
+    // (information_schema's constraint_column_usage mis-pairs composite keys — a known gotcha).
+    const res = await this.requirePool(id).query(
+      `SELECT ns.nspname AS "fromSchema", cl.relname AS "fromTable", att.attname AS "fromColumn",
+              fns.nspname AS "toSchema", fcl.relname AS "toTable", fatt.attname AS "toColumn"
+       FROM pg_constraint c
+       JOIN pg_class cl ON cl.oid = c.conrelid
+       JOIN pg_namespace ns ON ns.oid = cl.relnamespace
+       JOIN pg_class fcl ON fcl.oid = c.confrelid
+       JOIN pg_namespace fns ON fns.oid = fcl.relnamespace
+       JOIN LATERAL unnest(c.conkey, c.confkey) WITH ORDINALITY AS k(conkey, confkey, ord) ON true
+       JOIN pg_attribute att ON att.attrelid = c.conrelid AND att.attnum = k.conkey
+       JOIN pg_attribute fatt ON fatt.attrelid = c.confrelid AND fatt.attnum = k.confkey
+       WHERE c.contype = 'f' AND ns.nspname NOT IN ('pg_catalog', 'information_schema')`
+    )
+    return (res.rows as Omit<Relationship, 'origin'>[]).map((r) => ({ ...r, origin: 'declared' as const }))
   }
 }

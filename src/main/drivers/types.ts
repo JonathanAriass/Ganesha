@@ -1,9 +1,9 @@
 import type { ConnectionType } from '../../shared/domain'
 import type { MongoCommand } from './mongo/command'
 import type { ColumnMeta, QueryResult, EditableResult, RowEdit } from '../../shared/query'
-import type { DbObject, ObjectRef, ColumnInfo } from '../../shared/schema'
+import type { DbObject, ObjectRef, ColumnInfo, Relationship } from '../../shared/schema'
 export type { ColumnMeta, QueryResult, EditableResult, RowEdit }
-export type { DbObject, ObjectRef, ColumnInfo }
+export type { DbObject, ObjectRef, ColumnInfo, Relationship }
 
 /** A batch of row edits against one table, sent from the renderer to a driver. */
 export interface TableEdits {
@@ -64,4 +64,7 @@ export interface DatabaseDriver {
   listObjects(id: string): Promise<DbObject[]>
   /** Describe an object's columns/fields. */
   describeObject(id: string, ref: ObjectRef): Promise<ColumnInfo[]>
+  /** Declared foreign-key relationships between user tables (origin always 'declared'). Empty for
+   *  engines without foreign keys (Mongo). For the schema diagram. */
+  listRelationships(id: string): Promise<Relationship[]>
 }

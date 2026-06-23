@@ -36,7 +36,8 @@ function fakeDriver(calls: string[], queryIds?: string[]): DatabaseDriver {
     applyEdits: async () => ({ updated: 0 }),
     listDatabases: async () => [],
     listObjects: async () => [],
-    describeObject: async () => []
+    describeObject: async () => [],
+    listRelationships: async () => []
   }
 }
 

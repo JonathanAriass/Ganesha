@@ -1,7 +1,7 @@
 import { MongoClient } from 'mongodb'
 import type { Document, Filter, Sort, UpdateFilter } from 'mongodb'
 import { EJSON } from 'bson'
-import type { DatabaseDriver, ConnectParams, RunOptions, QueryRequest, QueryResult, DbObject, ObjectRef, ColumnInfo, TableEdits } from '../types'
+import type { DatabaseDriver, ConnectParams, RunOptions, QueryRequest, QueryResult, DbObject, ObjectRef, ColumnInfo, TableEdits, Relationship } from '../types'
 import type { MongoCommand } from './command'
 import { isMongoCommandWrite } from './command'
 import { normalizeFind, normalizeScalar, normalizeValues, normalizeWriteResult } from './normalize'
@@ -276,5 +276,11 @@ export class MongoDriver implements DatabaseDriver {
     const { client } = this.require(id)
     const sample = await client.db(ref.schema ?? undefined).collection(ref.name).findOne({})
     return inferFieldTypes(sample as Record<string, unknown> | null)
+  }
+
+  // MongoDB has no foreign keys; relationships are implicit. The schema diagram falls back to
+  // naming-inference (renderer-side) for Mongo.
+  async listRelationships(_id: string): Promise<Relationship[]> {
+    return []
   }
 }

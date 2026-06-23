@@ -226,6 +226,32 @@ export function registerIpcHandlers(): void {
     await connectStored(driver, c, secrets)
     return ok(await driver.describeObject(c.id, ref))
   })
+  // Every table's columns in one round-trip, for the schema diagram (avoids N describeObject calls).
+  handle('schema.allColumns', async (connectionId) => {
+    const { db, secrets } = store()
+    const c = conns.getConnection(db, connectionId)
+    if (!c) throw new Error(`Connection not found: ${connectionId}`)
+    const driver = drivers.get(c.type)
+    await connectStored(driver, c, secrets)
+    const objects = await driver.listObjects(c.id)
+    return ok(
+      await Promise.all(
+        objects.map(async (o) => ({
+          schema: o.schema,
+          name: o.name,
+          columns: await driver.describeObject(c.id, { schema: o.schema, name: o.name }).catch(() => [])
+        }))
+      )
+    )
+  })
+  handle('schema.relationships', async (connectionId) => {
+    const { db, secrets } = store()
+    const c = conns.getConnection(db, connectionId)
+    if (!c) throw new Error(`Connection not found: ${connectionId}`)
+    const driver = drivers.get(c.type)
+    await connectStored(driver, c, secrets)
+    return ok(await driver.listRelationships(c.id))
+  })
   handle('edits.apply', async ({ connectionId, table, rows }) => {
     const { db, secrets } = store()
     const c = conns.getConnection(db, connectionId)
