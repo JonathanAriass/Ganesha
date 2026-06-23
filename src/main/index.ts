@@ -6,12 +6,15 @@ import { openDb } from './persistence/db'
 import { getSettings } from './persistence/settings'
 
 // ── App identity ──
-// Pin the data directory to its long-standing location BEFORE renaming: app.getName() drives
-// app.getPath('userData'), so setName('Ganesha') would otherwise point userData at a fresh
-// '…/Ganesha' folder and orphan every saved connection/secret/model. The appData root is
-// name-independent, so this keeps the data exactly where it has always lived ('…/db-client').
+// The "Ganesha" display name comes ONLY from electron-builder `productName` (the packaged .app/dmg)
+// and the renderer brand. We deliberately do NOT call app.setName('Ganesha'): app.getName() drives
+// BOTH app.getPath('userData') AND the macOS safeStorage keychain key ("<name> Safe Storage").
+// Renaming repoints safeStorage at a brand-new key, so every saved password fails to decrypt
+// ("Error while decrypting the ciphertext provided to safeStorage.decryptString") — and it would move
+// userData too. Keeping app.getName() = the package.json 'db-client' keeps the encryption key and the
+// data exactly where they are. (userData is pinned defensively in case 'productName' ever leaks into
+// app.getName() via a packaged build.)
 app.setPath('userData', join(app.getPath('appData'), 'db-client'))
-app.setName('Ganesha')
 
 /**
  * Match the window background to the saved theme so launch doesn't flash
