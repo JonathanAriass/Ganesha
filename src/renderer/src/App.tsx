@@ -9,6 +9,7 @@ import SettingsModal from './components/SettingsModal'
 import CommandPalette from './components/CommandPalette'
 import TabBar from './components/TabBar'
 import QueryTab from './components/QueryTab'
+import DiagramView from './components/DiagramView'
 import SavedSection from './components/SavedSection'
 import HistorySection from './components/HistorySection'
 import SaveQueryModal from './components/SaveQueryModal'
@@ -36,6 +37,8 @@ function AppShell(): JSX.Element {
   const commitModal = useAppStore((s) => s.commitModal)
   const tabs = useAppStore((s) => s.tabs)
   const activeTabId = useAppStore((s) => s.activeTabId)
+  const activeConnectionId = useAppStore((s) => s.activeConnectionId)
+  const openDiagramTab = useAppStore((s) => s.openDiagramTab)
 
   const { data: settings } = useSettings()
   useEffect(() => {
@@ -49,6 +52,15 @@ function AppShell(): JSX.Element {
       <TopBar />
       <div className="app-body">
         <aside className="sidebar">
+          {activeConnectionId && (
+            <button
+              className="diagram-open-btn"
+              onClick={() => openDiagramTab(activeConnectionId)}
+              title="Open the schema diagram for this connection"
+            >
+              ◇ Schema diagram
+            </button>
+          )}
           <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
             <ObjectTree />
           </div>
@@ -60,7 +72,11 @@ function AppShell(): JSX.Element {
             <>
               <TabBar />
               {activeTab ? (
-                <QueryTab key={activeTabId} tab={activeTab} />
+                activeTab.kind === 'diagram' ? (
+                  <DiagramView key={activeTabId} connectionId={activeTab.connectionId} />
+                ) : (
+                  <QueryTab key={activeTabId} tab={activeTab} />
+                )
               ) : (
                 <Welcome />
               )}

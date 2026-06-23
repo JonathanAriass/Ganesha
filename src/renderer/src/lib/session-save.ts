@@ -1,15 +1,18 @@
 import type { SessionTab } from '@shared/domain'
 import type { QueryTabData } from '../state/store'
 
-/** Project the tab strip onto its persisted shape — text only, volatile state stays out. */
+/** Project the tab strip onto its persisted shape — text only, volatile state stays out. Diagram
+ *  tabs are ephemeral (no text to restore) and are skipped. */
 export function toSessionTabs(tabs: QueryTabData[], activeTabId: string | null): SessionTab[] {
-  return tabs.map((t) => ({
-    id: t.id,
-    connectionId: t.connectionId,
-    title: t.title,
-    text: t.text,
-    active: t.id === activeTabId,
-  }))
+  return tabs
+    .filter((t) => t.kind !== 'diagram')
+    .map((t) => ({
+      id: t.id,
+      connectionId: t.connectionId,
+      title: t.title,
+      text: t.text,
+      active: t.id === activeTabId,
+    }))
 }
 
 export interface SessionSaver {

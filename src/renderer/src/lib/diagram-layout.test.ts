@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { layoutDiagram, nodeHeight, NODE_WIDTH } from './diagram-layout'
+import { layoutDiagram, nodeHeight, NODE_WIDTH, pointsToPath, fitView } from './diagram-layout'
 import { buildDiagram, nodeKey } from './schema-diagram'
 import type { ColumnInfo, DbObject, Relationship } from '@shared/schema'
 
@@ -38,5 +38,24 @@ describe('layoutDiagram', () => {
     const a = layoutDiagram(diagram)
     const b = layoutDiagram(diagram)
     expect(b.nodes.map((n) => [n.x, n.y])).toEqual(a.nodes.map((n) => [n.x, n.y]))
+  })
+})
+
+describe('pointsToPath', () => {
+  it('builds an SVG move/line path', () => {
+    expect(pointsToPath([{ x: 0, y: 0 }, { x: 10, y: 5 }])).toBe('M 0 0 L 10 5')
+    expect(pointsToPath([])).toBe('')
+  })
+})
+
+describe('fitView', () => {
+  it('centres and scales a diagram to fit the viewport', () => {
+    const v = fitView(1000, 500, 400, 400)
+    expect(v.zoom).toBeCloseTo((400 / 1000) * 0.92, 5) // width is the binding dimension
+    expect(v.x).toBeCloseTo((400 - 1000 * v.zoom) / 2, 5)
+  })
+  it('is safe for an empty diagram or viewport', () => {
+    expect(fitView(0, 0, 400, 400)).toEqual({ x: 0, y: 0, zoom: 1 })
+    expect(fitView(100, 100, 0, 0)).toEqual({ x: 0, y: 0, zoom: 1 })
   })
 })

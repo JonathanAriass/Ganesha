@@ -44,6 +44,9 @@ export interface QueryTabData {
   id: string
   connectionId: string
   title: string
+  /** Tab kind. Absent/`'query'` = the normal editor+results tab; `'diagram'` = the read-only schema
+   *  diagram (query fields stay at their empties and are unused). */
+  kind?: 'query' | 'diagram'
   text: string
   /** Bumped when text is replaced programmatically (history load) to remount the editor. */
   epoch: number
@@ -101,6 +104,8 @@ interface AppState {
   closeModelManager: () => void
 
   openQueryTab: (args: { connectionId: string; title?: string; text?: string; runOnOpen?: boolean }) => void
+  /** Open (or focus the existing) read-only schema-diagram tab for a connection. */
+  openDiagramTab: (connectionId: string) => void
   /** One-shot boot restore of a persisted session. No-ops once any tab exists —
    *  it must never clobber tabs the user opened before the IPC round-trip landed. */
   hydrateTabs: (sessionTabs: SessionTab[]) => void
@@ -231,6 +236,30 @@ export const useAppStore = create<AppState>((set, get) => ({
         activeConnectionId: connectionId,
         lastActiveByConnection: { ...s.lastActiveByConnection, [connectionId]: tab.id },
         _queryCounter: n
+      }
+    }),
+
+  openDiagramTab: (connectionId) =>
+    set((s) => {
+      // One diagram tab per connection — focus an existing one instead of stacking duplicates.
+      const existing = s.tabs.find((t) => t.connectionId === connectionId && t.kind === 'diagram')
+      if (existing) {
+        return {
+          activeTabId: existing.id,
+          activeConnectionId: connectionId,
+          lastActiveByConnection: { ...s.lastActiveByConnection, [connectionId]: existing.id }
+        }
+      }
+      const tab: QueryTabData = {
+        id: crypto.randomUUID(), connectionId, title: '◇ Schema', kind: 'diagram',
+        text: '', epoch: 0, runOnOpen: false, running: false, queryId: null,
+        result: null, error: null, scriptRun: null, edits: {}, editError: null
+      }
+      return {
+        tabs: [...s.tabs, tab],
+        activeTabId: tab.id,
+        activeConnectionId: connectionId,
+        lastActiveByConnection: { ...s.lastActiveByConnection, [connectionId]: tab.id }
       }
     }),
 

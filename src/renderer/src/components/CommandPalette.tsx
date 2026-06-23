@@ -48,6 +48,17 @@ export default function CommandPalette(): JSX.Element {
                   <span className="kbd">{mod}T</span>
                 </Command.Item>
               )}
+              {activeConnectionId && (
+                <Command.Item
+                  value="action schema diagram"
+                  onSelect={() => {
+                    useAppStore.getState().openDiagramTab(activeConnectionId)
+                    close()
+                  }}
+                >
+                  Open schema diagram
+                </Command.Item>
+              )}
               <Command.Item
                 value="action toggle theme"
                 onSelect={() => {

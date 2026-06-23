@@ -53,6 +53,26 @@ export function useColumns(
   })
 }
 
+// ── Schema: diagram (all columns + relationships, fetched on demand) ──────────
+
+export function useAllColumns(connectionId: string | null, enabled = true) {
+  return useQuery({
+    queryKey: ['allColumns', connectionId],
+    queryFn: () => window.api.schema.allColumns(connectionId!).then(unwrap),
+    enabled: enabled && connectionId != null,
+    retry: false,
+  })
+}
+
+export function useRelationships(connectionId: string | null, enabled = true) {
+  return useQuery({
+    queryKey: ['relationships', connectionId],
+    queryFn: () => window.api.schema.relationships(connectionId!).then(unwrap),
+    enabled: enabled && connectionId != null,
+    retry: false,
+  })
+}
+
 // ── Mutations ────────────────────────────────────────────────────────────────
 
 export function useSaveConnection() {
