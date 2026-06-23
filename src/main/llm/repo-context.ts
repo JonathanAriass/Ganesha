@@ -125,9 +125,10 @@ export interface UsedFile {
   snippet: string
 }
 
-/** Read the top-ranked files (injected `readFile`), window each to the table mention, and assemble a
- *  budgeted, labeled code block for the system prompt. Returns the prompt text plus the per-file
- *  blocks used (for the transparency line + its expandable detail). Empty when no tables/files apply. */
+/** Read the top-ranked files (injected `readFile`), window each to the table mention, and assemble the
+ *  labeled code blocks (`// path — DB table: <real name>`) for STEP 2 of the system prompt. The
+ *  framing and name-precedence rules live in buildSystemPrompt. Returns the blocks plus the per-file
+ *  detail used (for the transparency line). Empty when no tables/files apply. */
 export function buildRepoContext(input: RepoContextInput): { text: string; used: UsedFile[] } {
   const { tables, ranked, readFile, budget = 8000, perFile = 2400, maxFiles = 5 } = input
   if (tables.length === 0 || ranked.length === 0) return { text: '', used: [] }
@@ -152,16 +153,5 @@ export function buildRepoContext(input: RepoContextInput): { text: string; used:
     total += block.length
   }
   if (used.length === 0) return { text: '', used: [] }
-  const realNames = [...new Set(used.map((u) => u.table))].map((n) => `\`${n}\``).join(', ')
-  const text =
-    'Relevant code from the linked repository — use it for relationships, columns, and intent. ' +
-    'The class/model names here are NOT database table names; always use the exact table name labeled ' +
-    'on each file (shown as "DB table: …") and the live schema above. For example a `User` model may ' +
-    'map to a table named `02_users`.\n\n' +
-    blocks.join('\n\n') +
-    // Reaffirm the authoritative names AFTER the snippets: migrations/models spell tables WITHOUT the
-    // numeric prefix many times over, so the last word must be the exact name from the live schema.
-    `\n\nWrite SQL using ONLY these exact table names: ${realNames}. The repository code above may ` +
-    'abbreviate them (e.g. drop a numeric prefix or use the class name); the database requires these exact names.'
-  return { text, used }
+  return { text: blocks.join('\n\n'), used }
 }

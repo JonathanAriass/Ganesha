@@ -23,6 +23,7 @@ import { LlmEngine } from './llm/engine'
 import { MODEL_CATALOG } from './llm/catalog'
 import { listLocalModels, deleteLocalModel, downloadModel } from './llm/models'
 import { buildSchemaContext } from './llm/schema-context'
+import { buildSystemPrompt } from './llm/system-prompt'
 import { relevantTables, rankRepoFiles, buildRepoContext } from './llm/repo-context'
 import { scanRepoFiles, readRepoFile } from './llm/repo-scan'
 import * as llm from './persistence/llm'
@@ -305,29 +306,29 @@ export function registerIpcHandlers(): void {
         object: o,
         columns: await driver.describeObject(config.id, { schema: o.schema, name: o.name }).catch(() => [])
       })))
-      let systemPrompt =
-        'You are a database query assistant. Recommend correct queries for the user\'s database. ' +
-        'Return runnable queries in fenced code blocks (```sql, or ```js for MongoDB). Be concise.\n\n' +
-        buildSchemaContext(config.type, withCols)
+      // The tables this question targets (named in the message or the open query). They lead the
+      // schema (so truncation can't drop them) AND drive repo retrieval — "read the tables first".
+      const knownTables = withCols.map((w) => w.object.name)
+      const focusTables = relevantTables(prompt, queryText ?? '', knownTables)
+      const schemaText = buildSchemaContext(config.type, withCols, undefined, focusTables)
 
-      // Optionally ground in the linked repo's code (ORM models, migrations) for the tables in play.
+      // STEP 2 — optionally ground in the linked repo's code (ORM models, migrations) for those tables.
       // Best-effort: any fs/permission failure falls back to schema-only grounding, never blocks.
-      if (config.repoPath) {
+      let repoText = ''
+      if (config.repoPath && focusTables.length > 0) {
         try {
-          const knownTables = withCols.map((w) => w.object.name)
-          const tables = relevantTables(prompt, queryText ?? '', knownTables)
-          if (tables.length > 0) {
-            const ranked = rankRepoFiles(scanRepoFiles(config.repoPath), tables)
-            const repoCtx = buildRepoContext({ tables, ranked, readFile: (p) => readRepoFile(config.repoPath!, p) })
-            if (repoCtx.text) {
-              systemPrompt += '\n\n' + repoCtx.text
-              sendContext({ requestId, files: repoCtx.used })
-            }
+          const ranked = rankRepoFiles(scanRepoFiles(config.repoPath), focusTables)
+          const repoCtx = buildRepoContext({ tables: focusTables, ranked, readFile: (p) => readRepoFile(config.repoPath!, p) })
+          if (repoCtx.text) {
+            repoText = repoCtx.text
+            sendContext({ requestId, files: repoCtx.used })
           }
         } catch {
           // Repo gone / unreadable / permissions — keep the schema-only prompt.
         }
       }
+
+      const systemPrompt = buildSystemPrompt(config.type, schemaText, repoText, focusTables)
 
       // Prior turns BEFORE this one, then load the model. Both happen before we
       // persist anything, so a setup failure leaves the conversation untouched.

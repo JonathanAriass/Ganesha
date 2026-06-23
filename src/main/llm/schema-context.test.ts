@@ -35,4 +35,15 @@ describe('buildSchemaContext', () => {
   it('handles an empty schema without throwing', () => {
     expect(buildSchemaContext('postgres', [])).toMatch(/no tables/i)
   })
+
+  it('lists priority (focus) tables first so a tight budget cannot drop them', () => {
+    const many = [
+      ...Array.from({ length: 50 }, (_, i) => t(`tbl${i}`, [col('c', 'int')])),
+      t('z_focus', [col('id', 'int')]),
+    ]
+    // A budget that would truncate long before reaching z_focus in original order.
+    const out = buildSchemaContext('mysql', many, 200, ['z_focus'])
+    expect(out).toContain('z_focus')
+    expect(out.indexOf('z_focus')).toBeLessThan(out.indexOf('tbl0'))
+  })
 })
