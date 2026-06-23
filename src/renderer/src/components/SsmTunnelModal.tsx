@@ -6,6 +6,46 @@ const EMPTY: SsmTunnelInput = {
   name: '', profile: '', region: 'eu-west-3', instanceId: '', remotePort: 3306, localPort: 13306, connectionId: null
 }
 
+/** Type-to-search instance picker: filters the live instance list by name or id as you type; pick a
+ *  match or paste an id manually (the field IS the instance id). */
+function InstanceCombobox({ instances, value, onChange }: { instances: AwsInstance[]; value: string; onChange: (id: string) => void }): JSX.Element {
+  const [open, setOpen] = useState(false)
+  const q = value.trim().toLowerCase()
+  const matches = instances.filter((i) => i.name.toLowerCase().includes(q) || i.instanceId.toLowerCase().includes(q))
+  return (
+    <div className="combo">
+      <input
+        id="ssm-instance"
+        value={value}
+        autoComplete="off"
+        placeholder="Type to search, or paste i-0123…"
+        onChange={(e) => { onChange(e.target.value); setOpen(true) }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => window.setTimeout(() => setOpen(false), 150)}
+      />
+      {open && instances.length > 0 && (
+        <div className="combo-list">
+          {matches.length === 0 && <div className="combo-empty">No instance matches.</div>}
+          {matches.slice(0, 50).map((i) => (
+            <button
+              type="button"
+              key={i.instanceId}
+              className="combo-item"
+              // mousedown-preventDefault keeps the input focused so this click lands before the blur.
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => { onChange(i.instanceId); setOpen(false) }}
+            >
+              <span className="combo-name">{i.name}</span>
+              {i.ping && i.ping !== 'Online' && <span className="combo-ping">{i.ping}</span>}
+              <span className="combo-id">{i.instanceId}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 type Auth = { status: 'idle' | 'checking' | 'ok' | 'fail'; arn?: string; error?: string }
 
 /** Add/edit an SSM tunnel. The AWS connector lets you pick a profile, sign in (SSO), and choose the
@@ -124,17 +164,7 @@ export default function SsmTunnelModal({ tunnel, onClose }: { tunnel: SsmTunnel 
               <label htmlFor="ssm-instance">
                 Instance {loadingInstances && <span className="hint">loading…</span>}
               </label>
-              {instances.length > 0 && (
-                <select className="ssm-instance-select" value={form.instanceId} onChange={(e) => set('instanceId', e.target.value)}>
-                  <option value="">— select an instance —</option>
-                  {instances.map((i) => (
-                    <option key={i.instanceId} value={i.instanceId}>
-                      {i.name} ({i.instanceId}){i.ping && i.ping !== 'Online' ? ` · ${i.ping}` : ''}
-                    </option>
-                  ))}
-                </select>
-              )}
-              <input id="ssm-instance" value={form.instanceId} onChange={(e) => set('instanceId', e.target.value)} placeholder="i-0123456789abcdef0 (or pick above)" />
+              <InstanceCombobox instances={instances} value={form.instanceId} onChange={(id) => set('instanceId', id)} />
             </div>
 
             <div className="form-row-2">
