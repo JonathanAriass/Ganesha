@@ -109,6 +109,9 @@ describe('buildRepoContext', () => {
     const out = buildRepoContext({ tables: ['02_users'], ranked, readFile: reader, budget: 4000 })
     expect(out.text).toContain('DB table: 02_users') // the real name, pinned next to the class file
     expect(out.text).toMatch(/not\b.*table name/i) // header tells the model not to derive names from classes
+    // …and reaffirm the exact name LAST, after the snippets (recency beats the repeated unprefixed
+    // mentions a Laravel migration/model spells out).
+    expect(out.text).toMatch(/exact table names:[^\n]*`02_users`/i)
   })
   it('returns empty when no tables are relevant', () => {
     expect(buildRepoContext({ tables: [], ranked: [], readFile: reader, budget: 4000 })).toEqual({

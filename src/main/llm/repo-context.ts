@@ -152,11 +152,16 @@ export function buildRepoContext(input: RepoContextInput): { text: string; used:
     total += block.length
   }
   if (used.length === 0) return { text: '', used: [] }
+  const realNames = [...new Set(used.map((u) => u.table))].map((n) => `\`${n}\``).join(', ')
   const text =
     'Relevant code from the linked repository — use it for relationships, columns, and intent. ' +
     'The class/model names here are NOT database table names; always use the exact table name labeled ' +
     'on each file (shown as "DB table: …") and the live schema above. For example a `User` model may ' +
     'map to a table named `02_users`.\n\n' +
-    blocks.join('\n\n')
+    blocks.join('\n\n') +
+    // Reaffirm the authoritative names AFTER the snippets: migrations/models spell tables WITHOUT the
+    // numeric prefix many times over, so the last word must be the exact name from the live schema.
+    `\n\nWrite SQL using ONLY these exact table names: ${realNames}. The repository code above may ` +
+    'abbreviate them (e.g. drop a numeric prefix or use the class name); the database requires these exact names.'
   return { text, used }
 }
