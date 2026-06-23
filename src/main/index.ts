@@ -5,6 +5,14 @@ import { installAppMenu } from './menu'
 import { openDb } from './persistence/db'
 import { getSettings } from './persistence/settings'
 
+// ── App identity ──
+// Pin the data directory to its long-standing location BEFORE renaming: app.getName() drives
+// app.getPath('userData'), so setName('Ganesha') would otherwise point userData at a fresh
+// '…/Ganesha' folder and orphan every saved connection/secret/model. The appData root is
+// name-independent, so this keeps the data exactly where it has always lived ('…/db-client').
+app.setPath('userData', join(app.getPath('appData'), 'db-client'))
+app.setName('Ganesha')
+
 /**
  * Match the window background to the saved theme so launch doesn't flash
  * the wrong color. Guarded: a broken better-sqlite3 must never stop the
@@ -67,6 +75,15 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  // Dev: show the Ganesha icon in the dock (packaged builds get it from the .app bundle, which is
+  // not present in dev). build/ is a build resource sitting two levels up from out/main.
+  if (!app.isPackaged && process.platform === 'darwin') {
+    try {
+      app.dock?.setIcon(join(__dirname, '../../build/icon.png'))
+    } catch {
+      /* cosmetic in dev */
+    }
+  }
   installAppMenu()
   registerIpcHandlers()
   createWindow()

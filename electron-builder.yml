@@ -1,5 +1,5 @@
 appId: com.jonathanariass.dbclient
-productName: DB Client
+productName: Ganesha
 directories:
   output: dist
   buildResources: build

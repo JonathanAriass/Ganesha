@@ -22,7 +22,7 @@ export default function TopBar(): JSX.Element {
 
   return (
     <header className="topbar">
-      <span className="brand">DB Client</span>
+      <span className="brand">Ganesha</span>
 
       {activeConn && (
         <span

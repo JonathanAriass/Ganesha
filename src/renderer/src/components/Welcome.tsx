@@ -32,7 +32,7 @@ export default function Welcome(): JSX.Element {
   if (!connections || connections.length === 0) {
     return (
       <div className="welcome">
-        <h2>Welcome to DB Client</h2>
+        <h2>Welcome to Ganesha</h2>
         <p>Connect to a Postgres, MySQL, MariaDB, or MongoDB database to get started.</p>
         <button className="btn primary" onClick={() => openModal({ mode: 'create' })}>
           + New connection
