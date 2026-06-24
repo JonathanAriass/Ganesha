@@ -104,4 +104,18 @@ describe('applyPaneClose', () => {
     expect(r.focusedPane).toBe('left')
     expect(r.tabs.map((t) => t.id)).toEqual(['a', 'b'])
   })
+
+  it('leaves same-pane tabs of OTHER connections untouched', () => {
+    const tabs = [t('a', 'left', 'c1'), t('b', 'left', 'c1'), t('z', 'left', 'c2')]
+    const r = applyPaneClose(tabs, active('a', null), 'left', 'others', 'a')
+    expect(r.tabs.map((x) => x.id)).toEqual(['a', 'z']) // b closed, z (other conn) kept
+  })
+
+  it('"all" clears the target pane+connection and collapses if nothing remains', () => {
+    const tabs = [t('a', 'left'), t('b', 'left')]
+    const r = applyPaneClose(tabs, active('a', null), 'left', 'all', 'a')
+    expect(r.tabs).toEqual([])
+    expect(r.activeByPane).toEqual({ left: null, right: null })
+    expect(r.focusedPane).toBe('left')
+  })
 })

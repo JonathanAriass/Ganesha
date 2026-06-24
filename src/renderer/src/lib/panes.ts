@@ -79,7 +79,9 @@ export function applyPaneClose<T extends { id: string; connectionId: string; pan
   if (activeByPane[tp] && tpTabs.some((t) => t.id === activeByPane[tp])) {
     tpActive = activeByPane[tp] // the active tab wasn't among those closed
   } else {
-    // nearest survivor in the closed group, else first remaining tab in the pane
+    // nearest survivor in the closed group, else first remaining tab in the pane.
+    // Keyed off keptIds (not a single removed id) so bulk modes (others/all/right/left)
+    // are handled too — which is why this can't reuse nextActiveInPane (single-id removal).
     const gIdx = scope.findIndex((t) => t.id === targetId)
     const after = scope.slice(gIdx + 1).find((t) => keptIds.has(t.id))
     const before = scope.slice(0, gIdx).reverse().find((t) => keptIds.has(t.id))
