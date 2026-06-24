@@ -335,42 +335,45 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   hydrateTabs: (sessionTabs) =>
     set((s) => {
-      // NOTE: still flat-mirror only — the pane maps (activeTabByPane/activeConnByPane) are made
-      // authoritative here by a later task (hydrate rewrite). Latent until the two-pane UI reads them.
       if (s.tabs.length > 0 || sessionTabs.length === 0) return s
-      // Volatile state (results, errors, run state) never persists — restored
-      // tabs come back clean, with their persisted ids kept stable.
-      const tabs: QueryTabData[] = sessionTabs.map((t) => ({
-        id: t.id,
-        connectionId: t.connectionId,
-        title: t.title,
-        pane: 'left',
-        text: t.text,
-        epoch: 0,
-        runOnOpen: false,
-        running: false,
-        queryId: null,
-        result: null,
-        error: null,
-        scriptRun: null,
-        edits: {},
-        editError: null,
-      }))
+      const tabs: QueryTabData[] = sessionTabs.map((st) => {
+        const tab = blankTab({
+          connectionId: st.connectionId,
+          title: st.title,
+          text: st.text,
+          pane: st.pane === 'right' ? 'right' : 'left', // legacy rows (undefined) → left
+        })
+        tab.id = st.id // keep persisted ids stable (session-save matches on them)
+        return tab
+      })
       // Bump the counter past restored "Query N" titles so new tabs don't duplicate them.
       const counter = tabs.reduce((max, t) => {
         const m = /^Query (\d+)$/.exec(t.title)
         return m ? Math.max(max, Number(m[1])) : max
       }, s._queryCounter)
-      const active = tabs.find((t, i) => sessionTabs[i].active) ?? tabs[tabs.length - 1]
-      return {
-        tabs,
-        activeTabId: active.id,
-        _queryCounter: counter,
-        // The restored active tab's connection is the active group (sidebar follows); seed the
-        // per-group memory so switching back to it restores this tab.
-        activeConnectionId: active.connectionId,
-        lastActiveByConnection: { [active.connectionId]: active.id },
+      // Each pane's active = its flagged session tab, else the pane's first tab. Focus always
+      // returns to the left pane on restore (we don't persist focus; left is non-empty when tabs exist).
+      const activeIn = (p: PaneId): string | null => {
+        const flagged = sessionTabs.find((st) => (st.pane === 'right' ? 'right' : 'left') === p && st.active)
+        return flagged?.id ?? tabs.find((t) => t.pane === p)?.id ?? null
       }
+      const activeTabByPane = { left: activeIn('left'), right: activeIn('right') }
+      const connFor = (id: string | null): string | null =>
+        id ? (tabs.find((t) => t.id === id)?.connectionId ?? null) : null
+      const lastActive: Record<string, string> = {}
+      for (const p of ['left', 'right'] as PaneId[]) {
+        const id = activeTabByPane[p]
+        const conn = connFor(id)
+        if (id && conn) lastActive[conn] = id
+      }
+      return withMirror({
+        tabs,
+        _queryCounter: counter,
+        focusedPane: 'left',
+        activeTabByPane,
+        activeConnByPane: { left: connFor(activeTabByPane.left), right: connFor(activeTabByPane.right) },
+        lastActiveByConnection: lastActive,
+      })
     }),
 
   // Single close (× / ⌘W / menu "Close") — group-aware: reselects the adjacent tab in the SAME

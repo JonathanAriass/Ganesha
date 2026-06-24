@@ -319,8 +319,10 @@ describe('hydrateTabs', () => {
     expect(useAppStore.getState().tabs[2].title).toBe('Query 4')
   })
 
-  it('falls back to the last tab when none is flagged active', () => {
-    useAppStore.getState().hydrateTabs([session({ id: 'a' }), session({ id: 'b' })])
+  it('restores the flagged active tab', () => {
+    // toSessionTabs now always flags exactly one active tab per pane; the per-pane hydrate
+    // honours that flag (the no-flag fallback is the pane's FIRST tab, exercised elsewhere).
+    useAppStore.getState().hydrateTabs([session({ id: 'a' }), session({ id: 'b', active: true })])
     expect(useAppStore.getState().activeTabId).toBe('b')
   })
 
@@ -345,6 +347,39 @@ describe('hydrateTabs', () => {
     useAppStore.setState({ activeConnectionId: 'chosen' })
     useAppStore.getState().hydrateTabs([session({ id: 'a', connectionId: 'c1', active: true })])
     expect(useAppStore.getState().activeConnectionId).toBe('c1')
+  })
+})
+
+describe('split views — hydrate', () => {
+  beforeEach(() => {
+    useAppStore.setState({
+      tabs: [], activeTabId: null, activeConnectionId: null, _queryCounter: 0,
+      focusedPane: 'left', activeTabByPane: { left: null, right: null }, activeConnByPane: { left: null, right: null },
+      lastActiveByConnection: {},
+    })
+  })
+
+  it('restores per-pane tabs, each pane’s active, and focuses left', () => {
+    useAppStore.getState().hydrateTabs([
+      { id: 'a', connectionId: 'c1', title: 'A', text: 'a', pane: 'left', active: true },
+      { id: 'b', connectionId: 'c2', title: 'B', text: 'b', pane: 'right', active: true },
+    ])
+    const s = useAppStore.getState()
+    expect(s.tabs.find((t) => t.id === 'a')!.pane).toBe('left')
+    expect(s.tabs.find((t) => t.id === 'b')!.pane).toBe('right')
+    expect(s.activeTabByPane).toEqual({ left: 'a', right: 'b' })
+    expect(s.activeConnByPane).toEqual({ left: 'c1', right: 'c2' })
+    expect(s.focusedPane).toBe('left')
+    expect(s.activeTabId).toBe('a') // mirror = focused (left)
+  })
+
+  it('treats legacy tabs (no pane) as a single left pane', () => {
+    useAppStore.getState().hydrateTabs([
+      { id: 'a', connectionId: 'c1', title: 'A', text: 'a', active: true } as never,
+    ])
+    const s = useAppStore.getState()
+    expect(s.tabs[0].pane).toBe('left')
+    expect(s.tabs.some((t) => t.pane === 'right')).toBe(false)
   })
 })
 
