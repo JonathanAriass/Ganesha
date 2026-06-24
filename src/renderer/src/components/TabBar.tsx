@@ -19,6 +19,7 @@ export default function TabBar({ pane }: { pane: PaneId }): JSX.Element {
   const closeTabsToLeft = useAppStore((s) => s.closeTabsToLeft)
   const closeAllTabs = useAppStore((s) => s.closeAllTabs)
   const openQueryTab = useAppStore((s) => s.openQueryTab)
+  const splitActiveTab = useAppStore((s) => s.splitActiveTab)
 
   // Inline rename: double-click a tab to edit its title. Enter/click-away commits, Escape cancels.
   const [editing, setEditing] = useState<{ id: string; draft: string } | null>(null)
@@ -153,6 +154,15 @@ export default function TabBar({ pane }: { pane: PaneId }): JSX.Element {
           onClick={() => { focusPane(pane); if (activeConnectionId) openQueryTab({ connectionId: activeConnectionId }) }}
         >
           +
+        </button>
+        <button
+          className="tab-split btn ghost"
+          aria-label="Split — open this tab on the other side"
+          title="Open this tab on the other side"
+          disabled={!activeTabId}
+          onClick={() => { focusPane(pane); splitActiveTab() }}
+        >
+          ⊟
         </button>
         {menu && (
           <TabContextMenu

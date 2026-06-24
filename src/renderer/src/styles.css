@@ -897,6 +897,11 @@ input[type="password"]::placeholder {
   border-right: none;
 }
 
+.tab-split {
+  font-size: 13px;
+  line-height: 1;
+}
+
 /* ── Tab right-click menu ── */
 .tab-menu-backdrop {
   position: fixed;
