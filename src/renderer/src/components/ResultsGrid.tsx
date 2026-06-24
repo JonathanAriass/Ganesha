@@ -9,7 +9,8 @@ import {
 } from '@tanstack/react-table'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { ColumnMeta, EditableResult } from '@shared/query'
-import { cellText, cellMatchesFilter } from '../lib/grid-text'
+import { cellText } from '../lib/grid-text'
+import { displayCellText, cellMatchesDateAware, type DateKind } from '../lib/date-format'
 import { buildGridTemplate, gridMinWidth, clampColumnWidth, autoFitWidth } from '../lib/column-size'
 import { columnEditable, columnEditKey, editChangesValue } from '../lib/edit-staging'
 import { coerceMongoEditValue } from '../lib/mongo-edit-value'
@@ -30,6 +31,9 @@ interface Props {
   /** Mongo connection: edited text is coerced to a typed value (preserving the original
    *  field's type) before staging, since `$set` would otherwise store the raw string. */
   isMongo?: boolean
+  /** Per-column date kind for DISPLAY formatting (null per column = not a date / non-SQL).
+   *  Display-only: copy, export, editing, and the tooltip keep the raw value. */
+  columnKinds?: (DateKind | null)[] | null
   /** Staged edits for this tab (store-owned, keyed `row<SEP>path`). */
   edits?: Record<string, unknown>
 }
@@ -43,6 +47,7 @@ export default function ResultsGrid({
   readOnly,
   requireCommit,
   isMongo,
+  columnKinds,
   edits = {},
 }: Props): JSX.Element {
   const [sorting, setSorting] = useState<SortingState>([])
@@ -107,6 +112,10 @@ export default function ResultsGrid({
     [columns],
   )
 
+  // The DISPLAY date kind for a column (null = show raw). Defined before the table so the
+  // filter closure can reach it.
+  const kindOf = (colIndex: number): DateKind | null => columnKinds?.[colIndex] ?? null
+
   const table = useReactTable({
     data: rows,
     columns: columnDefs,
@@ -115,8 +124,9 @@ export default function ResultsGrid({
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    // Date columns match either the raw or the formatted spelling (search what you see).
     globalFilterFn: (row, columnId, filterValue) =>
-      cellMatchesFilter(row.getValue(columnId), String(filterValue)),
+      cellMatchesDateAware(row.getValue(columnId), kindOf(Number(columnId)), String(filterValue)),
     getColumnCanGlobalFilter: () => true,
   })
 
@@ -212,7 +222,7 @@ export default function ResultsGrid({
     if (!ctx) return
     const sample = parentRef.current?.querySelector('.grid-cell') as HTMLElement | null
     ctx.font = (sample && getComputedStyle(sample).font) || '12.5px sans-serif'
-    const texts = table.getRowModel().rows.map((r) => cellText((r.original as unknown[])[colIndex]))
+    const texts = table.getRowModel().rows.map((r) => displayCellText((r.original as unknown[])[colIndex], kindOf(colIndex)))
     const w = autoFitWidth(columns[colIndex].name, texts, (s) => ctx.measureText(s).width)
     setWidths((prev) => ({ ...prev, [colIndex]: w }))
   }
@@ -284,7 +294,8 @@ export default function ResultsGrid({
                     const dk = cellKey(rowIndex, colIndex)
                     const isDirty = dk !== null && Object.prototype.hasOwnProperty.call(edits, dk)
                     const raw = isDirty ? edits[dk!] : cell.getValue()
-                    const text = cellText(raw)
+                    const rawText = cellText(raw) // raw value: copy + hover tooltip + edit
+                    const display = displayCellText(raw, kindOf(colIndex)) // formatted for date columns
                     const isEditing = editing?.rowIndex === rowIndex && editing?.colIndex === colIndex
                     if (isEditing) {
                       return (
@@ -301,16 +312,16 @@ export default function ResultsGrid({
                       <div
                         key={cell.id}
                         className={`grid-cell${isDirty ? ' cell-dirty' : ''}${editableCell ? ' editable' : ''}`}
-                        title={text}
+                        title={rawText}
                         onDoubleClick={() => {
                           if (editableCell) setEditing({ rowIndex, colIndex })
-                          else void window.api.clipboard.copy(text)
+                          else void window.api.clipboard.copy(rawText)
                         }}
                       >
                         {raw === null || raw === undefined ? (
                           <span className="cell-null">NULL</span>
                         ) : (
-                          text
+                          display
                         )}
                         {isDirty && tabId && (
                           // Per-cell reset: revert just this cell to its original value.

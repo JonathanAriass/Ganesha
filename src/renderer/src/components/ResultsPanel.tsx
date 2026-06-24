@@ -6,6 +6,7 @@ import ScriptResults from './ScriptResults'
 import DocumentView from './DocumentView'
 import { toCsv, toJsonText, toJsonObjects, download } from '../lib/export'
 import { rowMatchesFilter } from '../lib/grid-text'
+import { dateColumnKind, type SqlDialect } from '../lib/date-format'
 import { mod } from '../lib/platform'
 import { truncationLabel, affectedRowsLabel } from '../lib/result-label'
 
@@ -67,6 +68,16 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
 
   const result = tab.result
   const filtering = view === 'table' && filter !== ''
+
+  // Day-first DISPLAY formatting for SQL date/time/timestamp columns (postgres OIDs / mysql
+  // type codes). Per-column null = not a date (or a non-SQL connection) → the grid shows raw.
+  const dialect: SqlDialect | null =
+    connection?.type === 'postgres'
+      ? 'postgres'
+      : connection?.type === 'mysql' || connection?.type === 'mariadb'
+        ? 'mysql'
+        : null
+  const columnKinds = dialect ? result.columns.map((c) => dateColumnKind(c.dataType, dialect)) : null
 
   // Export what the grid shows: the filtered subset when a table filter is active.
   function exportRows(): unknown[][] {
@@ -151,6 +162,7 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
           readOnly={connection?.readOnly ?? true}
           requireCommit={connection?.requireCommit ?? true}
           isMongo={connection?.type === 'mongodb'}
+          columnKinds={columnKinds}
           edits={tab.edits}
         />
       ) : (
