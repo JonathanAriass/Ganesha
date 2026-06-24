@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query'
 import type { SsmTunnel } from '@shared/domain'
 import { useAppStore } from './state/store'
@@ -9,6 +9,8 @@ import ConnectionModal from './components/ConnectionModal'
 import SettingsModal from './components/SettingsModal'
 import CommandPalette from './components/CommandPalette'
 import EditorPane from './components/EditorPane'
+import PaneDivider from './components/PaneDivider'
+import { loadPaneFraction } from './lib/pane-split'
 import SsmPanel from './components/SsmPanel'
 import SavedSection from './components/SavedSection'
 import HistorySection from './components/HistorySection'
@@ -36,6 +38,9 @@ function AppShell(): JSX.Element {
   const saveQueryModal = useAppStore((s) => s.saveQueryModal)
   const commitModal = useAppStore((s) => s.commitModal)
   const tabs = useAppStore((s) => s.tabs)
+  const splitView = useAppStore((s) => s.tabs.some((t) => t.pane === 'right'))
+  const leftPaneRef = useRef<HTMLDivElement>(null)
+  const initialLeftFraction = loadPaneFraction()
 
   const { data: settings } = useSettings()
   useEffect(() => {
@@ -75,7 +80,21 @@ function AppShell(): JSX.Element {
           <HistorySection />
         </aside>
         <main className="main">
-          {tabs.length === 0 ? <Welcome /> : <EditorPane paneId="left" />}
+          {tabs.length === 0 ? (
+            <Welcome />
+          ) : splitView ? (
+            <div className="panes">
+              <div className="pane-slot" ref={leftPaneRef} style={{ flexBasis: `${initialLeftFraction * 100}%` }}>
+                <EditorPane paneId="left" />
+              </div>
+              <PaneDivider leftPaneRef={leftPaneRef} />
+              <div className="pane-slot pane-slot-right">
+                <EditorPane paneId="right" />
+              </div>
+            </div>
+          ) : (
+            <EditorPane paneId="left" />
+          )}
         </main>
         <AssistantPanel />
         <SsmPanel />
