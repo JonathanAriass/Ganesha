@@ -105,7 +105,7 @@ function Highlighted({ text, positions }: { text: string; positions: number[] })
 
 export default function ObjectTree(): JSX.Element {
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
-  const openQueryTab = useAppStore((s) => s.openQueryTab)
+  const openTableQuery = useAppStore((s) => s.openTableQuery)
 
   const { data: connections = [] } = useConnections()
   const { data: objects, isLoading, error } = useObjects(activeConnectionId)
@@ -126,11 +126,10 @@ export default function ObjectTree(): JSX.Element {
   function handleDoubleClick(obj: DbObject) {
     if (!activeConnectionId || !activeConn) return
     const ref = { schema: obj.schema, name: obj.name }
-    openQueryTab({
+    openTableQuery({
       connectionId: activeConnectionId,
       title: obj.name,
       text: defaultTableQuery(activeConn.type, ref),
-      runOnOpen: true,
     })
   }
 

@@ -83,6 +83,55 @@ describe('openOrLoadQuery', () => {
   })
 })
 
+describe('openTableQuery', () => {
+  beforeEach(() => {
+    useAppStore.setState({ tabs: [], activeTabId: null, _queryCounter: 0, activeConnectionId: null, lastActiveByConnection: {} })
+  })
+
+  it('opens a new auto-run tab when the connection has no query tab', () => {
+    useAppStore.getState().openTableQuery({ connectionId: 'c1', title: 'users', text: 'select * from users' })
+    const s = useAppStore.getState()
+    expect(s.tabs).toHaveLength(1)
+    expect(s.tabs[0]).toMatchObject({ connectionId: 'c1', title: 'users', text: 'select * from users', runOnOpen: true })
+    expect(s.activeTabId).toBe(s.tabs[0].id)
+  })
+
+  it("reuses the connection's query tab (loads + runs) instead of stacking a new one", () => {
+    useAppStore.getState().openQueryTab({ connectionId: 'c1', text: 'old' })
+    const tabId = useAppStore.getState().activeTabId!
+    const epoch = useAppStore.getState().tabs[0].epoch
+    useAppStore.getState().openTableQuery({ connectionId: 'c1', title: 'orders', text: 'select * from orders' })
+    const s = useAppStore.getState()
+    expect(s.tabs).toHaveLength(1)
+    expect(s.tabs[0]).toMatchObject({ id: tabId, title: 'orders', text: 'select * from orders', runOnOpen: true })
+    expect(s.tabs[0].epoch).toBe(epoch + 1) // remounts the editor + fires the run
+    expect(s.activeTabId).toBe(tabId)
+  })
+
+  it('does not reuse a diagram tab — opens a fresh query tab', () => {
+    useAppStore.getState().openDiagramTab('c1')
+    const diagramId = useAppStore.getState().activeTabId!
+    useAppStore.getState().openTableQuery({ connectionId: 'c1', title: 'users', text: 'q' })
+    const s = useAppStore.getState()
+    expect(s.tabs).toHaveLength(2)
+    expect(s.tabs.find((t) => t.id === diagramId)).toMatchObject({ kind: 'diagram', text: '' }) // untouched
+    const query = s.tabs.find((t) => t.kind !== 'diagram')!
+    expect(query).toMatchObject({ title: 'users', text: 'q', runOnOpen: true })
+    expect(s.activeTabId).toBe(query.id)
+  })
+
+  it("reuses a connection's query tab even when another connection is active", () => {
+    useAppStore.getState().openQueryTab({ connectionId: 'c1', text: 'c1tab' })
+    const c1Tab = useAppStore.getState().activeTabId!
+    useAppStore.getState().openQueryTab({ connectionId: 'c2', text: 'c2tab' }) // c2 active now
+    useAppStore.getState().openTableQuery({ connectionId: 'c1', title: 'users', text: 'q' })
+    const s = useAppStore.getState()
+    expect(s.tabs).toHaveLength(2) // reused c1's tab, didn't stack
+    expect(s.tabs.find((t) => t.id === c1Tab)).toMatchObject({ text: 'q', title: 'users', runOnOpen: true })
+    expect(s.activeTabId).toBe(c1Tab)
+  })
+})
+
 describe('script run lifecycle', () => {
   const result = {
     columns: [{ name: 'a', dataType: null }],

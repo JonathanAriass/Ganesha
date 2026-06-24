@@ -130,6 +130,9 @@ interface AppState {
   loadQueryText: (id: string, text: string) => void
   /** Load text into the active tab when it belongs to `connectionId`, else open a new tab. */
   openOrLoadQuery: (args: { connectionId: string; title: string; text: string }) => void
+  /** Open a table query, REUSING an existing (non-diagram) tab for the connection if one exists
+   *  (loading the query + running it); otherwise opens a fresh tab. */
+  openTableQuery: (args: { connectionId: string; title: string; text: string }) => void
   startRun: (id: string, queryId: string) => void
   finishRun: (id: string, payload: { result: QueryResult } | { error: string }) => void
   /** After a committed edit, write each value at its field path into the tab's result —
@@ -374,8 +377,31 @@ export const useAppStore = create<AppState>((set, get) => ({
   openOrLoadQuery: ({ connectionId, title, text }) => {
     const s = get()
     const activeTab = s.tabs.find((t) => t.id === s.activeTabId)
-    if (activeTab && activeTab.connectionId === connectionId) s.loadQueryText(activeTab.id, text)
+    // Reuse the active tab only if it's a query tab for this connection (never a diagram tab).
+    if (activeTab && activeTab.connectionId === connectionId && activeTab.kind !== 'diagram') s.loadQueryText(activeTab.id, text)
     else s.openQueryTab({ connectionId, title, text })
+  },
+
+  openTableQuery: ({ connectionId, title, text }) => {
+    const s = get()
+    const queryTabs = s.tabs.filter((t) => t.connectionId === connectionId && t.kind !== 'diagram')
+    if (queryTabs.length === 0) {
+      s.openQueryTab({ connectionId, title, text, runOnOpen: true })
+      return
+    }
+    // Reuse the connection's active query tab, else its last-active one, else its first.
+    const active = s.tabs.find((t) => t.id === s.activeTabId)
+    const target =
+      (active && active.connectionId === connectionId && active.kind !== 'diagram' ? active : null) ??
+      queryTabs.find((t) => t.id === s.lastActiveByConnection[connectionId]) ??
+      queryTabs[0]
+    set((st) => ({
+      // Bump epoch (remounts the editor with the new text) + runOnOpen so the run fires on the reuse.
+      tabs: st.tabs.map((t) => (t.id === target.id ? { ...t, text, title, epoch: t.epoch + 1, runOnOpen: true } : t)),
+      activeTabId: target.id,
+      activeConnectionId: connectionId,
+      lastActiveByConnection: { ...st.lastActiveByConnection, [connectionId]: target.id }
+    }))
   },
 
   startRun: (id, queryId) =>
