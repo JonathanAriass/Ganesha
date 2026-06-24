@@ -51,7 +51,10 @@ describe('overlay state invariants', () => {
 
 describe('openOrLoadQuery', () => {
   beforeEach(() => {
-    useAppStore.setState({ tabs: [], activeTabId: null, _queryCounter: 0 })
+    useAppStore.setState({
+      tabs: [], activeTabId: null, _queryCounter: 0,
+      focusedPane: 'left', activeTabByPane: { left: null, right: null }, activeConnByPane: { left: null, right: null },
+    })
   })
 
   it('loads into the active tab when it belongs to the connection', () => {
@@ -85,7 +88,10 @@ describe('openOrLoadQuery', () => {
 
 describe('openTableQuery', () => {
   beforeEach(() => {
-    useAppStore.setState({ tabs: [], activeTabId: null, _queryCounter: 0, activeConnectionId: null, lastActiveByConnection: {} })
+    useAppStore.setState({
+      tabs: [], activeTabId: null, _queryCounter: 0, activeConnectionId: null, lastActiveByConnection: {},
+      focusedPane: 'left', activeTabByPane: { left: null, right: null }, activeConnByPane: { left: null, right: null },
+    })
   })
 
   it('opens a new auto-run tab when that table is not open yet', () => {
@@ -145,7 +151,10 @@ describe('script run lifecycle', () => {
   }
 
   beforeEach(() => {
-    useAppStore.setState({ tabs: [], activeTabId: null, _queryCounter: 0 })
+    useAppStore.setState({
+      tabs: [], activeTabId: null, _queryCounter: 0,
+      focusedPane: 'left', activeTabByPane: { left: null, right: null }, activeConnByPane: { left: null, right: null },
+    })
     useAppStore.getState().openQueryTab({ connectionId: 'c1', text: 'select 1; select 2' })
   })
 
@@ -225,7 +234,10 @@ describe('script run lifecycle', () => {
 
 describe('renameTab', () => {
   beforeEach(() => {
-    useAppStore.setState({ tabs: [], activeTabId: null, _queryCounter: 0 })
+    useAppStore.setState({
+      tabs: [], activeTabId: null, _queryCounter: 0,
+      focusedPane: 'left', activeTabByPane: { left: null, right: null }, activeConnByPane: { left: null, right: null },
+    })
     useAppStore.getState().openQueryTab({ connectionId: 'c1' })
   })
 
@@ -257,7 +269,10 @@ describe('renameTab', () => {
 
 describe('hydrateTabs', () => {
   beforeEach(() => {
-    useAppStore.setState({ tabs: [], activeTabId: null, activeConnectionId: null, _queryCounter: 0 })
+    useAppStore.setState({
+      tabs: [], activeTabId: null, activeConnectionId: null, _queryCounter: 0,
+      focusedPane: 'left', activeTabByPane: { left: null, right: null }, activeConnByPane: { left: null, right: null },
+    })
   })
 
   const session = (over: Partial<SessionTab> & { id: string }): SessionTab => ({
@@ -272,7 +287,7 @@ describe('hydrateTabs', () => {
     const s = useAppStore.getState()
     expect(s.tabs.map((t) => t.id)).toEqual(['a', 'b'])
     expect(s.tabs[0]).toEqual({
-      id: 'a', connectionId: 'c1', title: 'Query 1', text: 'SELECT 1',
+      id: 'a', connectionId: 'c1', title: 'Query 1', text: 'SELECT 1', pane: 'left',
       epoch: 0, runOnOpen: false, running: false, queryId: null,
       result: null, error: null, scriptRun: null, edits: {}, editError: null
     })
@@ -335,7 +350,10 @@ describe('hydrateTabs', () => {
 
 describe('applyResultEdits', () => {
   beforeEach(() => {
-    useAppStore.setState({ tabs: [], activeTabId: null, _queryCounter: 0 })
+    useAppStore.setState({
+      tabs: [], activeTabId: null, _queryCounter: 0,
+      focusedPane: 'left', activeTabByPane: { left: null, right: null }, activeConnByPane: { left: null, right: null },
+    })
     useAppStore.getState().openQueryTab({ connectionId: 'c1', text: 'select * from t' })
   })
   const tab = () => useAppStore.getState().tabs[0]
@@ -398,7 +416,10 @@ describe('applyResultEdits', () => {
 
 describe('staged cell edits', () => {
   beforeEach(() => {
-    useAppStore.setState({ tabs: [], activeTabId: null, _queryCounter: 0 })
+    useAppStore.setState({
+      tabs: [], activeTabId: null, _queryCounter: 0,
+      focusedPane: 'left', activeTabByPane: { left: null, right: null }, activeConnByPane: { left: null, right: null },
+    })
     useAppStore.getState().openQueryTab({ connectionId: 'c1', text: 'select * from t' })
   })
   // store.test.ts runs in the node env (no DOM), so stub `window` on globalThis — the
@@ -486,5 +507,34 @@ describe('staged cell edits', () => {
     await s().commitEdits(tab().id)
     expect(tab().edits).toEqual({ [editKey(0, 'name')]: 'NEW' }) // intact for retry
     expect(tab().editError).toMatch(/read-only/)
+  })
+})
+
+describe('split views — opens target the focused pane', () => {
+  beforeEach(() => {
+    useAppStore.setState({
+      tabs: [], activeTabId: null, activeConnectionId: null, _queryCounter: 0,
+      focusedPane: 'left', activeTabByPane: { left: null, right: null }, activeConnByPane: { left: null, right: null },
+      lastActiveByConnection: {},
+    })
+  })
+
+  it('openQueryTab creates a left tab and mirrors active*', () => {
+    useAppStore.getState().openQueryTab({ connectionId: 'c1', text: 'q' })
+    const s = useAppStore.getState()
+    expect(s.tabs[0].pane).toBe('left')
+    expect(s.activeTabByPane.left).toBe(s.tabs[0].id)
+    expect(s.activeTabId).toBe(s.tabs[0].id) // mirror
+    expect(s.activeConnectionId).toBe('c1') // mirror
+  })
+
+  it('setActiveConnection switches only the focused pane', () => {
+    useAppStore.getState().openQueryTab({ connectionId: 'c1', text: 'q' })
+    useAppStore.setState({ focusedPane: 'right', activeConnByPane: { left: 'c1', right: null }, activeTabByPane: { left: useAppStore.getState().tabs[0].id, right: null } })
+    useAppStore.getState().setActiveConnection('c2')
+    const s = useAppStore.getState()
+    expect(s.activeConnByPane.right).toBe('c2')
+    expect(s.activeConnByPane.left).toBe('c1') // left untouched
+    expect(s.activeConnectionId).toBe('c2') // mirror = focused (right)
   })
 })

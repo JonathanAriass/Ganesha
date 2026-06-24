@@ -5,7 +5,8 @@ import { buildRowEdits } from '../lib/edit-staging'
 import { parseEditKey, setAtPath } from '../lib/doc-path'
 import { unwrap } from '../lib/result'
 import { type CloseMode } from '../lib/tab-close'
-import { applyGroupedTabClose, nextActiveForGroup } from '../lib/tab-groups'
+import { applyGroupedTabClose } from '../lib/tab-groups'
+import { type PaneId } from '../lib/panes'
 
 type ConnectionModalState =
   | { mode: 'create' }
@@ -47,6 +48,9 @@ export interface QueryTabData {
   /** Tab kind. Absent/`'query'` = the normal editor+results tab; `'diagram'` = the read-only schema
    *  diagram (query fields stay at their empties and are unused). */
   kind?: 'query' | 'diagram'
+  /** Which side of a split this tab lives in. Defaults to `'left'`; only ever `'right'`
+   *  while a split is open. `tabs.some(t => t.pane === 'right')` IS "is the view split". */
+  pane: PaneId
   text: string
   /** Bumped when text is replaced programmatically (history load) to remount the editor. */
   epoch: number
@@ -91,6 +95,9 @@ interface AppState {
   activeTabId: string | null
   /** Last-active tab per connection — restores your spot when switching back to a server group. */
   lastActiveByConnection: Record<string, string>
+  focusedPane: PaneId
+  activeTabByPane: Record<PaneId, string | null>
+  activeConnByPane: Record<PaneId, string | null>
   _queryCounter: number
 
   setActiveConnection: (id: string | null) => void
@@ -133,6 +140,13 @@ interface AppState {
   /** Open a table query. If a tab for that same table is already open it's focused (no duplicate);
    *  otherwise a fresh tab opens and runs. Opening one table never replaces another's tab. */
   openTableQuery: (args: { connectionId: string; title: string; text: string }) => void
+  /** Peel the focused pane's active tab onto the other side (or, if that pane has only one
+   *  tab, open a fresh tab on the other side). Always ends in a visible two-pane split. */
+  splitActiveTab: () => void
+  /** Move a specific tab to the other pane and focus the destination. */
+  moveTabToOtherPane: (id: string) => void
+  /** Focus a pane (no-op if it has no tabs). */
+  focusPane: (pane: PaneId) => void
   startRun: (id: string, queryId: string) => void
   finishRun: (id: string, payload: { result: QueryResult } | { error: string }) => void
   /** After a committed edit, write each value at its field path into the tab's result —
@@ -165,6 +179,8 @@ function closeTabsResult(
   mode: CloseMode,
   targetId: string
 ): Pick<AppState, 'tabs' | 'activeTabId' | 'activeConnectionId' | 'commitModal'> {
+  // NOTE: still flat-mirror only — the pane maps (activeTabByPane/activeConnByPane) are made
+  // authoritative here by a later task (pane-aware close). Latent until the two-pane UI reads them.
   const r = applyGroupedTabClose(s.tabs, s.activeTabId, mode, targetId)
   // The active connection follows the (possibly new) active tab — keeps the sidebar's group in sync.
   const activeConnectionId = r.activeId
@@ -175,6 +191,49 @@ function closeTabsResult(
     activeTabId: r.activeId,
     activeConnectionId,
     commitModal: r.tabs.some((t) => t.id === s.commitModal?.tabId) ? s.commitModal : null
+  }
+}
+
+/** A fresh tab with every volatile field at its empty. Callers override what they need. */
+function blankTab(fields: {
+  connectionId: string
+  title: string
+  pane: PaneId
+  text?: string
+  kind?: 'query' | 'diagram'
+  runOnOpen?: boolean
+}): QueryTabData {
+  return {
+    id: crypto.randomUUID(),
+    connectionId: fields.connectionId,
+    title: fields.title,
+    kind: fields.kind,
+    pane: fields.pane,
+    text: fields.text ?? '',
+    epoch: 0,
+    runOnOpen: fields.runOnOpen ?? false,
+    running: false,
+    queryId: null,
+    result: null,
+    error: null,
+    scriptRun: null,
+    edits: {},
+    editError: null,
+  }
+}
+
+/** Recompute the focused-pane mirrors (`activeTabId`/`activeConnectionId`) from the per-pane
+ *  maps. Every action that changes panes/active/focus spreads this so the sidebar, global
+ *  shortcuts, and persistence keep reading the two legacy fields unchanged. */
+function withMirror<S extends {
+  focusedPane: PaneId
+  activeTabByPane: Record<PaneId, string | null>
+  activeConnByPane: Record<PaneId, string | null>
+}>(next: S): S & { activeTabId: string | null; activeConnectionId: string | null } {
+  return {
+    ...next,
+    activeTabId: next.activeTabByPane[next.focusedPane],
+    activeConnectionId: next.activeConnByPane[next.focusedPane],
   }
 }
 
@@ -193,19 +252,32 @@ export const useAppStore = create<AppState>((set, get) => ({
   tabs: [],
   activeTabId: null,
   lastActiveByConnection: {},
+  focusedPane: 'left',
+  activeTabByPane: { left: null, right: null },
+  activeConnByPane: { left: null, right: null },
   _queryCounter: 0,
 
   setActiveConnection: (id) =>
     set((s) => {
-      if (id === null) return { activeConnectionId: null, activeTabId: null }
-      // Selecting a connection switches to its tab group, activating its last-active tab (or null
-      // when it has no open tabs → empty subtab row + Welcome).
-      const tabId = nextActiveForGroup(s.tabs, id, s.lastActiveByConnection)
-      return {
-        activeConnectionId: id,
-        activeTabId: tabId,
-        lastActiveByConnection: tabId ? { ...s.lastActiveByConnection, [id]: tabId } : s.lastActiveByConnection
+      const p = s.focusedPane
+      if (id === null) {
+        return withMirror({
+          focusedPane: p,
+          activeTabByPane: { ...s.activeTabByPane, [p]: null },
+          activeConnByPane: { ...s.activeConnByPane, [p]: null },
+        })
       }
+      const inPane = s.tabs.filter((t) => t.pane === p && t.connectionId === id)
+      const remembered = s.lastActiveByConnection[id]
+      const tabId = remembered && inPane.some((t) => t.id === remembered)
+        ? remembered
+        : (inPane[0]?.id ?? null)
+      return withMirror({
+        focusedPane: p,
+        activeTabByPane: { ...s.activeTabByPane, [p]: tabId },
+        activeConnByPane: { ...s.activeConnByPane, [p]: id },
+        lastActiveByConnection: tabId ? { ...s.lastActiveByConnection, [id]: tabId } : s.lastActiveByConnection,
+      })
     }),
   openModal: (state) => set({ connectionModal: state }),
   closeModal: () => set({ connectionModal: null }),
@@ -235,56 +307,44 @@ export const useAppStore = create<AppState>((set, get) => ({
   openQueryTab: ({ connectionId, title, text, runOnOpen }) =>
     set((s) => {
       const n = s._queryCounter + 1
-      const tab: QueryTabData = {
-        id: crypto.randomUUID(),
-        connectionId,
-        title: title ?? `Query ${n}`,
-        text: text ?? '',
-        epoch: 0,
-        runOnOpen: runOnOpen ?? false,
-        running: false,
-        queryId: null,
-        result: null,
-        error: null,
-        scriptRun: null,
-        edits: {},
-        editError: null,
-      }
-      return {
+      const p = s.focusedPane
+      const tab = blankTab({ connectionId, title: title ?? `Query ${n}`, text, runOnOpen, pane: p })
+      return withMirror({
         tabs: [...s.tabs, tab],
-        activeTabId: tab.id,
-        activeConnectionId: connectionId,
+        focusedPane: p,
+        activeTabByPane: { ...s.activeTabByPane, [p]: tab.id },
+        activeConnByPane: { ...s.activeConnByPane, [p]: connectionId },
         lastActiveByConnection: { ...s.lastActiveByConnection, [connectionId]: tab.id },
-        _queryCounter: n
-      }
+        _queryCounter: n,
+      })
     }),
 
   openDiagramTab: (connectionId) =>
     set((s) => {
-      // One diagram tab per connection — focus an existing one instead of stacking duplicates.
       const existing = s.tabs.find((t) => t.connectionId === connectionId && t.kind === 'diagram')
       if (existing) {
-        return {
-          activeTabId: existing.id,
-          activeConnectionId: connectionId,
-          lastActiveByConnection: { ...s.lastActiveByConnection, [connectionId]: existing.id }
-        }
+        return withMirror({
+          focusedPane: existing.pane,
+          activeTabByPane: { ...s.activeTabByPane, [existing.pane]: existing.id },
+          activeConnByPane: { ...s.activeConnByPane, [existing.pane]: connectionId },
+          lastActiveByConnection: { ...s.lastActiveByConnection, [connectionId]: existing.id },
+        })
       }
-      const tab: QueryTabData = {
-        id: crypto.randomUUID(), connectionId, title: '◇ Schema', kind: 'diagram',
-        text: '', epoch: 0, runOnOpen: false, running: false, queryId: null,
-        result: null, error: null, scriptRun: null, edits: {}, editError: null
-      }
-      return {
+      const p = s.focusedPane
+      const tab = blankTab({ connectionId, title: '◇ Schema', kind: 'diagram', pane: p })
+      return withMirror({
         tabs: [...s.tabs, tab],
-        activeTabId: tab.id,
-        activeConnectionId: connectionId,
-        lastActiveByConnection: { ...s.lastActiveByConnection, [connectionId]: tab.id }
-      }
+        focusedPane: p,
+        activeTabByPane: { ...s.activeTabByPane, [p]: tab.id },
+        activeConnByPane: { ...s.activeConnByPane, [p]: connectionId },
+        lastActiveByConnection: { ...s.lastActiveByConnection, [connectionId]: tab.id },
+      })
     }),
 
   hydrateTabs: (sessionTabs) =>
     set((s) => {
+      // NOTE: still flat-mirror only — the pane maps (activeTabByPane/activeConnByPane) are made
+      // authoritative here by a later task (hydrate rewrite). Latent until the two-pane UI reads them.
       if (s.tabs.length > 0 || sessionTabs.length === 0) return s
       // Volatile state (results, errors, run state) never persists — restored
       // tabs come back clean, with their persisted ids kept stable.
@@ -292,6 +352,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         id: t.id,
         connectionId: t.connectionId,
         title: t.title,
+        pane: 'left',
         text: t.text,
         epoch: 0,
         runOnOpen: false,
@@ -349,12 +410,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => {
       const tab = s.tabs.find((t) => t.id === id)
       if (!tab) return s
-      // The active tab's connection becomes the active group/connection (sidebar follows).
-      return {
-        activeTabId: id,
-        activeConnectionId: tab.connectionId,
-        lastActiveByConnection: { ...s.lastActiveByConnection, [tab.connectionId]: id }
-      }
+      const p = tab.pane
+      return withMirror({
+        focusedPane: p,
+        activeTabByPane: { ...s.activeTabByPane, [p]: id },
+        activeConnByPane: { ...s.activeConnByPane, [p]: tab.connectionId },
+        lastActiveByConnection: { ...s.lastActiveByConnection, [tab.connectionId]: id },
+      })
     }),
 
   renameTab: (id, title) =>
@@ -394,6 +456,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     s.openQueryTab({ connectionId, title, text, runOnOpen: true })
   },
+
+  splitActiveTab: () => {},
+  moveTabToOtherPane: () => {},
+  focusPane: () => {},
 
   startRun: (id, queryId) =>
     set((s) => ({
