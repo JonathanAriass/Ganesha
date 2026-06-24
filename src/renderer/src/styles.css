@@ -290,6 +290,15 @@ button, input, select, textarea {
   background: var(--bg);
 }
 
+.editor-pane {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
 /* ── Welcome screen ── */
 .welcome {
   display: flex;

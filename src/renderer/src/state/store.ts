@@ -527,6 +527,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   focusPane: (pane) =>
     set((s) => {
+      if (s.focusedPane === pane) return s // already focused — avoid a needless notify
       if (!s.tabs.some((t) => t.pane === pane)) return s // empty pane can't take focus
       return withMirror({
         focusedPane: pane,

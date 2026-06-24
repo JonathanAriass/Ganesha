@@ -8,9 +8,7 @@ import ObjectTree from './components/ObjectTree'
 import ConnectionModal from './components/ConnectionModal'
 import SettingsModal from './components/SettingsModal'
 import CommandPalette from './components/CommandPalette'
-import TabBar from './components/TabBar'
-import QueryTab from './components/QueryTab'
-import DiagramView from './components/DiagramView'
+import EditorPane from './components/EditorPane'
 import SsmPanel from './components/SsmPanel'
 import SavedSection from './components/SavedSection'
 import HistorySection from './components/HistorySection'
@@ -38,7 +36,6 @@ function AppShell(): JSX.Element {
   const saveQueryModal = useAppStore((s) => s.saveQueryModal)
   const commitModal = useAppStore((s) => s.commitModal)
   const tabs = useAppStore((s) => s.tabs)
-  const activeTabId = useAppStore((s) => s.activeTabId)
 
   const { data: settings } = useSettings()
   useEffect(() => {
@@ -66,8 +63,6 @@ function AppShell(): JSX.Element {
     })
   }, [setSsmRunning, markSsm, qc])
 
-  const activeTab = tabs.find((t) => t.id === activeTabId)
-
   return (
     <div className="app">
       <TopBar />
@@ -80,22 +75,7 @@ function AppShell(): JSX.Element {
           <HistorySection />
         </aside>
         <main className="main">
-          {tabs.length > 0 ? (
-            <>
-              <TabBar />
-              {activeTab ? (
-                activeTab.kind === 'diagram' ? (
-                  <DiagramView key={activeTabId} connectionId={activeTab.connectionId} />
-                ) : (
-                  <QueryTab key={activeTabId} tab={activeTab} />
-                )
-              ) : (
-                <Welcome />
-              )}
-            </>
-          ) : (
-            <Welcome />
-          )}
+          {tabs.length === 0 ? <Welcome /> : <EditorPane paneId="left" />}
         </main>
         <AssistantPanel />
         <SsmPanel />

@@ -3,11 +3,13 @@ import { useAppStore } from '../state/store'
 import { useConnections } from '../lib/hooks'
 import { groupTabs } from '../lib/tab-groups'
 import TabContextMenu, { type TabCloseAction } from './TabContextMenu'
+import { type PaneId, paneTabs } from '../lib/panes'
 
-export default function TabBar(): JSX.Element {
+export default function TabBar({ pane }: { pane: PaneId }): JSX.Element {
   const tabs = useAppStore((s) => s.tabs)
-  const activeTabId = useAppStore((s) => s.activeTabId)
-  const activeConnectionId = useAppStore((s) => s.activeConnectionId)
+  const activeTabId = useAppStore((s) => s.activeTabByPane[pane])
+  const activeConnectionId = useAppStore((s) => s.activeConnByPane[pane])
+  const focusPane = useAppStore((s) => s.focusPane)
   const setActiveTab = useAppStore((s) => s.setActiveTab)
   const setActiveConnection = useAppStore((s) => s.setActiveConnection)
   const renameTab = useAppStore((s) => s.renameTab)
@@ -41,8 +43,9 @@ export default function TabBar(): JSX.Element {
   const { data: connections = [] } = useConnections()
 
   // Groups (top level) are a view over the flat tabs; the active group is the active connection.
-  const groups = groupTabs(tabs)
-  const subtabs = tabs.filter((t) => t.connectionId === activeConnectionId)
+  const paneAllTabs = paneTabs(tabs, pane)
+  const groups = groupTabs(paneAllTabs)
+  const subtabs = paneAllTabs.filter((t) => t.connectionId === activeConnectionId)
   const menuIdx = menu ? subtabs.findIndex((t) => t.id === menu.tabId) : -1
 
   return (
@@ -58,7 +61,7 @@ export default function TabBar(): JSX.Element {
                 role="tab"
                 aria-selected={active}
                 className={`tab-group${active ? ' active' : ''}`}
-                onClick={() => setActiveConnection(g.connectionId)}
+                onClick={() => { focusPane(pane); setActiveConnection(g.connectionId) }}
               >
                 {conn && (
                   <span
@@ -147,7 +150,7 @@ export default function TabBar(): JSX.Element {
           aria-label="New query tab"
           disabled={!activeConnectionId}
           title={activeConnectionId ? 'New query tab' : 'Connect first'}
-          onClick={() => activeConnectionId && openQueryTab({ connectionId: activeConnectionId })}
+          onClick={() => { focusPane(pane); if (activeConnectionId) openQueryTab({ connectionId: activeConnectionId }) }}
         >
           +
         </button>
