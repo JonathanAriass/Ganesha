@@ -5,8 +5,7 @@ import { buildRowEdits } from '../lib/edit-staging'
 import { parseEditKey, setAtPath } from '../lib/doc-path'
 import { unwrap } from '../lib/result'
 import { type CloseMode } from '../lib/tab-close'
-import { applyGroupedTabClose } from '../lib/tab-groups'
-import { type PaneId, otherPane, normalizePanes, nextActiveInPane } from '../lib/panes'
+import { type PaneId, otherPane, normalizePanes, nextActiveInPane, applyPaneClose } from '../lib/panes'
 
 type ConnectionModalState =
   | { mode: 'create' }
@@ -172,26 +171,19 @@ interface AppState {
   finishScript: (id: string) => void
 }
 
-/** Apply a bulk tab-close to the state and drop a commit modal whose tab no longer survives
- *  (mirrors the closeTab/closeTabsForConnection invariant). */
-function closeTabsResult(
-  s: AppState,
-  mode: CloseMode,
-  targetId: string
-): Pick<AppState, 'tabs' | 'activeTabId' | 'activeConnectionId' | 'commitModal'> {
-  // NOTE: still flat-mirror only — the pane maps (activeTabByPane/activeConnByPane) are made
-  // authoritative here by a later task (pane-aware close). Latent until the two-pane UI reads them.
-  const r = applyGroupedTabClose(s.tabs, s.activeTabId, mode, targetId)
-  // The active connection follows the (possibly new) active tab — keeps the sidebar's group in sync.
-  const activeConnectionId = r.activeId
-    ? (r.tabs.find((t) => t.id === r.activeId)?.connectionId ?? s.activeConnectionId)
-    : s.activeConnectionId
-  return {
+/** Apply a pane-aware bulk close and drop a commit modal whose tab no longer survives. */
+function closeTabsResult(s: AppState, mode: CloseMode, targetId: string) {
+  const r = applyPaneClose(s.tabs, s.activeTabByPane, s.focusedPane, mode, targetId)
+  // Each pane's active connection follows its (possibly new) active tab.
+  const connFor = (id: string | null): string | null =>
+    id ? (r.tabs.find((t) => t.id === id)?.connectionId ?? null) : null
+  return withMirror({
     tabs: r.tabs,
-    activeTabId: r.activeId,
-    activeConnectionId,
-    commitModal: r.tabs.some((t) => t.id === s.commitModal?.tabId) ? s.commitModal : null
-  }
+    focusedPane: r.focusedPane,
+    activeTabByPane: r.activeByPane,
+    activeConnByPane: { left: connFor(r.activeByPane.left), right: connFor(r.activeByPane.right) },
+    commitModal: r.tabs.some((t) => t.id === s.commitModal?.tabId) ? s.commitModal : null,
+  })
 }
 
 /** A fresh tab with every volatile field at its empty. Callers override what they need. */
@@ -388,17 +380,27 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   closeTabsForConnection: (connectionId) =>
     set((s) => {
-      const next = s.tabs.filter((t) => t.connectionId !== connectionId)
-      if (next.length === s.tabs.length) return s
-      const stillActive = next.some((t) => t.id === s.activeTabId)
-      const activeTabId = stillActive ? s.activeTabId : (next[0]?.id ?? null)
-      // Keep the active connection (the group) in sync with the new active tab — so deleting a
-      // connection hands off to a remaining group instead of a dead empty view.
-      const activeConnectionId = activeTabId
-        ? (next.find((t) => t.id === activeTabId)?.connectionId ?? s.activeConnectionId)
-        : (s.activeConnectionId === connectionId ? null : s.activeConnectionId)
-      const commitModal = next.some((t) => t.id === s.commitModal?.tabId) ? s.commitModal : null
-      return { tabs: next, activeTabId, activeConnectionId, commitModal }
+      const remaining = s.tabs.filter((t) => t.connectionId !== connectionId)
+      if (remaining.length === s.tabs.length) return s
+      const norm = normalizePanes(remaining)
+      const pick = (p: PaneId): string | null => {
+        const cur = s.activeTabByPane[p]
+        if (cur && norm.tabs.some((t) => t.id === cur && t.pane === p)) return cur
+        return norm.tabs.find((t) => t.pane === p)?.id ?? null
+      }
+      const activeTabByPane = { left: pick('left'), right: norm.hasRight ? pick('right') : null }
+      const connFor = (id: string | null): string | null =>
+        id ? (norm.tabs.find((t) => t.id === id)?.connectionId ?? null) : null
+      const focusedPane: PaneId =
+        norm.tabs.some((t) => t.pane === s.focusedPane) ? s.focusedPane : 'left'
+      const commitModal = norm.tabs.some((t) => t.id === s.commitModal?.tabId) ? s.commitModal : null
+      return withMirror({
+        tabs: norm.tabs,
+        focusedPane,
+        activeTabByPane,
+        activeConnByPane: { left: connFor(activeTabByPane.left), right: connFor(activeTabByPane.right) },
+        commitModal,
+      })
     }),
 
   closeOtherTabs: (id) => set((s) => closeTabsResult(s, 'others', id)),

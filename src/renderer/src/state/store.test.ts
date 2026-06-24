@@ -615,3 +615,57 @@ describe('split views — split/move/focus', () => {
     expect(s.activeConnByPane.left).toBe('c1') // not stale c2
   })
 })
+
+describe('split views — close', () => {
+  beforeEach(() => {
+    useAppStore.setState({
+      tabs: [], activeTabId: null, activeConnectionId: null, _queryCounter: 0,
+      focusedPane: 'left', activeTabByPane: { left: null, right: null }, activeConnByPane: { left: null, right: null },
+      lastActiveByConnection: {}, commitModal: null,
+    })
+  })
+
+  function splitTwo() {
+    useAppStore.getState().openQueryTab({ connectionId: 'c1', title: 'A', text: 'a' })
+    useAppStore.getState().openQueryTab({ connectionId: 'c1', title: 'B', text: 'b' })
+    const bId = useAppStore.getState().activeTabId!
+    useAppStore.getState().splitActiveTab() // B → right, focus right
+    return { aId: useAppStore.getState().tabs.find((t) => t.title === 'A')!.id, bId }
+  }
+
+  it('closing the last right tab collapses to one left pane', () => {
+    const { aId, bId } = splitTwo()
+    useAppStore.getState().closeTab(bId)
+    const s = useAppStore.getState()
+    expect(s.tabs.map((t) => t.pane)).toEqual(['left'])
+    expect(s.tabs[0].id).toBe(aId)
+    expect(s.focusedPane).toBe('left')
+    expect(s.activeTabByPane.right).toBeNull()
+    expect(s.activeTabId).toBe(aId) // mirror
+  })
+
+  it('closing a left tab while right has tabs keeps the split and reselects left', () => {
+    useAppStore.getState().openQueryTab({ connectionId: 'c1', title: 'A', text: 'a' })
+    useAppStore.getState().openQueryTab({ connectionId: 'c1', title: 'B', text: 'b' })
+    useAppStore.getState().openQueryTab({ connectionId: 'c1', title: 'C', text: 'c' }) // A,B,C left, C active
+    const cId = useAppStore.getState().activeTabId!
+    useAppStore.getState().splitActiveTab() // C → right
+    const aId = useAppStore.getState().tabs.find((t) => t.title === 'A')!.id
+    useAppStore.getState().focusPane('left')
+    useAppStore.getState().closeTab(aId)
+    const s = useAppStore.getState()
+    expect(s.tabs.some((t) => t.id === cId && t.pane === 'right')).toBe(true) // still split
+    expect(s.activeTabByPane.left).toBe(s.tabs.find((t) => t.title === 'B')!.id)
+  })
+
+  it('closing the last left tab re-homes the right tabs to left', () => {
+    const { bId } = splitTwo() // A left, B right
+    useAppStore.getState().focusPane('left')
+    const aId = useAppStore.getState().tabs.find((t) => t.title === 'A')!.id
+    useAppStore.getState().closeTab(aId)
+    const s = useAppStore.getState()
+    expect(s.tabs.every((t) => t.pane === 'left')).toBe(true)
+    expect(s.tabs.map((t) => t.id)).toEqual([bId])
+    expect(s.focusedPane).toBe('left')
+  })
+})
