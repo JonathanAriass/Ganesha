@@ -538,3 +538,80 @@ describe('split views — opens target the focused pane', () => {
     expect(s.activeConnectionId).toBe('c2') // mirror = focused (right)
   })
 })
+
+describe('split views — split/move/focus', () => {
+  beforeEach(() => {
+    useAppStore.setState({
+      tabs: [], activeTabId: null, activeConnectionId: null, _queryCounter: 0,
+      focusedPane: 'left', activeTabByPane: { left: null, right: null }, activeConnByPane: { left: null, right: null },
+      lastActiveByConnection: {},
+    })
+  })
+
+  it('splitActiveTab peels the active tab to the right when the pane has ≥2 tabs', () => {
+    useAppStore.getState().openQueryTab({ connectionId: 'c1', title: 'A', text: 'a' })
+    useAppStore.getState().openQueryTab({ connectionId: 'c1', title: 'B', text: 'b' }) // B active, left
+    const bId = useAppStore.getState().activeTabId!
+    useAppStore.getState().splitActiveTab()
+    const s = useAppStore.getState()
+    expect(s.tabs.find((t) => t.id === bId)!.pane).toBe('right')
+    expect(s.tabs.some((t) => t.pane === 'right')).toBe(true) // split visible
+    expect(s.focusedPane).toBe('right')
+    expect(s.activeTabByPane.right).toBe(bId)
+  })
+
+  it('splitActiveTab opens a fresh tab on the other side when the pane has one tab', () => {
+    useAppStore.getState().openQueryTab({ connectionId: 'c1', title: 'A', text: 'a' })
+    const aId = useAppStore.getState().activeTabId!
+    useAppStore.getState().splitActiveTab()
+    const s = useAppStore.getState()
+    expect(s.tabs.find((t) => t.id === aId)!.pane).toBe('left') // original stays
+    expect(s.tabs.filter((t) => t.pane === 'right')).toHaveLength(1) // new tab on the right
+    expect(s.focusedPane).toBe('right')
+    expect(s.activeConnByPane.right).toBe('c1') // same connection
+  })
+
+  it('moveTabToOtherPane moves a tab and focuses the destination', () => {
+    useAppStore.getState().openQueryTab({ connectionId: 'c1', title: 'A', text: 'a' })
+    useAppStore.getState().openQueryTab({ connectionId: 'c1', title: 'B', text: 'b' })
+    const aId = useAppStore.getState().tabs[0].id
+    useAppStore.getState().moveTabToOtherPane(aId)
+    const s = useAppStore.getState()
+    expect(s.tabs.find((t) => t.id === aId)!.pane).toBe('right')
+    expect(s.focusedPane).toBe('right')
+    expect(s.activeTabByPane.right).toBe(aId)
+    expect(s.activeTabByPane.left).toBe(s.tabs.find((t) => t.title === 'B')!.id) // left reselected
+  })
+
+  it('focusPane is a no-op for an empty pane and switches focus + mirror otherwise', () => {
+    useAppStore.getState().openQueryTab({ connectionId: 'c1', title: 'A', text: 'a' })
+    useAppStore.getState().focusPane('right') // right empty → no-op
+    expect(useAppStore.getState().focusedPane).toBe('left')
+    useAppStore.getState().splitActiveTab() // now right has the fresh tab, focus right
+    useAppStore.getState().focusPane('left')
+    const s = useAppStore.getState()
+    expect(s.focusedPane).toBe('left')
+    expect(s.activeTabId).toBe(s.activeTabByPane.left) // mirror follows focus
+  })
+
+  it('split keeps activeConnByPane[src] consistent when the survivor is a different connection', () => {
+    useAppStore.getState().openQueryTab({ connectionId: 'c1', title: 'A', text: 'a' }) // left
+    useAppStore.getState().openQueryTab({ connectionId: 'c2', title: 'B', text: 'b' }) // left, B(c2) active
+    useAppStore.getState().splitActiveTab() // B(c2) peeled right; left survivor A(c1)
+    const s = useAppStore.getState()
+    expect(s.activeTabByPane.left).toBe(s.tabs.find((t) => t.title === 'A')!.id)
+    expect(s.activeConnByPane.left).toBe('c1') // NOT stale c2
+    expect(s.activeConnByPane.right).toBe('c2')
+  })
+
+  it('move keeps activeConnByPane[src] consistent when moving the active tab away', () => {
+    useAppStore.getState().openQueryTab({ connectionId: 'c1', title: 'A', text: 'a' }) // left
+    useAppStore.getState().openQueryTab({ connectionId: 'c2', title: 'B', text: 'b' }) // left, B(c2) active
+    const bId = useAppStore.getState().activeTabId!
+    useAppStore.getState().moveTabToOtherPane(bId) // B(c2)→right; left survivor A(c1); still split
+    const s = useAppStore.getState()
+    expect(s.tabs.find((t) => t.id === bId)!.pane).toBe('right')
+    expect(s.activeTabByPane.left).toBe(s.tabs.find((t) => t.title === 'A')!.id)
+    expect(s.activeConnByPane.left).toBe('c1') // not stale c2
+  })
+})

@@ -6,7 +6,7 @@ import { parseEditKey, setAtPath } from '../lib/doc-path'
 import { unwrap } from '../lib/result'
 import { type CloseMode } from '../lib/tab-close'
 import { applyGroupedTabClose } from '../lib/tab-groups'
-import { type PaneId } from '../lib/panes'
+import { type PaneId, otherPane, normalizePanes, nextActiveInPane } from '../lib/panes'
 
 type ConnectionModalState =
   | { mode: 'create' }
@@ -457,9 +457,78 @@ export const useAppStore = create<AppState>((set, get) => ({
     s.openQueryTab({ connectionId, title, text, runOnOpen: true })
   },
 
-  splitActiveTab: () => {},
-  moveTabToOtherPane: () => {},
-  focusPane: () => {},
+  splitActiveTab: () =>
+    set((s) => {
+      const src = s.focusedPane
+      const dst = otherPane(src)
+      const activeId = s.activeTabByPane[src]
+      if (!activeId) return s // button is disabled in this state, but guard anyway
+      const srcCount = s.tabs.filter((t) => t.pane === src).length
+      if (srcCount >= 2) {
+        // Peel the active tab across.
+        const tabs = s.tabs.map((t) => (t.id === activeId ? { ...t, pane: dst } : t))
+        const moved = tabs.find((t) => t.id === activeId)!
+        const srcActiveId = nextActiveInPane(tabs, src, activeId)
+        const srcConn = srcActiveId ? tabs.find((t) => t.id === srcActiveId)!.connectionId : s.activeConnByPane[src]
+        return withMirror({
+          tabs,
+          focusedPane: dst,
+          activeTabByPane: { ...s.activeTabByPane, [src]: srcActiveId, [dst]: activeId },
+          activeConnByPane: { ...s.activeConnByPane, [src]: srcConn, [dst]: moved.connectionId },
+        })
+      }
+      // Source has a single tab — open a fresh one on the other side instead (keeps the split).
+      const moved = s.tabs.find((t) => t.id === activeId)!
+      const n = s._queryCounter + 1
+      const tab = blankTab({ connectionId: moved.connectionId, title: `Query ${n}`, pane: dst })
+      return withMirror({
+        tabs: [...s.tabs, tab],
+        focusedPane: dst,
+        activeTabByPane: { ...s.activeTabByPane, [dst]: tab.id },
+        activeConnByPane: { ...s.activeConnByPane, [dst]: moved.connectionId },
+        lastActiveByConnection: { ...s.lastActiveByConnection, [moved.connectionId]: tab.id },
+        _queryCounter: n,
+      })
+    }),
+
+  moveTabToOtherPane: (id) =>
+    set((s) => {
+      const tab = s.tabs.find((t) => t.id === id)
+      if (!tab) return s
+      const src = tab.pane
+      const dst = otherPane(src)
+      const tabs = s.tabs.map((t) => (t.id === id ? { ...t, pane: dst } : t))
+      // Reselect the source pane's active if we moved its active tab; normalize for collapse.
+      const srcActive = s.activeTabByPane[src] === id ? nextActiveInPane(tabs, src, id) : s.activeTabByPane[src]
+      const norm = normalizePanes(tabs)
+      const reHomed = !norm.hasRight && tabs.some((t) => t.pane === 'right')
+      if (!norm.hasRight) {
+        // Moving emptied a pane and collapsed — everything is left now.
+        return withMirror({
+          tabs: norm.tabs,
+          focusedPane: 'left',
+          activeTabByPane: { left: reHomed ? id : (srcActive ?? id), right: null },
+          activeConnByPane: { ...s.activeConnByPane, left: tab.connectionId, right: null },
+        })
+      }
+      const srcConn = srcActive ? tabs.find((t) => t.id === srcActive)!.connectionId : s.activeConnByPane[src]
+      return withMirror({
+        tabs: norm.tabs,
+        focusedPane: dst,
+        activeTabByPane: { ...s.activeTabByPane, [src]: srcActive, [dst]: id },
+        activeConnByPane: { ...s.activeConnByPane, [src]: srcConn, [dst]: tab.connectionId },
+      })
+    }),
+
+  focusPane: (pane) =>
+    set((s) => {
+      if (!s.tabs.some((t) => t.pane === pane)) return s // empty pane can't take focus
+      return withMirror({
+        focusedPane: pane,
+        activeTabByPane: s.activeTabByPane,
+        activeConnByPane: s.activeConnByPane,
+      })
+    }),
 
   startRun: (id, queryId) =>
     set((s) => ({
