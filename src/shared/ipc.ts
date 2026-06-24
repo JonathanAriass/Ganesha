@@ -84,7 +84,7 @@ export interface LlmContextFile { path: string; table: string; snippet: string }
 export interface LlmContextEvent { requestId: string; files: LlmContextFile[] }
 /** main->renderer push payloads for SSM tunnel processes. */
 export interface SsmOutputEvent { id: string; chunk: string }
-export interface SsmStatusEvent { id: string; running: boolean; code: number | null }
+export interface SsmStatusEvent { id: string; running: boolean; code: number | null; ready?: boolean }
 
 export type ChannelName = keyof IpcChannels
 export type Req<K extends ChannelName> = IpcChannels[K]['req']

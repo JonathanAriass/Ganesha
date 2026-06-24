@@ -5,6 +5,11 @@ import { resolveUserPath } from './aws'
 
 type OutputCb = (id: string, chunk: string) => void
 type StatusCb = (id: string, running: boolean, code: number | null) => void
+type ReadyCb = (id: string) => void
+
+/** The session-manager-plugin prints one of these once the local port is actually accepting
+ *  connections — distinct from the process merely having spawned. */
+const READY_RE = /Waiting for connections|Port \d+ opened/i
 
 /** Spawns and tracks `aws ssm start-session` port-forwarding processes by tunnel id, streaming their
  *  output and surfacing start/exit status. Stopping kills the whole process group so the
@@ -12,7 +17,7 @@ type StatusCb = (id: string, running: boolean, code: number | null) => void
 export class SsmRunner {
   private procs = new Map<string, ChildProcess>()
 
-  constructor(private onOutput: OutputCb, private onStatus: StatusCb) {}
+  constructor(private onOutput: OutputCb, private onStatus: StatusCb, private onReady: ReadyCb) {}
 
   isRunning(id: string): boolean {
     return this.procs.has(id)
@@ -31,7 +36,12 @@ export class SsmRunner {
     this.procs.set(tunnel.id, child)
     this.onStatus(tunnel.id, true, null)
 
-    child.stdout?.on('data', (d: Buffer) => this.onOutput(tunnel.id, d.toString()))
+    let ready = false
+    child.stdout?.on('data', (d: Buffer) => {
+      const s = d.toString()
+      this.onOutput(tunnel.id, s)
+      if (!ready && READY_RE.test(s)) { ready = true; this.onReady(tunnel.id) }
+    })
     child.stderr?.on('data', (d: Buffer) => this.onOutput(tunnel.id, d.toString()))
     child.on('error', (e) => {
       this.onOutput(tunnel.id, `\n[failed to start: ${e.message}]\n`)

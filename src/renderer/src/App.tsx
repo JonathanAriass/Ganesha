@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query'
+import type { SsmTunnel } from '@shared/domain'
 import { useAppStore } from './state/store'
 import TopBar from './components/TopBar'
 import Welcome from './components/Welcome'
@@ -49,10 +50,23 @@ function AppShell(): JSX.Element {
   // Keep the running-SSM-tunnel set live for the panel + the connect-time banner.
   const setSsmRunning = useAppStore((s) => s.setSsmRunning)
   const markSsm = useAppStore((s) => s.markSsm)
+  const qc = useQueryClient()
   useEffect(() => {
     window.api.ssm.running().then((r) => { if (r.ok) setSsmRunning(r.data) })
-    return window.api.ssm.onStatus((e) => markSsm(e.id, e.running))
-  }, [setSsmRunning, markSsm])
+    return window.api.ssm.onStatus((e) => {
+      markSsm(e.id, e.running)
+      // The tunnel is now accepting connections → if a DB connection is linked to it, refresh its
+      // schema (table list + autocomplete + diagram) so it appears without a manual reconnect. The
+      // local port is fixed, so the existing pool just re-dials the now-open forward.
+      if (!e.ready) return
+      const connId = qc.getQueryData<SsmTunnel[]>(['ssm'])?.find((t) => t.id === e.id)?.connectionId
+      if (connId) {
+        for (const k of ['objects', 'columns', 'databases', 'allColumns', 'relationships']) {
+          void qc.invalidateQueries({ queryKey: [k, connId] })
+        }
+      }
+    })
+  }, [setSsmRunning, markSsm, qc])
 
   const activeTab = tabs.find((t) => t.id === activeTabId)
 

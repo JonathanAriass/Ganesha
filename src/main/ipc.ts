@@ -51,7 +51,9 @@ const broadcastSsm = (channel: 'ssm:output' | 'ssm:status', payload: unknown): v
 }
 const ssmRunner = new SsmRunner(
   (id, chunk) => broadcastSsm('ssm:output', { id, chunk }),
-  (id, running, code) => broadcastSsm('ssm:status', { id, running, code })
+  (id, running, code) => broadcastSsm('ssm:status', { id, running, code }),
+  // The forward is now accepting connections → tell the renderer (it refreshes a linked connection).
+  (id) => broadcastSsm('ssm:status', { id, running: true, ready: true })
 )
 
 /** Close every live SSH tunnel — called on app quit. */
