@@ -115,8 +115,9 @@ export interface SessionTab {
   connectionId: string
   title: string
   text: string
-  /** The focused tab. At most one should be flagged; readers tolerate zero
-   *  (fall back to the last tab) and extras (the first flagged one wins). */
+  /** Which side of a split the tab was on. Absent in legacy rows → `'left'`. */
+  pane: 'left' | 'right'
+  /** The focused tab in its pane. At most one per pane; readers tolerate zero/extras. */
   active: boolean
 }
 

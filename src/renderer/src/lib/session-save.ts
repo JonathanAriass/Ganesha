@@ -1,9 +1,13 @@
 import type { SessionTab } from '@shared/domain'
+import type { PaneId } from './panes'
 import type { QueryTabData } from '../state/store'
 
-/** Project the tab strip onto its persisted shape — text only, volatile state stays out. Diagram
- *  tabs are ephemeral (no text to restore) and are skipped. */
-export function toSessionTabs(tabs: QueryTabData[], activeTabId: string | null): SessionTab[] {
+/** Project the tab strip onto its persisted shape — text only, volatile state stays out.
+ *  Diagram tabs are ephemeral and skipped. Each pane's active tab is flagged. */
+export function toSessionTabs(
+  tabs: QueryTabData[],
+  activeByPane: Record<PaneId, string | null>
+): SessionTab[] {
   return tabs
     .filter((t) => t.kind !== 'diagram')
     .map((t) => ({
@@ -11,7 +15,8 @@ export function toSessionTabs(tabs: QueryTabData[], activeTabId: string | null):
       connectionId: t.connectionId,
       title: t.title,
       text: t.text,
-      active: t.id === activeTabId,
+      pane: t.pane,
+      active: t.id === activeByPane[t.pane],
     }))
 }
 

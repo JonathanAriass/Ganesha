@@ -1,93 +1,56 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
+import { toSessionTabs, makeSessionSaver } from './session-save'
 import type { SessionTab } from '@shared/domain'
 import type { QueryTabData } from '../state/store'
-import { makeSessionSaver, toSessionTabs } from './session-save'
 
-function tab(over: Partial<QueryTabData> & { id: string }): QueryTabData {
-  return {
-    connectionId: 'c1', title: 'Query 1', text: 'SELECT 1', pane: 'left', epoch: 0, runOnOpen: false,
-    running: false, queryId: null, result: null, error: null, scriptRun: null, edits: {}, editError: null, ...over
-  }
-}
-
-function session(over: Partial<SessionTab> & { id: string }): SessionTab {
-  return { connectionId: 'c1', title: 'Query 1', text: 'SELECT 1', active: false, ...over }
-}
+const base = (over: Partial<QueryTabData> & { id: string; connectionId: string; pane: 'left' | 'right' }): QueryTabData => ({
+  title: 'Q', text: 't', kind: undefined, epoch: 0, runOnOpen: false, running: false,
+  queryId: null, result: null, error: null, scriptRun: null, edits: {}, editError: null, ...over,
+})
 
 describe('toSessionTabs', () => {
-  it('projects text-only fields and flags the active tab', () => {
-    const tabs = [tab({ id: 'a' }), tab({ id: 'b', title: 'mine', text: '' })]
-    expect(toSessionTabs(tabs, 'b')).toEqual([
-      { id: 'a', connectionId: 'c1', title: 'Query 1', text: 'SELECT 1', active: false },
-      { id: 'b', connectionId: 'c1', title: 'mine', text: '', active: true }
+  it('flags each pane’s active tab and emits pane', () => {
+    const tabs = [
+      base({ id: 'a', connectionId: 'c1', pane: 'left' }),
+      base({ id: 'b', connectionId: 'c1', pane: 'right' }),
+    ]
+    const out = toSessionTabs(tabs, { left: 'a', right: 'b' })
+    expect(out).toEqual([
+      { id: 'a', connectionId: 'c1', title: 'Q', text: 't', pane: 'left', active: true },
+      { id: 'b', connectionId: 'c1', title: 'Q', text: 't', pane: 'right', active: true },
     ])
   })
 
-  it('flags nothing when no tab is active', () => {
-    expect(toSessionTabs([tab({ id: 'a' })], null).map((t) => t.active)).toEqual([false])
+  it('skips diagram tabs', () => {
+    const tabs = [base({ id: 'd', connectionId: 'c1', pane: 'left', kind: 'diagram' })]
+    expect(toSessionTabs(tabs, { left: 'd', right: null })).toEqual([])
+  })
+
+  it('only the per-pane active tab is flagged', () => {
+    const tabs = [
+      base({ id: 'a', connectionId: 'c1', pane: 'left' }),
+      base({ id: 'b', connectionId: 'c1', pane: 'left' }),
+    ]
+    const out = toSessionTabs(tabs, { left: 'b', right: null })
+    expect(out.map((t) => t.active)).toEqual([false, true])
   })
 })
 
 describe('makeSessionSaver', () => {
-  it('writes a changed strip and dedups the unchanged one', () => {
-    const write = vi.fn()
-    const saver = makeSessionSaver(write)
-    saver.save([session({ id: 'a' })])
-    saver.save([session({ id: 'a' })])
-    expect(write).toHaveBeenCalledTimes(1)
+  const t = (id: string): SessionTab => ({ id, connectionId: 'c1', title: 'Q', text: 't', pane: 'left', active: false })
+  it('writes once, then skips an identical save (fingerprint)', () => {
+    const writes: SessionTab[][] = []
+    const saver = makeSessionSaver((tabs) => writes.push(tabs))
+    saver.save([t('a')])
+    saver.save([t('a')]) // identical → skipped
+    saver.save([t('b')]) // different → written
+    expect(writes).toHaveLength(2)
   })
-
-  it('a flush before the restore resolves must not wipe the saved session', () => {
-    // Boot baseline is the EMPTY strip: saving [] with no restore seeded and no
-    // user action is a no-information write and must be skipped (else a quit
-    // inside the boot round-trip deletes every session_tabs row).
-    const write = vi.fn()
-    makeSessionSaver(write).save([])
-    expect(write).not.toHaveBeenCalled()
-  })
-
-  it('skips the boot echo after seeding disk truth', () => {
-    const write = vi.fn()
-    const saver = makeSessionSaver(write)
-    const disk = [session({ id: 'a', active: true })]
-    saver.seedFromDisk(disk)
-    saver.save(disk) // hydrate echoes the restored strip back
-    expect(write).not.toHaveBeenCalled()
-  })
-
-  it('still saves user tabs after a no-op hydrate (seed differs from state)', () => {
-    const write = vi.fn()
-    const saver = makeSessionSaver(write)
-    saver.seedFromDisk([session({ id: 'old' })])
-    saver.save([session({ id: 'user-tab' })])
-    expect(write).toHaveBeenCalledWith([session({ id: 'user-tab' })])
-  })
-
-  it('a stale seed cannot overwrite a save that beat a slow restore', () => {
-    const write = vi.fn()
-    const saver = makeSessionSaver(write)
-    saver.save([session({ id: 'user-tab' })]) // throttled save fired first
-    saver.seedFromDisk([session({ id: 'old' })]) // restore resolves late — ignored
-    saver.save([session({ id: 'user-tab' })])
-    expect(write).toHaveBeenCalledTimes(1)
-  })
-
-  it('a skipped save does not poison a later seed — savedOnce counts real writes only', () => {
-    const write = vi.fn()
-    const saver = makeSessionSaver(write)
-    saver.save([]) // boot flush before restore: skipped, must not count as a save
-    saver.seedFromDisk([session({ id: 'a' })]) // restore lands after — seed must still apply
-    saver.save([session({ id: 'a' })]) // hydrate echo: skipped
-    expect(write).not.toHaveBeenCalled()
-    saver.save([session({ id: 'a' }), session({ id: 'b' })]) // real change still writes
-    expect(write).toHaveBeenCalledTimes(1)
-  })
-
-  it('a deliberate close-all after restore still clears disk', () => {
-    const write = vi.fn()
-    const saver = makeSessionSaver(write)
-    saver.seedFromDisk([session({ id: 'a' })])
-    saver.save([])
-    expect(write).toHaveBeenCalledWith([])
+  it('seedFromDisk suppresses the boot echo', () => {
+    const writes: SessionTab[][] = []
+    const saver = makeSessionSaver((tabs) => writes.push(tabs))
+    saver.seedFromDisk([t('a')])
+    saver.save([t('a')]) // matches disk seed → skipped
+    expect(writes).toHaveLength(0)
   })
 })

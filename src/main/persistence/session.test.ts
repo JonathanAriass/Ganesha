@@ -14,7 +14,7 @@ let db: DB
 beforeEach(() => { db = new Database(':memory:'); migrate(db) })
 
 function tab(over: Partial<SessionTab> & { id: string; connectionId: string }): SessionTab {
-  return { title: 'Query 1', text: 'SELECT 1', active: false, ...over }
+  return { title: 'Query 1', text: 'SELECT 1', pane: 'left', active: false, ...over }
 }
 
 describe('session tabs service', () => {
@@ -66,6 +66,24 @@ describe('session tabs service', () => {
       saveSessionTabs(db, [tab({ id: 'dup', connectionId: c.id }), tab({ id: 'dup', connectionId: c.id })])
     ).toThrow()
     expect(listSessionTabs(db).map((t) => t.id)).toEqual(['a', 'b'])
+  })
+
+  it('round-trips the pane column', () => {
+    const c = createConnection(db, input, 1)
+    const tabs = [
+      tab({ id: 'a', connectionId: c.id, pane: 'left', active: true }),
+      tab({ id: 'b', connectionId: c.id, pane: 'right', active: true }),
+    ]
+    saveSessionTabs(db, tabs)
+    expect(listSessionTabs(db)).toEqual(tabs)
+  })
+
+  it('defaults legacy rows (no pane column value) to left', () => {
+    const c = createConnection(db, input, 1)
+    db.prepare(
+      `INSERT INTO session_tabs (id, connection_id, title, text, position, active) VALUES (?,?,?,?,?,?)`
+    ).run('legacy', c.id, 'L', 'x', 0, 1)
+    expect(listSessionTabs(db)[0].pane).toBe('left')
   })
 
   it('cascades when the connection is deleted', () => {

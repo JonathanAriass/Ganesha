@@ -260,7 +260,7 @@ describe('renameTab', () => {
 
   it('a renamed title round-trips through hydrateTabs', () => {
     useAppStore.getState().renameTab(tab().id, 'mine')
-    const persisted = { id: tab().id, connectionId: 'c1', title: tab().title, text: '', active: true }
+    const persisted = { id: tab().id, connectionId: 'c1', title: tab().title, text: '', pane: 'left' as const, active: true }
     useAppStore.setState({ tabs: [], activeTabId: null })
     useAppStore.getState().hydrateTabs([persisted])
     expect(useAppStore.getState().tabs[0].title).toBe('mine')
@@ -276,7 +276,7 @@ describe('hydrateTabs', () => {
   })
 
   const session = (over: Partial<SessionTab> & { id: string }): SessionTab => ({
-    connectionId: 'c1', title: 'Query 1', text: 'SELECT 1', active: false, ...over
+    connectionId: 'c1', title: 'Query 1', text: 'SELECT 1', pane: 'left', active: false, ...over
   })
 
   it('restores tabs in order with clean volatile state', () => {

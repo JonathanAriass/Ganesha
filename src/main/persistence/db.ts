@@ -67,7 +67,8 @@ export function migrate(db: DB): void {
       title         TEXT NOT NULL,
       text          TEXT NOT NULL,
       position      INTEGER NOT NULL,
-      active        INTEGER NOT NULL DEFAULT 0
+      active        INTEGER NOT NULL DEFAULT 0,
+      pane          TEXT NOT NULL DEFAULT 'left'
     );
     CREATE TABLE IF NOT EXISTS llm_conversations (
       id            TEXT PRIMARY KEY,
@@ -107,6 +108,8 @@ export function migrate(db: DB): void {
   addColumnIfMissing(db, 'connections', 'require_commit', 'INTEGER NOT NULL DEFAULT 1')
   // Assistant code-context: nullable absolute path to a linked local repo.
   addColumnIfMissing(db, 'connections', 'repo_path', 'TEXT')
+  // Split views (added later): which side of a two-pane split a tab was on.
+  addColumnIfMissing(db, 'session_tabs', 'pane', "TEXT NOT NULL DEFAULT 'left'")
   migrateSecretsCompositeKey(db)
 }
 

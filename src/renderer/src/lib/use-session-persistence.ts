@@ -31,12 +31,12 @@ export function useSessionPersistence(): void {
 
     const save = (): void => {
       const s = useAppStore.getState()
-      saver.save(toSessionTabs(s.tabs, s.activeTabId))
+      saver.save(toSessionTabs(s.tabs, s.activeTabByPane))
     }
 
     const unsubscribe = useAppStore.subscribe((s, prev) => {
-      // Zustand fires on every set(); only tab-strip changes matter here.
-      if (s.tabs === prev.tabs && s.activeTabId === prev.activeTabId) return
+      // Only tab-strip / per-pane-active changes matter here.
+      if (s.tabs === prev.tabs && s.activeTabByPane === prev.activeTabByPane) return
       // Throttle, not debounce: an armed timer is never pushed back, so the
       // result churn of a long script can't starve an edit's save. save()
       // reads live state at fire time, so later changes in the window ride along.
