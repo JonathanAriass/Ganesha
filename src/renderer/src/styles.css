@@ -937,6 +937,11 @@ input[type="password"]::placeholder {
   opacity: 0.5;
   cursor: default;
 }
+.tab-menu-sep {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--border);
+}
 
 /* ── Query tab ── */
 .querytab {

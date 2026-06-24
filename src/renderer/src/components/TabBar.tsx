@@ -20,6 +20,7 @@ export default function TabBar({ pane }: { pane: PaneId }): JSX.Element {
   const closeAllTabs = useAppStore((s) => s.closeAllTabs)
   const openQueryTab = useAppStore((s) => s.openQueryTab)
   const splitActiveTab = useAppStore((s) => s.splitActiveTab)
+  const moveTabToOtherPane = useAppStore((s) => s.moveTabToOtherPane)
 
   // Inline rename: double-click a tab to edit its title. Enter/click-away commits, Escape cancels.
   const [editing, setEditing] = useState<{ id: string; draft: string } | null>(null)
@@ -34,7 +35,8 @@ export default function TabBar({ pane }: { pane: PaneId }): JSX.Element {
   const runMenu = (action: TabCloseAction): void => {
     if (!menu) return
     const id = menu.tabId
-    if (action === 'close') closeTab(id)
+    if (action === 'move-pane') moveTabToOtherPane(id)
+    else if (action === 'close') closeTab(id)
     else if (action === 'others') closeOtherTabs(id)
     else if (action === 'right') closeTabsToRight(id)
     else if (action === 'left') closeTabsToLeft(id)

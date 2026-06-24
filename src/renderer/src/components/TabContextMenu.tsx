@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 
-export type TabCloseAction = 'close' | 'others' | 'right' | 'left' | 'all'
+export type TabCloseAction = 'close' | 'others' | 'right' | 'left' | 'all' | 'move-pane'
 
 interface Props {
   x: number
@@ -52,6 +52,8 @@ export default function TabContextMenu({ x, y, canRight, canLeft, onSelect, onCl
         style={{ left: x, top: y }}
         onMouseDown={(e) => e.stopPropagation()}
       >
+        {item('move-pane', 'Move to other side')}
+        <div className="tab-menu-sep" aria-hidden="true" />
         {item('close', 'Close')}
         {item('others', 'Close others')}
         {item('right', 'Close to the right', !canRight)}
