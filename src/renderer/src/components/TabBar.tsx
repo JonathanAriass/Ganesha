@@ -1,9 +1,12 @@
-import { useState } from 'react'
+import { useState, type DragEvent } from 'react'
 import { useAppStore } from '../state/store'
 import { useConnections } from '../lib/hooks'
 import { groupTabs } from '../lib/tab-groups'
 import TabContextMenu, { type TabCloseAction } from './TabContextMenu'
 import { type PaneId, paneTabs } from '../lib/panes'
+
+/** dataTransfer key carrying the dragged tab's id (readable only on drop, by any pane). */
+const TAB_MIME = 'application/x-ganesha-tab'
 
 export default function TabBar({ pane }: { pane: PaneId }): JSX.Element {
   const tabs = useAppStore((s) => s.tabs)
@@ -21,10 +24,50 @@ export default function TabBar({ pane }: { pane: PaneId }): JSX.Element {
   const openQueryTab = useAppStore((s) => s.openQueryTab)
   const splitActiveTab = useAppStore((s) => s.splitActiveTab)
   const moveTabToOtherPane = useAppStore((s) => s.moveTabToOtherPane)
+  const reorderTab = useAppStore((s) => s.reorderTab)
 
   // Inline rename: double-click a tab to edit its title. Enter/click-away commits, Escape cancels.
   const [editing, setEditing] = useState<{ id: string; draft: string } | null>(null)
   const [menu, setMenu] = useState<{ tabId: string; x: number; y: number } | null>(null)
+
+  // Drag-and-drop: `drag` is the tab being dragged from THIS strip (dims it); `drop` marks where a
+  // drop would land in THIS strip (null = not over it; `beforeId` null = at the end of the strip).
+  const [drag, setDrag] = useState<string | null>(null)
+  const [drop, setDrop] = useState<{ beforeId: string | null } | null>(null)
+
+  // The drop position is computed centrally from the pointer-x vs each tab's midpoint, so a drop
+  // on empty strip space (or the other pane) is handled by one place. The other pane's TabBar is
+  // its own drop target reading the same dataTransfer id, so cross-pane drag needs no shared state.
+  function onStripDragOver(e: DragEvent<HTMLDivElement>): void {
+    if (!e.dataTransfer.types.includes(TAB_MIME)) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    let beforeId: string | null = null
+    for (const el of e.currentTarget.querySelectorAll<HTMLElement>('[data-tab-id]')) {
+      if (el.dataset.tabId === drag) continue // never indicate a drop before the dragged tab itself
+      const r = el.getBoundingClientRect()
+      if (e.clientX < r.left + r.width / 2) {
+        beforeId = el.dataset.tabId ?? null
+        break
+      }
+    }
+    setDrop({ beforeId })
+  }
+
+  function onStripDrop(e: DragEvent<HTMLDivElement>): void {
+    if (!e.dataTransfer.types.includes(TAB_MIME)) return
+    e.preventDefault()
+    const id = e.dataTransfer.getData(TAB_MIME)
+    const beforeId = drop?.beforeId ?? null
+    setDrop(null)
+    setDrag(null)
+    if (id) reorderTab({ tabId: id, toPane: pane, beforeId })
+  }
+
+  // dragleave fires when crossing into a child too — only clear when truly leaving the strip.
+  function onStripDragLeave(e: DragEvent<HTMLDivElement>): void {
+    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDrop(null)
+  }
 
   const commit = (): void => {
     if (editing) renameTab(editing.id, editing.draft)
@@ -81,7 +124,13 @@ export default function TabBar({ pane }: { pane: PaneId }): JSX.Element {
         </div>
       )}
 
-      <div className="tabbar" role="tablist">
+      <div
+        className="tabbar"
+        role="tablist"
+        onDragOver={onStripDragOver}
+        onDrop={onStripDrop}
+        onDragLeave={onStripDragLeave}
+      >
         {subtabs.map((tab) => {
           const conn = connections.find((c) => c.id === tab.connectionId)
           const dot = conn && (
@@ -123,8 +172,19 @@ export default function TabBar({ pane }: { pane: PaneId }): JSX.Element {
               key={tab.id}
               role="tab"
               aria-selected={tab.id === activeTabId}
-              className={`tab${tab.id === activeTabId ? ' active' : ''}`}
-              title="Double-click to rename"
+              data-tab-id={tab.id}
+              draggable
+              className={`tab${tab.id === activeTabId ? ' active' : ''}${tab.id === drag ? ' dragging' : ''}${drop?.beforeId === tab.id ? ' drop-before' : ''}`}
+              title="Double-click to rename · drag to reorder or move to the other pane"
+              onDragStart={(e) => {
+                e.dataTransfer.setData(TAB_MIME, tab.id)
+                e.dataTransfer.effectAllowed = 'move'
+                setDrag(tab.id)
+              }}
+              onDragEnd={() => {
+                setDrag(null)
+                setDrop(null)
+              }}
               onClick={() => setActiveTab(tab.id)}
               onDoubleClick={() => setEditing({ id: tab.id, draft: tab.title })}
               onContextMenu={(e) => {
@@ -149,7 +209,7 @@ export default function TabBar({ pane }: { pane: PaneId }): JSX.Element {
           )
         })}
         <button
-          className="tab-add btn ghost"
+          className={`tab-add btn ghost${drop !== null && drop.beforeId === null ? ' drop-before' : ''}`}
           aria-label="New query tab"
           disabled={!activeConnectionId}
           title={activeConnectionId ? 'New query tab' : 'Connect first'}

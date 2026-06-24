@@ -709,3 +709,49 @@ describe('split views — close', () => {
     expect(s.focusedPane).toBe('left')
   })
 })
+
+describe('split views — reorderTab (drag-and-drop)', () => {
+  const mk = (id: string, connectionId: string, pane: 'left' | 'right') => ({
+    id, connectionId, title: id, pane, text: '', epoch: 0, runOnOpen: false, running: false,
+    queryId: null, result: null, error: null, scriptRun: null, edits: {}, editError: null,
+  })
+
+  it('reorders within a pane and keeps the tab active', () => {
+    useAppStore.setState({
+      tabs: [mk('a', 'c1', 'left'), mk('b', 'c1', 'left'), mk('c', 'c1', 'left')],
+      focusedPane: 'left', activeTabByPane: { left: 'b', right: null }, activeConnByPane: { left: 'c1', right: null },
+      activeTabId: 'b', activeConnectionId: 'c1', _queryCounter: 0, lastActiveByConnection: {},
+    })
+    useAppStore.getState().reorderTab({ tabId: 'b', toPane: 'left', beforeId: null }) // → end of the strip
+    const s = useAppStore.getState()
+    expect(s.tabs.map((t) => t.id)).toEqual(['a', 'c', 'b'])
+    expect(s.activeTabId).toBe('b') // still active (mirror)
+  })
+
+  it('moves a tab across panes, recomputing activeConnByPane from the survivor (no stale conn)', () => {
+    // left: a(c1), b(c2) with b active; right: c(c1) active. Drag b(c2) into the right pane.
+    useAppStore.setState({
+      tabs: [mk('a', 'c1', 'left'), mk('b', 'c2', 'left'), mk('c', 'c1', 'right')],
+      focusedPane: 'left', activeTabByPane: { left: 'b', right: 'c' }, activeConnByPane: { left: 'c2', right: 'c1' },
+      activeTabId: 'b', activeConnectionId: 'c2', _queryCounter: 0, lastActiveByConnection: {},
+    })
+    useAppStore.getState().reorderTab({ tabId: 'b', toPane: 'right', beforeId: 'c' })
+    const s = useAppStore.getState()
+    expect(s.tabs.find((t) => t.id === 'b')!.pane).toBe('right')
+    expect(s.activeTabByPane.left).toBe('a') // survivor
+    expect(s.activeConnByPane.left).toBe('c1') // a's conn — NOT stale c2
+    expect(s.activeTabByPane.right).toBe('b') // moved tab focused
+    expect(s.focusedPane).toBe('right')
+    expect(s.activeConnectionId).toBe('c2') // b's conn (mirror = focused right)
+  })
+
+  it('a no-op drop leaves state untouched', () => {
+    const tabs = [mk('a', 'c1', 'left'), mk('b', 'c1', 'left')]
+    useAppStore.setState({
+      tabs, focusedPane: 'left', activeTabByPane: { left: 'a', right: null }, activeConnByPane: { left: 'c1', right: null },
+      activeTabId: 'a', activeConnectionId: 'c1', _queryCounter: 0, lastActiveByConnection: {},
+    })
+    useAppStore.getState().reorderTab({ tabId: 'b', toPane: 'left', beforeId: 'b' }) // self-drop
+    expect(useAppStore.getState().tabs).toBe(tabs) // unchanged reference
+  })
+})

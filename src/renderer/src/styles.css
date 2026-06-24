@@ -831,6 +831,7 @@ input[type="password"]::placeholder {
 }
 
 .tab {
+  position: relative; /* anchors the drag drop-indicator pseudo-element */
   display: flex;
   align-items: center;
   gap: 6px;
@@ -844,6 +845,30 @@ input[type="password"]::placeholder {
   white-space: nowrap;
   flex-shrink: 0;
   transition: background 0.08s, color 0.08s;
+}
+
+/* ── Tab drag-and-drop ── */
+.tab.dragging {
+  opacity: 0.45;
+}
+
+.tab.drop-before,
+.tab-add.drop-before {
+  position: relative;
+}
+
+/* A thin accent bar at the insertion point (no layout shift while dragging). */
+.tab.drop-before::before,
+.tab-add.drop-before::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  pointer-events: none;
 }
 
 .tab:hover {

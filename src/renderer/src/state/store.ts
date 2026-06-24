@@ -6,6 +6,7 @@ import { parseEditKey, setAtPath } from '../lib/doc-path'
 import { unwrap } from '../lib/result'
 import { type CloseMode } from '../lib/tab-close'
 import { type PaneId, otherPane, normalizePanes, nextActiveInPane, applyPaneClose } from '../lib/panes'
+import { applyTabReorder, type TabMove } from '../lib/tab-reorder'
 
 type ConnectionModalState =
   | { mode: 'create' }
@@ -144,6 +145,9 @@ interface AppState {
   splitActiveTab: () => void
   /** Move a specific tab to the other pane and focus the destination. */
   moveTabToOtherPane: (id: string) => void
+  /** Drag-and-drop relocation: move a tab into a pane at the drop position (before `beforeId`,
+   *  or appended). Reorders within a pane and moves across panes; collapses an emptied side. */
+  reorderTab: (move: TabMove) => void
   /** Focus a pane (no-op if it has no tabs). */
   focusPane: (pane: PaneId) => void
   startRun: (id: string, queryId: string) => void
@@ -522,6 +526,22 @@ export const useAppStore = create<AppState>((set, get) => ({
         focusedPane: dst,
         activeTabByPane: { ...s.activeTabByPane, [src]: srcActive, [dst]: id },
         activeConnByPane: { ...s.activeConnByPane, [src]: srcConn, [dst]: tab.connectionId },
+      })
+    }),
+
+  reorderTab: (move) =>
+    set((s) => {
+      const r = applyTabReorder(s.tabs, s.activeTabByPane, s.focusedPane, move)
+      if (r.tabs === s.tabs) return s // no-op: unknown id, self-drop, or dropped in place
+      // Each pane's active connection follows its (possibly new) active tab — recomputed from
+      // the survivor, so a multi-connection pane never keeps a stale connection.
+      const connFor = (id: string | null): string | null =>
+        id ? (r.tabs.find((t) => t.id === id)?.connectionId ?? null) : null
+      return withMirror({
+        tabs: r.tabs,
+        focusedPane: r.focusedPane,
+        activeTabByPane: r.activeByPane,
+        activeConnByPane: { left: connFor(r.activeByPane.left), right: connFor(r.activeByPane.right) },
       })
     }),
 
