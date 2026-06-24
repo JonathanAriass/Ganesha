@@ -6,7 +6,7 @@ import { parseEditKey, setAtPath } from '../lib/doc-path'
 import { unwrap } from '../lib/result'
 import { type CloseMode } from '../lib/tab-close'
 import { type PaneId, otherPane, normalizePanes, nextActiveInPane, applyPaneClose } from '../lib/panes'
-import { applyTabReorder, type TabMove } from '../lib/tab-reorder'
+import { applyTabReorder, applyTabToSide, type TabMove } from '../lib/tab-reorder'
 
 type ConnectionModalState =
   | { mode: 'create' }
@@ -148,6 +148,13 @@ interface AppState {
   /** Drag-and-drop relocation: move a tab into a pane at the drop position (before `beforeId`,
    *  or appended). Reorders within a pane and moves across panes; collapses an emptied side. */
   reorderTab: (move: TabMove) => void
+  /** Drag a tab onto the editor body to split: the dragged tab claims `side`, every other tab
+   *  goes to the opposite side. A single tab can't split. */
+  splitTabToSide: (arg: { tabId: string; side: PaneId }) => void
+  /** Transient flag: a tab drag is in progress (drives the editor-body drop overlay). Never
+   *  persisted — session-save only serializes the tab strip. */
+  tabDragging: boolean
+  setTabDragging: (dragging: boolean) => void
   /** Focus a pane (no-op if it has no tabs). */
   focusPane: (pane: PaneId) => void
   startRun: (id: string, queryId: string) => void
@@ -251,6 +258,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   focusedPane: 'left',
   activeTabByPane: { left: null, right: null },
   activeConnByPane: { left: null, right: null },
+  tabDragging: false,
   _queryCounter: 0,
 
   setActiveConnection: (id) =>
@@ -544,6 +552,22 @@ export const useAppStore = create<AppState>((set, get) => ({
         activeConnByPane: { left: connFor(r.activeByPane.left), right: connFor(r.activeByPane.right) },
       })
     }),
+
+  splitTabToSide: (arg) =>
+    set((s) => {
+      const r = applyTabToSide(s.tabs, s.activeTabByPane, s.focusedPane, arg)
+      if (r.tabs === s.tabs) return s // no-op: unknown id, single tab, or nothing moved
+      const connFor = (id: string | null): string | null =>
+        id ? (r.tabs.find((t) => t.id === id)?.connectionId ?? null) : null
+      return withMirror({
+        tabs: r.tabs,
+        focusedPane: r.focusedPane,
+        activeTabByPane: r.activeByPane,
+        activeConnByPane: { left: connFor(r.activeByPane.left), right: connFor(r.activeByPane.right) },
+      })
+    }),
+
+  setTabDragging: (dragging) => set({ tabDragging: dragging }),
 
   focusPane: (pane) =>
     set((s) => {

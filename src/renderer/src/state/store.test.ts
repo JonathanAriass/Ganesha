@@ -754,4 +754,22 @@ describe('split views — reorderTab (drag-and-drop)', () => {
     useAppStore.getState().reorderTab({ tabId: 'b', toPane: 'left', beforeId: 'b' }) // self-drop
     expect(useAppStore.getState().tabs).toBe(tabs) // unchanged reference
   })
+
+  it('splitTabToSide splits, focuses the dragged tab, and keeps activeConnByPane consistent', () => {
+    // not split: a(c1), b(c2), c(c1) all left with b active. Drag b(c2) to the right edge.
+    useAppStore.setState({
+      tabs: [mk('a', 'c1', 'left'), mk('b', 'c2', 'left'), mk('c', 'c1', 'left')],
+      focusedPane: 'left', activeTabByPane: { left: 'b', right: null }, activeConnByPane: { left: 'c2', right: null },
+      activeTabId: 'b', activeConnectionId: 'c2', _queryCounter: 0, lastActiveByConnection: {},
+    })
+    useAppStore.getState().splitTabToSide({ tabId: 'b', side: 'right' })
+    const s = useAppStore.getState()
+    expect(s.tabs.find((t) => t.id === 'b')!.pane).toBe('right')
+    expect(s.tabs.filter((t) => t.pane === 'left').map((t) => t.id)).toEqual(['a', 'c']) // rest on the left
+    expect(s.focusedPane).toBe('right')
+    expect(s.activeTabByPane.right).toBe('b')
+    expect(s.activeTabByPane.left).toBe('a') // survivor
+    expect(s.activeConnByPane.left).toBe('c1') // a's conn — NOT stale c2
+    expect(s.activeConnectionId).toBe('c2') // b's conn (mirror = focused right)
+  })
 })

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { applyTabReorder } from './tab-reorder'
+import { applyTabReorder, applyTabToSide } from './tab-reorder'
 
 type T = { id: string; connectionId: string; pane: 'left' | 'right' }
 const t = (id: string, pane: 'left' | 'right', connectionId = 'c1'): T => ({ id, connectionId, pane })
@@ -66,5 +66,56 @@ describe('applyTabReorder — across panes', () => {
     expect(r.tabs.every((x) => x.pane === 'left')).toBe(true) // left emptied → collapse
     expect(r.focusedPane).toBe('left')
     expect(r.activeByPane.right).toBeNull()
+  })
+})
+
+describe('applyTabToSide — drag onto the body to split', () => {
+  it('puts the dragged tab on the side and every other tab on the opposite side', () => {
+    const tabs = [t('a', 'left'), t('b', 'left'), t('c', 'left')] // not split
+    const r = applyTabToSide(tabs, active('b', null), 'left', { tabId: 'b', side: 'right' })
+    expect(r.tabs.find((x) => x.id === 'b')!.pane).toBe('right')
+    expect(r.tabs.filter((x) => x.pane === 'left').map((x) => x.id)).toEqual(['a', 'c'])
+    expect(r.activeByPane).toEqual({ left: 'a', right: 'b' }) // b active right; left's prev (b) moved → first 'a'
+    expect(r.focusedPane).toBe('right')
+  })
+
+  it('keeps the previously-active tab active in the pane that keeps the rest', () => {
+    const tabs = [t('a', 'left'), t('b', 'left'), t('c', 'left')]
+    const r = applyTabToSide(tabs, active('a', null), 'left', { tabId: 'c', side: 'right' })
+    expect(r.activeByPane.right).toBe('c') // dragged tab
+    expect(r.activeByPane.left).toBe('a') // previously-active stays active among the rest
+    expect(r.tabs.filter((x) => x.pane === 'left').map((x) => x.id)).toEqual(['a', 'b'])
+  })
+
+  it('side=left claims the left for the dragged tab and sends the rest right', () => {
+    const tabs = [t('a', 'left'), t('b', 'left'), t('c', 'left')]
+    const r = applyTabToSide(tabs, active('a', null), 'left', { tabId: 'a', side: 'left' })
+    expect(r.tabs.find((x) => x.id === 'a')!.pane).toBe('left')
+    expect(r.tabs.filter((x) => x.pane === 'right').map((x) => x.id)).toEqual(['b', 'c'])
+    expect(r.focusedPane).toBe('left')
+    expect(r.activeByPane).toEqual({ left: 'a', right: 'b' })
+  })
+
+  it('keeps a multi-connection survivor pane pointed at a real tab', () => {
+    // a(c1), b(c2), c(c1) all left, b active. Drag b(c2) to the right → left keeps a(c1)+c(c1).
+    const tabs = [t('a', 'left', 'c1'), t('b', 'left', 'c2'), t('c', 'left', 'c1')]
+    const r = applyTabToSide(tabs, active('b', null), 'left', { tabId: 'b', side: 'right' })
+    expect(r.activeByPane.right).toBe('b')
+    expect(r.activeByPane.left).toBe('a') // a real c1 tab → the store derives activeConnByPane.left = c1
+  })
+
+  it('a single tab cannot split — re-homes to left (side=right) or no-ops (side=left)', () => {
+    const tabs = [t('a', 'left')]
+    const rRight = applyTabToSide(tabs, active('a', null), 'left', { tabId: 'a', side: 'right' })
+    expect(rRight.tabs.every((x) => x.pane === 'left')).toBe(true)
+    expect(rRight.activeByPane.right).toBeNull()
+    expect(applyTabToSide(tabs, active('a', null), 'left', { tabId: 'a', side: 'left' }).tabs).toBe(tabs)
+  })
+
+  it('is a no-op when every tab is already on its target side, or the id is unknown', () => {
+    const split = [t('a', 'left'), t('b', 'right')]
+    expect(applyTabToSide(split, active('a', 'b'), 'left', { tabId: 'b', side: 'right' }).tabs).toBe(split)
+    const one = [t('a', 'left'), t('b', 'left')]
+    expect(applyTabToSide(one, active('a', null), 'left', { tabId: 'zzz', side: 'right' }).tabs).toBe(one)
   })
 })

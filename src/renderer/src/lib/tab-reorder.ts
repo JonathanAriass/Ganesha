@@ -1,4 +1,7 @@
-import { type PaneId, normalizePanes } from './panes'
+import { type PaneId, otherPane, normalizePanes } from './panes'
+
+/** dataTransfer key carrying the dragged tab's id (readable only on drop, by any pane). */
+export const TAB_MIME = 'application/x-ganesha-tab'
 
 export interface TabMove {
   tabId: string
@@ -56,5 +59,41 @@ export function applyTabReorder<T extends { id: string; connectionId: string; pa
     tabs: norm.tabs,
     activeByPane: { left: activeFor('left'), right: norm.hasRight ? activeFor('right') : null },
     focusedPane: norm.hasRight ? movedPane : 'left', // a collapse always lands on left
+  }
+}
+
+/** Drag a tab onto the editor body to split: put `tabId` on `side` and EVERY OTHER tab on the
+ *  opposite side, then enforce the invariants (so a single tab can't split — it re-homes left)
+ *  and focus the dragged tab. The other pane keeps the previously-focused tab if it landed
+ *  there, else its first tab. Returns the inputs unchanged (same refs) when the id is unknown
+ *  or no pane actually changes. Same return shape as `applyTabReorder`. */
+export function applyTabToSide<T extends { id: string; connectionId: string; pane: PaneId }>(
+  tabs: T[],
+  activeByPane: Record<PaneId, string | null>,
+  focusedPane: PaneId,
+  arg: { tabId: string; side: PaneId }
+): { tabs: T[]; activeByPane: Record<PaneId, string | null>; focusedPane: PaneId } {
+  const { tabId, side } = arg
+  const unchanged = { tabs, activeByPane, focusedPane }
+  if (!tabs.some((t) => t.id === tabId)) return unchanged
+  const other = otherPane(side)
+  const next = tabs.map((t) => ({ ...t, pane: t.id === tabId ? side : other }))
+  if (next.every((t, i) => t.pane === tabs[i].pane)) return unchanged // nothing moved
+
+  const norm = normalizePanes(next)
+  const movedPane = norm.tabs.find((t) => t.id === tabId)!.pane
+
+  const activeFor = (p: PaneId): string | null => {
+    if (p === movedPane) return tabId
+    const inPane = norm.tabs.filter((t) => t.pane === p)
+    const prev = activeByPane[focusedPane] // the tab that was active before the split
+    if (prev && prev !== tabId && inPane.some((t) => t.id === prev)) return prev
+    return inPane[0]?.id ?? null
+  }
+
+  return {
+    tabs: norm.tabs,
+    activeByPane: { left: activeFor('left'), right: norm.hasRight ? activeFor('right') : null },
+    focusedPane: norm.hasRight ? movedPane : 'left',
   }
 }

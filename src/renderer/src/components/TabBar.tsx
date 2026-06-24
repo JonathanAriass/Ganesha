@@ -4,9 +4,7 @@ import { useConnections } from '../lib/hooks'
 import { groupTabs } from '../lib/tab-groups'
 import TabContextMenu, { type TabCloseAction } from './TabContextMenu'
 import { type PaneId, paneTabs } from '../lib/panes'
-
-/** dataTransfer key carrying the dragged tab's id (readable only on drop, by any pane). */
-const TAB_MIME = 'application/x-ganesha-tab'
+import { TAB_MIME } from '../lib/tab-reorder'
 
 export default function TabBar({ pane }: { pane: PaneId }): JSX.Element {
   const tabs = useAppStore((s) => s.tabs)
@@ -25,6 +23,7 @@ export default function TabBar({ pane }: { pane: PaneId }): JSX.Element {
   const splitActiveTab = useAppStore((s) => s.splitActiveTab)
   const moveTabToOtherPane = useAppStore((s) => s.moveTabToOtherPane)
   const reorderTab = useAppStore((s) => s.reorderTab)
+  const setTabDragging = useAppStore((s) => s.setTabDragging)
 
   // Inline rename: double-click a tab to edit its title. Enter/click-away commits, Escape cancels.
   const [editing, setEditing] = useState<{ id: string; draft: string } | null>(null)
@@ -180,10 +179,12 @@ export default function TabBar({ pane }: { pane: PaneId }): JSX.Element {
                 e.dataTransfer.setData(TAB_MIME, tab.id)
                 e.dataTransfer.effectAllowed = 'move'
                 setDrag(tab.id)
+                setTabDragging(true) // arms the editor-body drop overlay in every pane
               }}
               onDragEnd={() => {
                 setDrag(null)
                 setDrop(null)
+                setTabDragging(false)
               }}
               onClick={() => setActiveTab(tab.id)}
               onDoubleClick={() => setEditing({ id: tab.id, draft: tab.title })}
