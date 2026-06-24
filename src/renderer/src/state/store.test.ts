@@ -321,9 +321,14 @@ describe('hydrateTabs', () => {
 
   it('restores the flagged active tab', () => {
     // toSessionTabs now always flags exactly one active tab per pane; the per-pane hydrate
-    // honours that flag (the no-flag fallback is the pane's FIRST tab, exercised elsewhere).
+    // honours that flag. The no-flag fallback (the pane's FIRST tab) is covered by the next test.
     useAppStore.getState().hydrateTabs([session({ id: 'a' }), session({ id: 'b', active: true })])
     expect(useAppStore.getState().activeTabId).toBe('b')
+  })
+
+  it("falls back to the pane's first tab when none is flagged active", () => {
+    useAppStore.getState().hydrateTabs([session({ id: 'a' }), session({ id: 'b' })])
+    expect(useAppStore.getState().activeTabId).toBe('a') // first tab, since no session tab is flagged
   })
 
   it('the first flagged tab wins when several claim active', () => {

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query'
 import type { SsmTunnel } from '@shared/domain'
 import { useAppStore } from './state/store'
@@ -40,7 +40,9 @@ function AppShell(): JSX.Element {
   const tabs = useAppStore((s) => s.tabs)
   const splitView = useAppStore((s) => s.tabs.some((t) => t.pane === 'right'))
   const leftPaneRef = useRef<HTMLDivElement>(null)
-  const initialLeftFraction = loadPaneFraction()
+  // Pin to first render: avoids re-reading localStorage on every render and a mid-drag flicker if
+  // the tree re-renders while the divider is being dragged (PaneDivider writes flex-basis directly).
+  const [initialLeftFraction] = useState(() => loadPaneFraction())
 
   const { data: settings } = useSettings()
   useEffect(() => {
