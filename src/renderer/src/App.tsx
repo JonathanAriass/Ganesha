@@ -39,8 +39,6 @@ function AppShell(): JSX.Element {
   const commitModal = useAppStore((s) => s.commitModal)
   const tabs = useAppStore((s) => s.tabs)
   const activeTabId = useAppStore((s) => s.activeTabId)
-  const activeConnectionId = useAppStore((s) => s.activeConnectionId)
-  const openDiagramTab = useAppStore((s) => s.openDiagramTab)
 
   const { data: settings } = useSettings()
   useEffect(() => {
@@ -75,15 +73,6 @@ function AppShell(): JSX.Element {
       <TopBar />
       <div className="app-body">
         <aside className="sidebar">
-          {activeConnectionId && (
-            <button
-              className="diagram-open-btn"
-              onClick={() => openDiagramTab(activeConnectionId)}
-              title="Open the schema diagram for this connection"
-            >
-              ◇ Schema diagram
-            </button>
-          )}
           <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
             <ObjectTree />
           </div>

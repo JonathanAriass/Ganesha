@@ -15,6 +15,7 @@ export default function TopBar(): JSX.Element {
   const toggleSsm = useAppStore((s) => s.toggleSsm)
   const ssmOpen = useAppStore((s) => s.ssmOpen)
   const runningSsm = useAppStore((s) => s.runningSsm)
+  const openDiagramTab = useAppStore((s) => s.openDiagramTab)
 
   const { data: connections = [] } = useConnections()
   const { data: tunnels = [] } = useSsmTunnels()
@@ -65,6 +66,17 @@ export default function TopBar(): JSX.Element {
           title="Edit connection"
         >
           <Icon name="pencil" />
+        </button>
+      )}
+
+      {activeConn && (
+        <button
+          className="icon-btn"
+          onClick={() => openDiagramTab(activeConn.id)}
+          aria-label="Schema diagram"
+          title="Schema diagram"
+        >
+          <Icon name="diagram" />
         </button>
       )}
 
