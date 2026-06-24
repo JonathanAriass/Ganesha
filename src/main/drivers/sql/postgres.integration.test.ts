@@ -158,4 +158,25 @@ describe('PostgresDriver (integration, requires Docker)', () => {
     const after = await driver.runQuery(id, { kind: 'sql', sql: 'SELECT ts, tz, iv FROM t_ts WHERE id=1' }, { maxRows: 10, queryId: 't3', readOnly: false })
     expect(after.rows[0]).toEqual([ts, tz, iv])
   })
+
+  it('listRelationships returns declared foreign keys, pairing composite keys in order', async () => {
+    await driver.runQuery(id, { kind: 'sql', sql: 'CREATE TABLE rel_parent (id int PRIMARY KEY)' }, { maxRows: 10, queryId: 'fk0', readOnly: false })
+    await driver.runQuery(id, { kind: 'sql', sql: 'CREATE TABLE rel_child (id int PRIMARY KEY, parent_id int REFERENCES rel_parent(id))' }, { maxRows: 10, queryId: 'fk1', readOnly: false })
+    // Composite FK — the `unnest WITH ORDINALITY` pairing must keep (x→a, y→b), never cross-pair.
+    await driver.runQuery(id, { kind: 'sql', sql: 'CREATE TABLE rel_pk2 (a int, b int, PRIMARY KEY (a, b))' }, { maxRows: 10, queryId: 'fk2', readOnly: false })
+    await driver.runQuery(id, { kind: 'sql', sql: 'CREATE TABLE rel_fk2 (x int, y int, FOREIGN KEY (x, y) REFERENCES rel_pk2 (a, b))' }, { maxRows: 10, queryId: 'fk3', readOnly: false })
+
+    const rels = await driver.listRelationships(id)
+    expect(rels).toContainEqual({
+      fromSchema: 'public', fromTable: 'rel_child', fromColumn: 'parent_id',
+      toSchema: 'public', toTable: 'rel_parent', toColumn: 'id', origin: 'declared'
+    })
+    // Composite pairs, correctly ordered…
+    expect(rels).toContainEqual({ fromSchema: 'public', fromTable: 'rel_fk2', fromColumn: 'x', toSchema: 'public', toTable: 'rel_pk2', toColumn: 'a', origin: 'declared' })
+    expect(rels).toContainEqual({ fromSchema: 'public', fromTable: 'rel_fk2', fromColumn: 'y', toSchema: 'public', toTable: 'rel_pk2', toColumn: 'b', origin: 'declared' })
+    // …and NOT cross-paired (the information_schema gotcha the WITH ORDINALITY query avoids).
+    expect(rels).not.toContainEqual({ fromSchema: 'public', fromTable: 'rel_fk2', fromColumn: 'x', toSchema: 'public', toTable: 'rel_pk2', toColumn: 'b', origin: 'declared' })
+    // The catalog read yields declared FKs only (inference is a separate renderer-side step).
+    expect(rels.every((r) => r.origin === 'declared')).toBe(true)
+  })
 })

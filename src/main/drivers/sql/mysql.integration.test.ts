@@ -150,4 +150,22 @@ describe('MySqlDriver (integration, requires Docker)', () => {
     const after = await driver.runQuery(id, { kind: 'sql', sql: 'SELECT ts, d FROM t_ts WHERE id=1' }, { maxRows: 10, queryId: 'mt3', readOnly: false })
     expect(after.rows[0]).toEqual([ts, d])
   })
+
+  it('listRelationships returns declared foreign keys (single-database scope, schema null)', async () => {
+    await driver.runQuery(id, { kind: 'sql', sql: 'CREATE TABLE rel_parent (id INT PRIMARY KEY) ENGINE=InnoDB' }, { maxRows: 10, queryId: 'mfk0', readOnly: false })
+    await driver.runQuery(id, { kind: 'sql', sql: 'CREATE TABLE rel_child (id INT PRIMARY KEY, parent_id INT, FOREIGN KEY (parent_id) REFERENCES rel_parent(id)) ENGINE=InnoDB' }, { maxRows: 10, queryId: 'mfk1', readOnly: false })
+    // Composite FK (KEY_COLUMN_USAGE pairs per row, so both column pairs come back correctly).
+    await driver.runQuery(id, { kind: 'sql', sql: 'CREATE TABLE rel_pk2 (a INT, b INT, PRIMARY KEY (a, b)) ENGINE=InnoDB' }, { maxRows: 10, queryId: 'mfk2', readOnly: false })
+    await driver.runQuery(id, { kind: 'sql', sql: 'CREATE TABLE rel_fk2 (x INT, y INT, KEY (x, y), FOREIGN KEY (x, y) REFERENCES rel_pk2 (a, b)) ENGINE=InnoDB' }, { maxRows: 10, queryId: 'mfk3', readOnly: false })
+
+    const rels = await driver.listRelationships(id)
+    // Single-database scope → schema is null (matching listObjects).
+    expect(rels).toContainEqual({
+      fromSchema: null, fromTable: 'rel_child', fromColumn: 'parent_id',
+      toSchema: null, toTable: 'rel_parent', toColumn: 'id', origin: 'declared'
+    })
+    expect(rels).toContainEqual({ fromSchema: null, fromTable: 'rel_fk2', fromColumn: 'x', toSchema: null, toTable: 'rel_pk2', toColumn: 'a', origin: 'declared' })
+    expect(rels).toContainEqual({ fromSchema: null, fromTable: 'rel_fk2', fromColumn: 'y', toSchema: null, toTable: 'rel_pk2', toColumn: 'b', origin: 'declared' })
+    expect(rels.every((r) => r.origin === 'declared')).toBe(true)
+  })
 })
