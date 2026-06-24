@@ -63,7 +63,7 @@ export default function TopBar(): JSX.Element {
           className="icon-btn"
           onClick={() => openModal({ mode: 'edit', id: activeConn.id })}
           aria-label="Edit active connection"
-          title="Edit connection"
+          data-tooltip="Edit connection"
         >
           <Icon name="pencil" />
         </button>
@@ -74,7 +74,7 @@ export default function TopBar(): JSX.Element {
           className="icon-btn"
           onClick={() => openDiagramTab(activeConn.id)}
           aria-label="Schema diagram"
-          title="Schema diagram"
+          data-tooltip="Schema diagram"
         >
           <Icon name="diagram" />
         </button>
@@ -82,7 +82,7 @@ export default function TopBar(): JSX.Element {
 
       <span className="spacer" />
 
-      <button className="icon-btn" onClick={() => openModal({ mode: 'create' })} aria-label="New connection" title="New connection">
+      <button className="icon-btn" onClick={() => openModal({ mode: 'create' })} aria-label="New connection" data-tooltip="New connection" data-tip="right">
         <Icon name="plus" />
       </button>
 
@@ -91,7 +91,8 @@ export default function TopBar(): JSX.Element {
         onClick={toggleAssistant}
         aria-label="Toggle assistant"
         aria-pressed={assistantOpen}
-        title="AI assistant"
+        data-tooltip="Assistant"
+        data-tip="right"
       >
         <Icon name="chat" />
       </button>
@@ -101,12 +102,13 @@ export default function TopBar(): JSX.Element {
         onClick={toggleSsm}
         aria-label="Toggle SSM tunnels"
         aria-pressed={ssmOpen}
-        title="SSM tunnels"
+        data-tooltip="SSM tunnels"
+        data-tip="right"
       >
         <Icon name="plug" />
       </button>
 
-      <button className="icon-btn" onClick={openSettings} aria-label="Settings" title={`Settings (${mod},)`}>
+      <button className="icon-btn" onClick={openSettings} aria-label="Settings" data-tooltip={`Settings (${mod},)`} data-tip="right">
         <Icon name="gear" />
       </button>
     </header>
