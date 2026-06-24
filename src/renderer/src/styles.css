@@ -374,11 +374,15 @@ button, input, select, textarea {
 .form-grid {
   display: grid;
   gap: 12px;
+  /* minmax(0,…) lets the column shrink below its content so long values (e.g. the data-dir path)
+     ellipsize instead of widening the track and overflowing the modal. */
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .form-row {
   display: grid;
   gap: 4px;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .form-row label {
@@ -1699,6 +1703,7 @@ input[type="password"]::placeholder {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 
 /* Linked-repo picker: path input grows, Browse…/✕ buttons stay natural width. */
