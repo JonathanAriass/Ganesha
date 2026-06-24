@@ -227,16 +227,14 @@ export default function QueryTab({ tab }: Props): JSX.Element {
     finishScript(tab.id)
   }
 
-  // Auto-run on mount AND when the tab is reused (epoch bumps + runOnOpen set) — once per epoch, so
-  // StrictMode's double-invoke and the runOnOpen→false flip after startRun don't re-run it.
-  const ranEpoch = useRef<number | null>(null)
+  const hasRunRef = useRef(false)
   useEffect(() => {
-    if (tab.runOnOpen && ranEpoch.current !== tab.epoch) {
-      ranEpoch.current = tab.epoch
+    if (tab.runOnOpen && !hasRunRef.current) {
+      hasRunRef.current = true
       run()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on epoch/runOnOpen; run() reads fresh state
-  }, [tab.epoch, tab.runOnOpen])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: auto-run once on mount
+  }, [])
 
   let statusEl: JSX.Element | null = null
   if (tab.running) {
