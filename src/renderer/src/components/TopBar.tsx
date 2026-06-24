@@ -2,6 +2,8 @@ import type { ChangeEvent } from 'react'
 import { useAppStore } from '../state/store'
 import { useConnections, useSsmTunnels } from '../lib/hooks'
 import { mod } from '../lib/platform'
+import { Icon } from './icons'
+import logo from '../assets/logo.png'
 
 export default function TopBar(): JSX.Element {
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
@@ -31,7 +33,7 @@ export default function TopBar(): JSX.Element {
   return (
     <>
     <header className="topbar">
-      <span className="brand">Ganesha</span>
+      <img className="brand-logo" src={logo} alt="Ganesha" title="Ganesha" />
 
       {activeConn && (
         <span
@@ -57,50 +59,43 @@ export default function TopBar(): JSX.Element {
 
       {activeConn && (
         <button
-          className="btn ghost"
+          className="icon-btn"
           onClick={() => openModal({ mode: 'edit', id: activeConn.id })}
           aria-label="Edit active connection"
+          title="Edit connection"
         >
-          Edit
+          <Icon name="pencil" />
         </button>
       )}
 
       <span className="spacer" />
 
-      <button
-        className="btn primary"
-        onClick={() => openModal({ mode: 'create' })}
-      >
-        + New connection
+      <button className="icon-btn" onClick={() => openModal({ mode: 'create' })} aria-label="New connection" title="New connection">
+        <Icon name="plus" />
       </button>
 
       <button
-        className={`btn ghost${assistantOpen ? ' active' : ''}`}
+        className={`icon-btn${assistantOpen ? ' active' : ''}`}
         onClick={toggleAssistant}
         aria-label="Toggle assistant"
         aria-pressed={assistantOpen}
         title="AI assistant"
       >
-        💬 Assistant
+        <Icon name="chat" />
       </button>
 
       <button
-        className={`btn ghost${ssmOpen ? ' active' : ''}`}
+        className={`icon-btn${ssmOpen ? ' active' : ''}`}
         onClick={toggleSsm}
         aria-label="Toggle SSM tunnels"
         aria-pressed={ssmOpen}
         title="SSM tunnels"
       >
-        🔌 Tunnels
+        <Icon name="plug" />
       </button>
 
-      <button
-        className="btn ghost"
-        onClick={openSettings}
-        aria-label="Settings"
-        title={`Settings (${mod},)`}
-      >
-        ⚙
+      <button className="icon-btn" onClick={openSettings} aria-label="Settings" title={`Settings (${mod},)`}>
+        <Icon name="gear" />
       </button>
     </header>
 

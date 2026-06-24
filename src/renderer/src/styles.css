@@ -31,7 +31,7 @@
   --obj-view: #67e8f9;
   --obj-coll: #86efac;
   --radius: 6px;
-  --topbar-h: 44px;
+  --topbar-h: 38px;
   --chat-user-bg: #2b3160;
   --chat-user-text: #e3e7f0;
   --chat-user-border: #3a4080;
@@ -115,20 +115,52 @@ button, input, select, textarea {
   display: flex;
   align-items: center;
   height: var(--topbar-h);
-  padding: 0 12px;
-  gap: 8px;
+  padding: 0 8px;
+  gap: 5px;
   background: var(--bg-2);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
   user-select: none;
 }
 
-.brand {
-  font-size: 13px;
-  font-weight: 700;
+/* Compact brand mark (the app icon) instead of a wordmark. */
+.brand-logo {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  flex-shrink: 0;
+  margin-right: 3px;
+  -webkit-user-drag: none;
+}
+
+/* Uniform icon button for the toolbar — square, monochrome, active toggles tint accent. */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  flex-shrink: 0;
+  color: var(--text-2);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+.icon-btn:hover {
+  background: var(--hover-overlay);
   color: var(--text);
-  letter-spacing: 0.02em;
-  margin-right: 4px;
+}
+.icon-btn.active {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.icon-btn:focus-visible {
+  outline: none;
+  border-color: var(--accent);
 }
 
 .conn-dot {
@@ -145,8 +177,8 @@ button, input, select, textarea {
   border-radius: var(--radius);
   color: var(--text);
   padding: 3px 24px 3px 8px;
-  height: 28px;
-  min-width: 160px;
+  height: 26px;
+  min-width: 150px;
   max-width: 260px;
   appearance: none;
   -webkit-appearance: none;
