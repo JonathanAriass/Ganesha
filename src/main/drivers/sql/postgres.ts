@@ -1,10 +1,19 @@
 import pg from 'pg'
 import type {
   DatabaseDriver, ConnectParams, RunOptions, QueryRequest, QueryResult, ColumnMeta,
-  DbObject, ObjectRef, ColumnInfo, EditableResult, TableEdits, Relationship
+  DbObject, ObjectRef, ColumnInfo, EditableResult, TableEdits, Relationship,
+  TableInfo, ColumnDetail, ConstraintInfo
 } from '../types'
 import { buildEditableResult, isSingleTableScan, type PerColumnSource } from './edit-target'
 import { buildUpdate } from './update-builder'
+import { groupIndexes, groupForeignKeys } from './table-info-shape'
+
+/** pg returns bigint counts/sizes as strings; a negative reltuples means "never analyzed". */
+function numOrNull(v: unknown): number | null {
+  if (v === null || v === undefined) return null
+  const n = Number(v)
+  return Number.isFinite(n) ? n : null
+}
 
 const { Pool } = pg
 
@@ -257,5 +266,121 @@ export class PostgresDriver implements DatabaseDriver {
        WHERE c.contype = 'f' AND ns.nspname NOT IN ('pg_catalog', 'information_schema')`
     )
     return (res.rows as Omit<Relationship, 'origin'>[]).map((r) => ({ ...r, origin: 'declared' as const }))
+  }
+
+  async describeTableInfo(id: string, ref: ObjectRef): Promise<TableInfo> {
+    const pool = this.requirePool(id)
+    const args = [ref.schema ?? 'public', ref.name]
+
+    const columns = (
+      await pool.query(
+        `SELECT c.column_name AS name, c.data_type AS "dataType", (c.is_nullable = 'YES') AS nullable,
+                c.column_default AS "default", COALESCE(pk.is_pk, false) AS "primaryKey"
+         FROM information_schema.columns c
+         LEFT JOIN (
+           SELECT kcu.column_name, true AS is_pk
+           FROM information_schema.table_constraints tc
+           JOIN information_schema.key_column_usage kcu
+             ON kcu.constraint_name = tc.constraint_name AND kcu.constraint_schema = tc.constraint_schema
+           WHERE tc.constraint_type = 'PRIMARY KEY' AND tc.table_schema = $1 AND tc.table_name = $2
+         ) pk ON pk.column_name = c.column_name
+         WHERE c.table_schema = $1 AND c.table_name = $2
+         ORDER BY c.ordinal_position`,
+        args
+      )
+    ).rows as ColumnDetail[]
+
+    // Index columns paired by position via unnest WITH ORDINALITY (expression indexes — attnum 0 —
+    // have no pg_attribute row and drop their expression columns; acceptable for v1).
+    const indexes = groupIndexes(
+      (
+        await pool.query(
+          `SELECT i.relname AS name, a.attname AS column, ix.indisunique AS unique,
+                  ix.indisprimary AS primary, am.amname AS method, k.ord::int AS ord
+           FROM pg_class t
+           JOIN pg_namespace n ON n.oid = t.relnamespace
+           JOIN pg_index ix ON ix.indrelid = t.oid
+           JOIN pg_class i ON i.oid = ix.indexrelid
+           JOIN pg_am am ON am.oid = i.relam
+           JOIN LATERAL unnest(ix.indkey) WITH ORDINALITY AS k(attnum, ord) ON true
+           JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum
+           WHERE n.nspname = $1 AND t.relname = $2
+           ORDER BY i.relname, k.ord`,
+          args
+        )
+      ).rows
+    )
+
+    // Outgoing FKs: this table's columns → the referenced table's columns.
+    const foreignKeys = groupForeignKeys(
+      (
+        await pool.query(
+          `SELECT c.conname AS name, att.attname AS column,
+                  fns.nspname AS "refSchema", fcl.relname AS "refTable", fatt.attname AS "refColumn", k.ord::int AS ord
+           FROM pg_constraint c
+           JOIN pg_class cl ON cl.oid = c.conrelid
+           JOIN pg_namespace ns ON ns.oid = cl.relnamespace
+           JOIN pg_class fcl ON fcl.oid = c.confrelid
+           JOIN pg_namespace fns ON fns.oid = fcl.relnamespace
+           JOIN LATERAL unnest(c.conkey, c.confkey) WITH ORDINALITY AS k(conkey, confkey, ord) ON true
+           JOIN pg_attribute att ON att.attrelid = c.conrelid AND att.attnum = k.conkey
+           JOIN pg_attribute fatt ON fatt.attrelid = c.confrelid AND fatt.attnum = k.confkey
+           WHERE c.contype = 'f' AND ns.nspname = $1 AND cl.relname = $2
+           ORDER BY c.conname, k.ord`,
+          args
+        )
+      ).rows
+    )
+
+    // Incoming refs: other tables' FKs that point at us. `refTable` = the referencing table,
+    // `refColumns` = its FK columns, `columns` = our referenced columns (reads "refTable.refColumns → columns").
+    const referencedBy = groupForeignKeys(
+      (
+        await pool.query(
+          `SELECT c.conname AS name, fatt.attname AS column,
+                  ns.nspname AS "refSchema", cl.relname AS "refTable", att.attname AS "refColumn", k.ord::int AS ord
+           FROM pg_constraint c
+           JOIN pg_class cl ON cl.oid = c.conrelid
+           JOIN pg_namespace ns ON ns.oid = cl.relnamespace
+           JOIN pg_class fcl ON fcl.oid = c.confrelid
+           JOIN pg_namespace fns ON fns.oid = fcl.relnamespace
+           JOIN LATERAL unnest(c.conkey, c.confkey) WITH ORDINALITY AS k(conkey, confkey, ord) ON true
+           JOIN pg_attribute att ON att.attrelid = c.conrelid AND att.attnum = k.conkey
+           JOIN pg_attribute fatt ON fatt.attrelid = c.confrelid AND fatt.attnum = k.confkey
+           WHERE c.contype = 'f' AND fns.nspname = $1 AND fcl.relname = $2
+           ORDER BY c.conname, k.ord`,
+          args
+        )
+      ).rows
+    )
+
+    const constraints = (
+      await pool.query(
+        `SELECT con.conname AS name,
+                CASE con.contype WHEN 'u' THEN 'unique' WHEN 'c' THEN 'check' END AS type,
+                pg_get_constraintdef(con.oid) AS detail
+         FROM pg_constraint con
+         JOIN pg_class cl ON cl.oid = con.conrelid
+         JOIN pg_namespace ns ON ns.oid = cl.relnamespace
+         WHERE con.contype IN ('u', 'c') AND ns.nspname = $1 AND cl.relname = $2
+         ORDER BY con.conname`,
+        args
+      )
+    ).rows as ConstraintInfo[]
+
+    const sizeRow = (
+      await pool.query(
+        `SELECT pg_total_relation_size(c.oid) AS bytes, c.reltuples::bigint AS "rowEstimate"
+         FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+         WHERE n.nspname = $1 AND c.relname = $2`,
+        args
+      )
+    ).rows[0] as { bytes: unknown; rowEstimate: unknown } | undefined
+    const est = sizeRow ? numOrNull(sizeRow.rowEstimate) : null
+    const size = sizeRow
+      ? { bytes: numOrNull(sizeRow.bytes), rowEstimate: est !== null && est >= 0 ? est : null }
+      : null
+
+    return { ref, columns, indexes, foreignKeys, referencedBy, constraints, size }
   }
 }

@@ -43,6 +43,7 @@ export interface DbClientApi {
     columns(connectionId: string, ref: ObjectRef): Promise<IpcResult<'schema.columns'>>
     allColumns(connectionId: string): Promise<IpcResult<'schema.allColumns'>>
     relationships(connectionId: string): Promise<IpcResult<'schema.relationships'>>
+    tableInfo(connectionId: string, ref: ObjectRef): Promise<IpcResult<'schema.tableInfo'>>
   }
   edits: {
     apply(req: {

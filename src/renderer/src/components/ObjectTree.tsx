@@ -13,9 +13,10 @@ interface ObjectNodeProps {
   obj: DbObject
   query: string
   onDoubleClick: (obj: DbObject) => void
+  onContextMenu: (obj: DbObject, x: number, y: number) => void
 }
 
-function ObjectNode({ connectionId, obj, query, onDoubleClick }: ObjectNodeProps): JSX.Element {
+function ObjectNode({ connectionId, obj, query, onDoubleClick, onContextMenu }: ObjectNodeProps): JSX.Element {
   const [expanded, setExpanded] = useState(false)
   const ref = { schema: obj.schema, name: obj.name }
 
@@ -37,6 +38,10 @@ function ObjectNode({ connectionId, obj, query, onDoubleClick }: ObjectNodeProps
           setExpanded((ex) => !ex)
         }}
         onDoubleClick={() => onDoubleClick(obj)}
+        onContextMenu={(e) => {
+          e.preventDefault()
+          onContextMenu(obj, e.clientX, e.clientY)
+        }}
         aria-expanded={expanded}
       >
         <span className={`tree-caret${expanded ? ' open' : ''}`} aria-hidden="true">
@@ -106,6 +111,8 @@ function Highlighted({ text, positions }: { text: string; positions: number[] })
 export default function ObjectTree(): JSX.Element {
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
   const openTableQuery = useAppStore((s) => s.openTableQuery)
+  const openTableInfoTab = useAppStore((s) => s.openTableInfoTab)
+  const [menu, setMenu] = useState<{ obj: DbObject; x: number; y: number } | null>(null)
 
   const { data: connections = [] } = useConnections()
   const { data: objects, isLoading, error } = useObjects(activeConnectionId)
@@ -132,6 +139,25 @@ export default function ObjectTree(): JSX.Element {
       text: defaultTableQuery(activeConn.type, ref),
     })
   }
+
+  function handleTableInfo(obj: DbObject) {
+    if (activeConnectionId) openTableInfoTab(activeConnectionId, { schema: obj.schema, name: obj.name })
+    setMenu(null)
+  }
+
+  // Right-click menu for a tree object. Position-fixed; the full-screen backdrop dismisses it.
+  const menuEl = menu && (
+    <div
+      className="tab-menu-backdrop"
+      onMouseDown={() => setMenu(null)}
+      onContextMenu={(e) => { e.preventDefault(); setMenu(null) }}
+    >
+      <div className="tab-menu" role="menu" style={{ left: menu.x, top: menu.y }} onMouseDown={(e) => e.stopPropagation()}>
+        <button className="tab-menu-item" role="menuitem" onClick={() => handleTableInfo(menu.obj)}>Table info</button>
+        <button className="tab-menu-item" role="menuitem" onClick={() => { handleDoubleClick(menu.obj); setMenu(null) }}>Open query</button>
+      </div>
+    </div>
+  )
 
   if (!activeConnectionId) {
     return (
@@ -224,8 +250,10 @@ export default function ObjectTree(): JSX.Element {
             obj={obj}
             query={query}
             onDoubleClick={handleDoubleClick}
+            onContextMenu={(o, x, y) => setMenu({ obj: o, x, y })}
           />
         ))}
+        {menuEl}
       </nav>
     )
   }
@@ -256,10 +284,12 @@ export default function ObjectTree(): JSX.Element {
               obj={obj}
               query={query}
               onDoubleClick={handleDoubleClick}
+              onContextMenu={(o, x, y) => setMenu({ obj: o, x, y })}
             />
           ))}
         </div>
       ))}
+      {menuEl}
     </nav>
   )
 }

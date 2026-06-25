@@ -37,7 +37,10 @@ function fakeDriver(calls: string[], queryIds?: string[]): DatabaseDriver {
     listDatabases: async () => [],
     listObjects: async () => [],
     describeObject: async () => [],
-    listRelationships: async () => []
+    listRelationships: async () => [],
+    describeTableInfo: async () => ({
+      ref: { schema: null, name: 't' }, columns: [], indexes: [], foreignKeys: [], referencedBy: [], constraints: [], size: null
+    })
   }
 }
 

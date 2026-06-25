@@ -46,8 +46,10 @@ export interface QueryTabData {
   connectionId: string
   title: string
   /** Tab kind. Absent/`'query'` = the normal editor+results tab; `'diagram'` = the read-only schema
-   *  diagram (query fields stay at their empties and are unused). */
-  kind?: 'query' | 'diagram'
+   *  diagram; `'table-info'` = the read-only table-structure view for `objectRef`. */
+  kind?: 'query' | 'diagram' | 'table-info'
+  /** The table this tab targets (only set for `kind: 'table-info'`). */
+  objectRef?: { schema: string | null; name: string }
   /** Which side of a split this tab lives in. Defaults to `'left'`; only ever `'right'`
    *  while a split is open. `tabs.some(t => t.pane === 'right')` IS "is the view split". */
   pane: PaneId
@@ -121,6 +123,8 @@ interface AppState {
   openQueryTab: (args: { connectionId: string; title?: string; text?: string; runOnOpen?: boolean }) => void
   /** Open (or focus the existing) read-only schema-diagram tab for a connection. */
   openDiagramTab: (connectionId: string) => void
+  /** Open (or focus the existing) read-only table-info tab for one table. */
+  openTableInfoTab: (connectionId: string, ref: { schema: string | null; name: string }) => void
   /** One-shot boot restore of a persisted session. No-ops once any tab exists —
    *  it must never clobber tabs the user opened before the IPC round-trip landed. */
   hydrateTabs: (sessionTabs: SessionTab[]) => void
@@ -203,7 +207,8 @@ function blankTab(fields: {
   title: string
   pane: PaneId
   text?: string
-  kind?: 'query' | 'diagram'
+  kind?: 'query' | 'diagram' | 'table-info'
+  objectRef?: { schema: string | null; name: string }
   runOnOpen?: boolean
 }): QueryTabData {
   return {
@@ -211,6 +216,7 @@ function blankTab(fields: {
     connectionId: fields.connectionId,
     title: fields.title,
     kind: fields.kind,
+    objectRef: fields.objectRef,
     pane: fields.pane,
     text: fields.text ?? '',
     epoch: 0,
@@ -336,6 +342,32 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       const p = s.focusedPane
       const tab = blankTab({ connectionId, title: '◇ Schema', kind: 'diagram', pane: p })
+      return withMirror({
+        tabs: [...s.tabs, tab],
+        focusedPane: p,
+        activeTabByPane: { ...s.activeTabByPane, [p]: tab.id },
+        activeConnByPane: { ...s.activeConnByPane, [p]: connectionId },
+        lastActiveByConnection: { ...s.lastActiveByConnection, [connectionId]: tab.id },
+      })
+    }),
+
+  openTableInfoTab: (connectionId, ref) =>
+    set((s) => {
+      // One info tab per table — focus an existing one (in whichever pane) instead of stacking.
+      const existing = s.tabs.find(
+        (t) => t.connectionId === connectionId && t.kind === 'table-info' &&
+          t.objectRef?.schema === ref.schema && t.objectRef?.name === ref.name
+      )
+      if (existing) {
+        return withMirror({
+          focusedPane: existing.pane,
+          activeTabByPane: { ...s.activeTabByPane, [existing.pane]: existing.id },
+          activeConnByPane: { ...s.activeConnByPane, [existing.pane]: connectionId },
+          lastActiveByConnection: { ...s.lastActiveByConnection, [connectionId]: existing.id },
+        })
+      }
+      const p = s.focusedPane
+      const tab = blankTab({ connectionId, title: `▤ ${ref.name} · info`, kind: 'table-info', objectRef: ref, pane: p })
       return withMirror({
         tabs: [...s.tabs, tab],
         focusedPane: p,

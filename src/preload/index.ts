@@ -46,7 +46,8 @@ const api: DbClientApi = {
     databases: (connectionId) => invoke('schema.databases', connectionId),
     columns: (connectionId, ref) => invoke('schema.columns', { connectionId, ref }),
     allColumns: (connectionId) => invoke('schema.allColumns', connectionId),
-    relationships: (connectionId) => invoke('schema.relationships', connectionId)
+    relationships: (connectionId) => invoke('schema.relationships', connectionId),
+    tableInfo: (connectionId, ref) => invoke('schema.tableInfo', { connectionId, ref })
   },
   edits: {
     apply: (req) => invoke('edits.apply', req)

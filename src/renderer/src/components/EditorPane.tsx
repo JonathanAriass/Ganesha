@@ -5,6 +5,7 @@ import { TAB_MIME } from '../lib/tab-reorder'
 import TabBar from './TabBar'
 import QueryTab from './QueryTab'
 import DiagramView from './DiagramView'
+import TableInfoView from './TableInfoView'
 import Welcome from './Welcome'
 
 type DropSide = 'left' | 'right' | 'whole'
@@ -67,6 +68,8 @@ export default function EditorPane({ paneId }: { paneId: PaneId }): JSX.Element 
         {tab ? (
           tab.kind === 'diagram' ? (
             <DiagramView key={tab.id} connectionId={tab.connectionId} />
+          ) : tab.kind === 'table-info' && tab.objectRef ? (
+            <TableInfoView key={tab.id} connectionId={tab.connectionId} objectRef={tab.objectRef} />
           ) : (
             <QueryTab key={tab.id} tab={tab} />
           )
