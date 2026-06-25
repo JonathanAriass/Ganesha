@@ -19,7 +19,7 @@ jobs:
         include:
           - runner: macos-14 # Apple Silicon
             arch: arm64
-          - runner: macos-13 # Intel
+          - runner: macos-15-intel # Intel (macos-13 was retired Dec 2025; this is the x86_64 image, available until Aug 2027)
             arch: x64
     runs-on: ${{ matrix.runner }}
     steps:
