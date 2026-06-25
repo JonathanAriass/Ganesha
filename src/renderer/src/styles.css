@@ -761,6 +761,31 @@ input[type="password"]::placeholder {
   font-size: 12px;
 }
 
+/* Hover-reveal "Table info" icon at the right of a tree row. */
+.tree-info {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  color: var(--text-2);
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.08s, color 0.08s, background 0.08s;
+}
+
+.tree-row:hover .tree-info {
+  opacity: 0.7;
+}
+
+.tree-info:hover {
+  opacity: 1;
+  color: var(--text);
+  background: var(--bg-3);
+}
+
 .tree-children {
   padding-left: 24px;
   border-left: 1px solid var(--border);

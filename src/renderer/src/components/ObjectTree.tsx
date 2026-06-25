@@ -14,9 +14,10 @@ interface ObjectNodeProps {
   query: string
   onDoubleClick: (obj: DbObject) => void
   onContextMenu: (obj: DbObject, x: number, y: number) => void
+  onInfo: (obj: DbObject) => void
 }
 
-function ObjectNode({ connectionId, obj, query, onDoubleClick, onContextMenu }: ObjectNodeProps): JSX.Element {
+function ObjectNode({ connectionId, obj, query, onDoubleClick, onContextMenu, onInfo }: ObjectNodeProps): JSX.Element {
   const [expanded, setExpanded] = useState(false)
   const ref = { schema: obj.schema, name: obj.name }
 
@@ -52,6 +53,18 @@ function ObjectNode({ connectionId, obj, query, onDoubleClick, onContextMenu }: 
         </span>
         <span className="tree-label">
           <Highlighted text={obj.name} positions={substringMatch(query, obj.name) ?? []} />
+        </span>
+        <span
+          className="tree-info"
+          role="button"
+          aria-label={`Table info for ${obj.name}`}
+          title="Table info"
+          onClick={(e) => {
+            e.stopPropagation()
+            onInfo(obj)
+          }}
+        >
+          ⓘ
         </span>
       </button>
 
@@ -251,6 +264,7 @@ export default function ObjectTree(): JSX.Element {
             query={query}
             onDoubleClick={handleDoubleClick}
             onContextMenu={(o, x, y) => setMenu({ obj: o, x, y })}
+            onInfo={handleTableInfo}
           />
         ))}
         {menuEl}
@@ -285,6 +299,7 @@ export default function ObjectTree(): JSX.Element {
               query={query}
               onDoubleClick={handleDoubleClick}
               onContextMenu={(o, x, y) => setMenu({ obj: o, x, y })}
+              onInfo={handleTableInfo}
             />
           ))}
         </div>

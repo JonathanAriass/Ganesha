@@ -10,6 +10,7 @@ export default function CommandPalette(): JSX.Element {
   const setPaletteOpen = useAppStore((s) => s.setPaletteOpen)
   const openSettings = useAppStore((s) => s.openSettings)
   const openQueryTab = useAppStore((s) => s.openQueryTab)
+  const openTableInfoTab = useAppStore((s) => s.openTableInfoTab)
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
   const setActiveConnection = useAppStore((s) => s.setActiveConnection)
 
@@ -152,6 +153,25 @@ export default function CommandPalette(): JSX.Element {
                     <span className={`obj-icon ${o.kind}`} aria-hidden="true">
                       {o.kind === 'table' ? 'T' : o.kind === 'view' ? 'V' : 'C'}
                     </span>
+                    {o.name}
+                    {o.schema && <span className="palette-meta">{o.schema}</span>}
+                  </Command.Item>
+                ))}
+              </Command.Group>
+            )}
+
+            {activeConn && objects.length > 0 && (
+              <Command.Group heading={`Table info — ${activeConn.name}`}>
+                {objects.map((o) => (
+                  <Command.Item
+                    key={`info:${o.schema ?? ''}:${o.name}`}
+                    value={`table info structure ${o.kind} ${o.schema ?? ''} ${o.name}`}
+                    onSelect={() => {
+                      openTableInfoTab(activeConn.id, { schema: o.schema, name: o.name })
+                      close()
+                    }}
+                  >
+                    <span className="obj-icon" aria-hidden="true">ⓘ</span>
                     {o.name}
                     {o.schema && <span className="palette-meta">{o.schema}</span>}
                   </Command.Item>
