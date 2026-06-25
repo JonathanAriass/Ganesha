@@ -89,6 +89,22 @@ Ganesha is a desktop client for the four databases people actually reach for, bu
 
 ## Install
 
+### Homebrew (macOS)
+
+```sh
+brew install --cask jonathanariass/tap/ganesha
+```
+
+Ganesha isn't notarized by Apple yet, so macOS quarantines it on download. On first launch either right-click **Ganesha** in Applications and choose **Open** (once), or clear the quarantine flag:
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/Ganesha.app"
+```
+
+Update later with `brew upgrade --cask ganesha`. The cask serves the right build for Apple Silicon or Intel automatically.
+
+### Direct download
+
 Download the latest build for your platform from the [**Releases**](https://github.com/JonathanAriass/Ganesha/releases) page:
 
 | Platform | Artifact |

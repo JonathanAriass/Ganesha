@@ -15,6 +15,22 @@ asarUnpack:
 mac:
   target: dmg
   category: public.app-category.developer-tools
+  # Names each build the release + Homebrew cask expect: Ganesha-<version>-arm64.dmg / -x64.dmg
+  artifactName: ${productName}-${version}-${arch}.dmg
+  # ── Sign + notarize later (when an Apple Developer account is available) ──
+  #  1. Add repo Actions secrets: CSC_LINK (base64 Developer ID .p12), CSC_KEY_PASSWORD,
+  #     APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID.
+  #  2. Uncomment the matching env lines in .github/workflows/release.yml.
+  #  3. Uncomment the four lines below, then drop the Gatekeeper caveat from the
+  #     Homebrew cask (homebrew-tap repo: Casks/ganesha.rb).
+  # hardenedRuntime: true
+  # entitlements: build/entitlements.mac.plist
+  # entitlementsInherit: build/entitlements.mac.plist
+  # notarize: true
+publish:
+  provider: github
+  owner: JonathanAriass
+  repo: Ganesha
 win:
   target: nsis
 linux:

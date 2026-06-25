@@ -1,6 +1,6 @@
 {
   "name": "db-client",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "Modern, fast, cross-platform database client",
   "author": "JonathanAriass",
   "license": "MIT",
