@@ -32,8 +32,9 @@ function Card({ title, count, empty, children }: { title: string; count: number;
   )
 }
 
-/** The read-only "Table info" tab — a scannable, card-based view of one table/collection's
- *  structure. Sections an engine lacks (e.g. Mongo foreign keys/constraints) are hidden. */
+/** The read-only "Table info" tab — a scannable, full-width view of one table/collection's
+ *  structure: columns flow in responsive sub-columns; the smaller sections sit in a card row.
+ *  Sections an engine lacks (e.g. Mongo foreign keys/constraints) are hidden or show "None". */
 export default function TableInfoView({ connectionId, objectRef }: { connectionId: string; objectRef: ObjectRef }): JSX.Element {
   const { data: info, isLoading, error } = useTableInfo(connectionId, objectRef)
 
@@ -41,7 +42,6 @@ export default function TableInfoView({ connectionId, objectRef }: { connectionI
   if (error) return <div className="ti-view"><pre className="qt-error">{error instanceof Error ? error.message : String(error)}</pre></div>
   if (!info) return <div className="ti-view"><div className="ti-status">No info.</div></div>
 
-  // A column is a foreign key if it participates in any outgoing FK.
   const fkCols = new Set(info.foreignKeys.flatMap((f) => f.columns))
 
   const chips: string[] = [
@@ -68,83 +68,77 @@ export default function TableInfoView({ connectionId, objectRef }: { connectionI
         </div>
 
         <Card title="Columns" count={info.columns.length}>
-          <table className="ti-table">
-            <tbody>
-              {info.columns.map((c) => (
-                <tr key={c.name}>
-                  <td className="ti-name-cell">{c.name}</td>
-                  <td className="ti-type-cell">{c.dataType}</td>
-                  <td className="ti-tags-cell">
-                    {c.primaryKey && <span className="ti-pill pk">PK</span>}
-                    {fkCols.has(c.name) && <span className="ti-pill fk">FK</span>}
-                    {!c.nullable && <span className="ti-tag">NOT NULL</span>}
-                    {c.default != null && c.default !== '' && (
-                      <span className="ti-tag soft">default <span className="ti-mono">{c.default}</span></span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="ti-col-list">
+            {info.columns.map((c) => (
+              <div className="ti-col-item" key={c.name}>
+                <span className="ti-col-name" title={c.name}>{c.name}</span>
+                <span className="ti-col-type" title={c.dataType}>{c.dataType}</span>
+                <span className="ti-col-flags">
+                  {c.primaryKey && <span className="ti-pill pk">PK</span>}
+                  {fkCols.has(c.name) && <span className="ti-pill fk">FK</span>}
+                  {!c.nullable && <span className="ti-tag">NOT NULL</span>}
+                  {c.default != null && c.default !== '' && (
+                    <span className="ti-tag">default <span className="ti-mono">{c.default}</span></span>
+                  )}
+                </span>
+              </div>
+            ))}
+          </div>
         </Card>
 
-        <Card title="Indexes" count={info.indexes.length} empty={info.indexes.length === 0}>
-          <table className="ti-table">
-            <tbody>
-              {info.indexes.map((ix) => (
-                <tr key={ix.name}>
-                  <td className="ti-name-cell">
-                    {ix.name}
-                    {ix.primary && <span className="ti-pill pk ti-pill-after">PK</span>}
-                  </td>
-                  <td className="ti-mono ti-cols-cell">({ix.columns.join(', ')})</td>
-                  <td className="ti-tags-cell">
-                    {ix.unique && <span className="ti-pill uniq">UNIQUE</span>}
-                    {ix.method && <span className="ti-tag soft">{ix.method}</span>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
-
-        <Card title="Foreign keys" count={info.foreignKeys.length} empty={info.foreignKeys.length === 0}>
-          {info.foreignKeys.map((fk, i) => (
-            <div className="ti-rel" key={fk.name ?? i}>
-              <span className="ti-mono ti-rel-from">{fk.columns.join(', ')}</span>
-              <span className="ti-arrow">→</span>
-              <span className="ti-mono">{fk.refTable}<span className="ti-soft">({fk.refColumns.join(', ')})</span></span>
-            </div>
-          ))}
-        </Card>
-
-        {info.referencedBy.length > 0 && (
-          <Card title="Referenced by" count={info.referencedBy.length}>
-            {info.referencedBy.map((fk, i) => (
-              <div className="ti-rel" key={fk.name ?? i}>
-                <span className="ti-mono ti-rel-from">{fk.refTable}<span className="ti-soft">({fk.refColumns.join(', ')})</span></span>
-                <span className="ti-arrow">→</span>
-                <span className="ti-mono">{fk.columns.join(', ')}</span>
+        <div className="ti-cards-grid">
+          <Card title="Indexes" count={info.indexes.length} empty={info.indexes.length === 0}>
+            {info.indexes.map((ix) => (
+              <div className="ti-row2" key={ix.name}>
+                <div className="ti-row2-top">
+                  <span className="ti-mono ti-row2-name" title={ix.name}>{ix.name}</span>
+                  {ix.unique && <span className="ti-pill uniq">UNIQUE</span>}
+                  {ix.primary && <span className="ti-pill pk">PK</span>}
+                </div>
+                <div className="ti-row2-sub">
+                  <span className="ti-mono">({ix.columns.join(', ')})</span>
+                  {ix.method && <span className="ti-soft"> · {ix.method}</span>}
+                </div>
               </div>
             ))}
           </Card>
-        )}
 
-        {info.constraints.length > 0 && (
-          <Card title="Constraints" count={info.constraints.length}>
-            <table className="ti-table">
-              <tbody>
-                {info.constraints.map((c) => (
-                  <tr key={c.name}>
-                    <td className="ti-name-cell">{c.name}</td>
-                    <td className="ti-tags-cell"><span className="ti-pill uniq">{c.type}</span></td>
-                    <td className="ti-mono ti-soft ti-detail-cell">{c.detail}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <Card title="Foreign keys" count={info.foreignKeys.length} empty={info.foreignKeys.length === 0}>
+            {info.foreignKeys.map((fk, i) => (
+              <div className="ti-rel" key={fk.name ?? i}>
+                <span className="ti-mono">{fk.columns.join(', ')}</span>
+                <span className="ti-arrow">→</span>
+                <span className="ti-mono">{fk.refTable}<span className="ti-soft">({fk.refColumns.join(', ')})</span></span>
+              </div>
+            ))}
           </Card>
-        )}
+
+          {info.referencedBy.length > 0 && (
+            <Card title="Referenced by" count={info.referencedBy.length}>
+              {info.referencedBy.map((fk, i) => (
+                <div className="ti-rel" key={fk.name ?? i}>
+                  <span className="ti-mono">{fk.refTable}<span className="ti-soft">({fk.refColumns.join(', ')})</span></span>
+                  <span className="ti-arrow">→</span>
+                  <span className="ti-mono">{fk.columns.join(', ')}</span>
+                </div>
+              ))}
+            </Card>
+          )}
+
+          {info.constraints.length > 0 && (
+            <Card title="Constraints" count={info.constraints.length}>
+              {info.constraints.map((c) => (
+                <div className="ti-row2" key={c.name}>
+                  <div className="ti-row2-top">
+                    <span className="ti-mono ti-row2-name" title={c.name}>{c.name}</span>
+                    <span className="ti-pill uniq">{c.type}</span>
+                  </div>
+                  <div className="ti-row2-sub ti-mono ti-soft">{c.detail}</div>
+                </div>
+              ))}
+            </Card>
+          )}
+        </div>
       </div>
     </div>
   )

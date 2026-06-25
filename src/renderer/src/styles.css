@@ -2180,7 +2180,7 @@ input[type="password"]::placeholder {
 }
 
 .ti-content {
-  max-width: 960px;
+  max-width: 1680px;
 }
 
 .ti-status {
@@ -2265,26 +2265,6 @@ input[type="password"]::placeholder {
   font-size: 12.5px;
 }
 
-.ti-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12.5px;
-}
-
-.ti-table td {
-  padding: 7px 14px;
-  vertical-align: middle;
-  color: var(--text);
-}
-
-.ti-table tr:not(:last-child) td {
-  border-bottom: 1px solid var(--bg-3);
-}
-
-.ti-table tr:hover td {
-  background: color-mix(in srgb, var(--accent) 7%, transparent);
-}
-
 .ti-mono {
   font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
 }
@@ -2293,25 +2273,61 @@ input[type="password"]::placeholder {
   color: var(--text-2);
 }
 
-.ti-name-cell {
+/* Columns flow into responsive sub-columns (1 / 2 / 3 by available width). */
+.ti-col-list {
+  column-width: 460px;
+  column-gap: 28px;
+  padding: 2px 0;
+}
+
+.ti-col-item {
+  display: grid;
+  grid-template-columns: minmax(0, 210px) minmax(0, 150px) 1fr;
+  gap: 0 12px;
+  align-items: center;
+  padding: 5px 14px;
+  break-inside: avoid;
+  border-bottom: 1px solid var(--bg-3);
+  font-size: 12.5px;
+}
+
+.ti-col-item:hover {
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+
+.ti-col-name {
   font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-weight: 600;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.ti-type-cell {
+.ti-col-type {
   font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   color: var(--text-2);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.ti-cols-cell {
-  white-space: nowrap;
+.ti-col-flags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
-.ti-tags-cell,
-.ti-detail-cell {
-  width: 100%;
+/* The smaller sections sit side by side, filling the width. */
+.ti-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.ti-cards-grid .ti-card {
+  margin-bottom: 0;
 }
 
 .ti-pill {
@@ -2324,11 +2340,6 @@ input[type="password"]::placeholder {
   margin-right: 6px;
   vertical-align: middle;
   text-transform: uppercase;
-}
-
-.ti-pill.ti-pill-after {
-  margin-left: 7px;
-  margin-right: 0;
 }
 
 .ti-pill.pk {
@@ -2354,10 +2365,45 @@ input[type="password"]::placeholder {
   margin-right: 12px;
 }
 
+/* Two-line entry (indexes, constraints): name + pills on top, detail below. */
+.ti-row2 {
+  padding: 7px 14px;
+}
+
+.ti-row2:not(:last-child) {
+  border-bottom: 1px solid var(--bg-3);
+}
+
+.ti-row2:hover {
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+
+.ti-row2-top {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.ti-row2-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.ti-row2-sub {
+  font-size: 11.5px;
+  margin-top: 2px;
+  word-break: break-word;
+}
+
 .ti-rel {
   display: flex;
   align-items: center;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 6px 10px;
   padding: 7px 14px;
   font-size: 12.5px;
 }
@@ -2368,10 +2414,6 @@ input[type="password"]::placeholder {
 
 .ti-rel:hover {
   background: color-mix(in srgb, var(--accent) 7%, transparent);
-}
-
-.ti-rel-from {
-  min-width: 140px;
 }
 
 .ti-arrow {
