@@ -92,8 +92,12 @@ Ganesha is a desktop client for the four databases people actually reach for, bu
 ### Homebrew (macOS)
 
 ```sh
-brew install --cask jonathanariass/tap/ganesha
+brew tap jonathanariass/tap
+brew trust jonathanariass/tap   # Homebrew 6.0+: confirm you trust this third-party tap (one-time)
+brew install --cask ganesha
 ```
+
+On Homebrew older than 6.0 the `brew trust` line doesn't exist and isn't needed — `brew install --cask jonathanariass/tap/ganesha` works on its own.
 
 Ganesha isn't notarized by Apple yet, so macOS quarantines it on download. On first launch either right-click **Ganesha** in Applications and choose **Open** (once), or clear the quarantine flag:
 
