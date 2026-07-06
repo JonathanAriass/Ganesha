@@ -1,11 +1,12 @@
 name: Release
 
-# Build the macOS apps and publish a GitHub Release whenever a v* tag is pushed.
+# Build the macOS app and publish a GitHub Release whenever a v* tag is pushed.
 #
-# Two NATIVE builds (Apple Silicon + Intel) rather than one universal dmg: the
-# native modules (node-llama-cpp, better-sqlite3) make universal builds fragile,
-# so each arch is built on its own native runner and the Homebrew cask picks the
-# right dmg per machine (`arch arm: / intel:`).
+# Apple Silicon (arm64) only. Intel was dropped: GitHub retired the macos-13 Intel
+# runner, and its replacement (macos-15-intel) can't package the app reliably
+# (hdiutil "Resource busy"). The app ships as a zip (no disk image to mount/detach).
+# To re-add Intel, put the macos-15-intel leg back in the matrix and restore the
+# x64 arch to the cask (homebrew-tap: Casks/ganesha.rb + update-cask.yml).
 on:
   push:
     tags:
@@ -19,8 +20,6 @@ jobs:
         include:
           - runner: macos-14 # Apple Silicon
             arch: arm64
-          - runner: macos-15-intel # Intel (macos-13 was retired Dec 2025; this is the x86_64 image, available until Aug 2027)
-            arch: x64
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
