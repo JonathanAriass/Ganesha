@@ -33,13 +33,7 @@ jobs:
       - name: Set the version from the tag (v1.2.3 -> 1.2.3)
         run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
 
-      # electron-builder finalizes the .dmg with `hdiutil detach`, which fails with
-      # "Resource busy" (exit 16) when Spotlight is indexing the freshly-mounted DMG
-      # volume — reliably so on the macos-15-intel image. Turn indexing off first.
-      - name: Disable Spotlight (prevents hdiutil "Resource busy" when packaging the dmg)
-        run: sudo mdutil -a -i off || true
-
-      - name: Build + package the ${{ matrix.arch }} dmg
+      - name: Build + package the ${{ matrix.arch }} app
         env:
           NODE_OPTIONS: --max-old-space-size=4096
           # electron-builder auto-publishes in CI when GH_TOKEN is set — we publish in
@@ -57,20 +51,20 @@ jobs:
           npm run build
           npx electron-builder --mac --${{ matrix.arch }} --publish never
 
-      - name: Upload the dmg artifact
+      - name: Upload the app zip
         uses: actions/upload-artifact@v4
         with:
-          name: dmg-${{ matrix.arch }}
-          path: dist/*.dmg
+          name: mac-${{ matrix.arch }}
+          path: dist/*.zip
           if-no-files-found: error
 
   release:
     needs: build
     runs-on: ubuntu-latest
     permissions:
-      contents: write # create the Release and attach the dmgs
+      contents: write # create the Release and attach the zips
     steps:
-      - name: Download both dmgs
+      - name: Download both zips
         uses: actions/download-artifact@v4
         with:
           path: artifacts
@@ -81,11 +75,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber artifacts/*.dmg
+            gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber artifacts/*.zip
           else
             gh release create "$GITHUB_REF_NAME" \
               --repo "$GITHUB_REPOSITORY" \
               --title "$GITHUB_REF_NAME" \
               --generate-notes \
-              artifacts/*.dmg
+              artifacts/*.zip
           fi

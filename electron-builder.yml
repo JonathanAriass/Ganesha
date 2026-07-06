@@ -13,10 +13,14 @@ asarUnpack:
   - "**/node_modules/node-llama-cpp/**"
   - "**/node_modules/@node-llama-cpp/**"
 mac:
-  target: dmg
+  # zip, not dmg: on the macos-15-intel runner electron-builder's dmg finalize step
+  # (`hdiutil detach`) reliably fails with "Resource busy", and macos-13 (the old Intel
+  # image) is retired. zip never mounts a disk image, so it can't hit that. Homebrew
+  # installs a zipped .app exactly like a dmg, so the cask UX is unchanged.
+  target: zip
   category: public.app-category.developer-tools
-  # Names each build the release + Homebrew cask expect: Ganesha-<version>-arm64.dmg / -x64.dmg
-  artifactName: ${productName}-${version}-${arch}.dmg
+  # Names each build what the release + Homebrew cask expect: Ganesha-<version>-arm64.zip / -x64.zip
+  artifactName: ${productName}-${version}-${arch}.zip
   # ── Sign + notarize later (when an Apple Developer account is available) ──
   #  1. Add repo Actions secrets: CSC_LINK (base64 Developer ID .p12), CSC_KEY_PASSWORD,
   #     APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID.

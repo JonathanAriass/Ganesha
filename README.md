@@ -115,7 +115,7 @@ Download the latest build for your platform from the [**Releases**](https://gith
 
 | Platform | Artifact |
 |---|---|
-| macOS | `.dmg` |
+| macOS | `.zip` (unzip → drag `Ganesha.app` to Applications) |
 | Windows | `.exe` (NSIS installer) |
 | Linux | `.AppImage` / `.deb` |
 
