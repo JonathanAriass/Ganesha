@@ -59,6 +59,13 @@ export function isAuthError(e: unknown): boolean {
  *  Reach them by setting the connection's Database or via db.getSiblingDB("admin"). */
 const MONGO_SYSTEM_DBS = new Set(['admin', 'config', 'local'])
 
+// Server-selection + initial-connect timeout. Restores MongoDB's own 30s default
+// (the app previously overrode it down to 10s) so connections across the globe —
+// high latency, slow replica-set discovery — don't give up before the round-trips
+// complete. A higher ceiling costs nothing on fast links; it only delays the error
+// when a server genuinely can't be reached.
+const MONGO_CONNECT_TIMEOUT_MS = 30_000
+
 interface OpenConnection {
   client: MongoClient
   /** The connection's configured database ('' = none → browse all databases). */
@@ -71,7 +78,10 @@ export class MongoDriver implements DatabaseDriver {
   private conns = new Map<string, OpenConnection>()
 
   private newClient(p: ConnectParams): MongoClient {
-    return new MongoClient(buildMongoUri(p), { serverSelectionTimeoutMS: 10_000 })
+    return new MongoClient(buildMongoUri(p), {
+      serverSelectionTimeoutMS: MONGO_CONNECT_TIMEOUT_MS,
+      connectTimeoutMS: MONGO_CONNECT_TIMEOUT_MS
+    })
   }
 
   async testConnection(p: ConnectParams): Promise<void> {
