@@ -33,6 +33,12 @@ jobs:
       - name: Set the version from the tag (v1.2.3 -> 1.2.3)
         run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
 
+      # electron-builder finalizes the .dmg with `hdiutil detach`, which fails with
+      # "Resource busy" (exit 16) when Spotlight is indexing the freshly-mounted DMG
+      # volume — reliably so on the macos-15-intel image. Turn indexing off first.
+      - name: Disable Spotlight (prevents hdiutil "Resource busy" when packaging the dmg)
+        run: sudo mdutil -a -i off || true
+
       - name: Build + package the ${{ matrix.arch }} dmg
         env:
           NODE_OPTIONS: --max-old-space-size=4096
