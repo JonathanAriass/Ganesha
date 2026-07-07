@@ -179,4 +179,33 @@ describe('PostgresDriver (integration, requires Docker)', () => {
     // The catalog read yields declared FKs only (inference is a separate renderer-side step).
     expect(rels.every((r) => r.origin === 'declared')).toBe(true)
   })
+
+  it('describeTableInfo returns columns, indexes, FKs (out + in), constraints, and size', async () => {
+    const opt = (q: string) => ({ maxRows: 1000, queryId: q, readOnly: false })
+    await driver.runQuery(id, { kind: 'sql', sql: 'CREATE TABLE ti_parent (id int PRIMARY KEY, code text UNIQUE)' }, opt('ti0'))
+    await driver.runQuery(id, { kind: 'sql', sql:
+      `CREATE TABLE ti_main (
+         id int PRIMARY KEY, email text NOT NULL, status text DEFAULT 'active',
+         parent_id int REFERENCES ti_parent(id), CONSTRAINT ti_email_chk CHECK (email <> ''))` }, opt('ti1'))
+    await driver.runQuery(id, { kind: 'sql', sql: 'CREATE UNIQUE INDEX ti_email_uq ON ti_main (email)' }, opt('ti2'))
+    await driver.runQuery(id, { kind: 'sql', sql: 'CREATE TABLE ti_child (id int PRIMARY KEY, main_id int REFERENCES ti_main(id))' }, opt('ti3'))
+    await driver.runQuery(id, { kind: 'sql', sql: "INSERT INTO ti_main VALUES (1,'a@b.com','active',NULL),(2,'c@d.com','active',NULL)" }, opt('ti4'))
+    await driver.runQuery(id, { kind: 'sql', sql: 'ANALYZE ti_main' }, opt('ti5'))
+
+    const info = await driver.describeTableInfo(id, { schema: 'public', name: 'ti_main' })
+
+    expect(info.columns.find((c) => c.name === 'id')).toMatchObject({ primaryKey: true, nullable: false })
+    expect(info.columns.find((c) => c.name === 'status')).toMatchObject({ dataType: 'text', nullable: true, primaryKey: false, default: expect.stringContaining('active') })
+
+    expect(info.indexes).toContainEqual(expect.objectContaining({ name: 'ti_main_pkey', columns: ['id'], unique: true, primary: true, method: 'btree' }))
+    expect(info.indexes).toContainEqual(expect.objectContaining({ name: 'ti_email_uq', columns: ['email'], unique: true, primary: false }))
+
+    expect(info.foreignKeys).toContainEqual(expect.objectContaining({ columns: ['parent_id'], refSchema: 'public', refTable: 'ti_parent', refColumns: ['id'] }))
+    expect(info.referencedBy).toContainEqual(expect.objectContaining({ refTable: 'ti_child', refColumns: ['main_id'], columns: ['id'] }))
+
+    expect(info.constraints.some((c) => c.type === 'check' && c.name === 'ti_email_chk')).toBe(true)
+
+    expect(typeof info.size?.bytes).toBe('number')
+    expect(info.size!.bytes!).toBeGreaterThan(0)
+  })
 })

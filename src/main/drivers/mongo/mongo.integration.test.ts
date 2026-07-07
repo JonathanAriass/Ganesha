@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { GenericContainer, type StartedTestContainer } from 'testcontainers'
 import { Long } from 'bson'
+import { MongoClient } from 'mongodb'
 import { MongoDriver } from './mongo'
 
 describe('MongoDriver (integration, requires Docker)', () => {
@@ -178,5 +179,27 @@ describe('MongoDriver (integration, requires Docker)', () => {
   it('applyEdits refuses on read-only and throws when the document is gone', async () => {
     await expect(driver.applyEdits(id, { table: { schema: 'testdb', name: 'edit_c' }, rows: [{ key: { _id: 1 }, set: { name: 'z' } }] }, { readOnly: true })).rejects.toThrow(/read-only/i)
     await expect(driver.applyEdits(id, { table: { schema: 'testdb', name: 'edit_c' }, rows: [{ key: { _id: 9999 }, set: { name: 'z' } }] }, { readOnly: false })).rejects.toThrow(/matched 0|expected exactly one/i)
+  })
+
+  it('describeTableInfo returns inferred columns, indexes (unique/compound), no FKs, and size', async () => {
+    const raw = new MongoClient(`mongodb://${container.getHost()}:${container.getMappedPort(27017)}`)
+    await raw.connect()
+    try {
+      const coll = raw.db('testdb').collection<{ _id: number; email: string; tags: string[] }>('ti_users')
+      await coll.insertMany([{ _id: 1, email: 'a@b.com', tags: ['x'] }, { _id: 2, email: 'c@d.com', tags: [] }])
+      await coll.createIndex({ email: 1 }, { unique: true, name: 'email_uq' })
+      await coll.createIndex({ email: 1, _id: -1 }, { name: 'email_id' })
+    } finally {
+      await raw.close()
+    }
+
+    const info = await driver.describeTableInfo(id, { schema: null, name: 'ti_users' })
+    expect(info.columns.find((c) => c.name === '_id')).toMatchObject({ primaryKey: true })
+    expect(info.indexes).toContainEqual(expect.objectContaining({ name: '_id_', columns: ['_id'], primary: true }))
+    expect(info.indexes).toContainEqual(expect.objectContaining({ name: 'email_uq', columns: ['email'], unique: true, primary: false }))
+    expect(info.indexes).toContainEqual(expect.objectContaining({ name: 'email_id', columns: ['email', '_id'] }))
+    expect(info.foreignKeys).toEqual([])
+    expect(info.constraints).toEqual([])
+    expect(info.size?.rowEstimate).toBe(2)
   })
 })

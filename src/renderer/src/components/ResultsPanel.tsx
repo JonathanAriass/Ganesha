@@ -25,6 +25,7 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
   const view: View = userView ?? (hasDocuments ? 'documents' : 'table')
   const { data: connections = [] } = useConnections()
   const connection = connections.find((c) => c.id === tab.connectionId)
+  const openTableInfoTab = useAppStore((s) => s.openTableInfoTab)
   const pendingEdits = Object.keys(tab.edits).length
 
   // Before the running spinner: a script renders progressively while it executes.
@@ -126,6 +127,15 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
           />
         )}
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+          {result.editable && (
+            <button
+              className="btn"
+              title="Table info — columns, indexes, foreign keys"
+              onClick={() => openTableInfoTab(tab.connectionId, result.editable!.table)}
+            >
+              ⓘ Info
+            </button>
+          )}
           {result.truncated && <span className="chip-warn">{truncationLabel(result)}</span>}
           <button
             className="btn"

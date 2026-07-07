@@ -1,7 +1,7 @@
 import { MongoClient } from 'mongodb'
 import type { Document, Filter, Sort, UpdateFilter } from 'mongodb'
 import { EJSON } from 'bson'
-import type { DatabaseDriver, ConnectParams, RunOptions, QueryRequest, QueryResult, DbObject, ObjectRef, ColumnInfo, TableEdits, Relationship } from '../types'
+import type { DatabaseDriver, ConnectParams, RunOptions, QueryRequest, QueryResult, DbObject, ObjectRef, ColumnInfo, TableEdits, Relationship, TableInfo, ColumnDetail, IndexInfo, TableSize } from '../types'
 import type { MongoCommand } from './command'
 import { isMongoCommandWrite } from './command'
 import { normalizeFind, normalizeScalar, normalizeValues, normalizeWriteResult } from './normalize'
@@ -292,5 +292,45 @@ export class MongoDriver implements DatabaseDriver {
   // naming-inference (renderer-side) for Mongo.
   async listRelationships(_id: string): Promise<Relationship[]> {
     return []
+  }
+
+  async describeTableInfo(id: string, ref: ObjectRef): Promise<TableInfo> {
+    const { client } = this.require(id)
+    const db = client.db(ref.schema ?? undefined)
+    const coll = db.collection(ref.name)
+
+    // "Columns" = the fields inferred from one sampled document; `_id` is the implicit key.
+    const sample = await coll.findOne({})
+    const columns: ColumnDetail[] = inferFieldTypes(sample as Record<string, unknown> | null).map((c) => ({
+      ...c, default: null, primaryKey: c.name === '_id'
+    }))
+
+    // Indexes: key field names in declaration order; `_id_` is the primary. A string key value
+    // (e.g. 'text', '2dsphere') is the index method; a numeric direction (1/-1) leaves it null.
+    const raw = (await coll.indexes()) as { name?: string; key?: Record<string, unknown>; unique?: boolean }[]
+    const indexes: IndexInfo[] = raw.map((ix) => {
+      const entries = Object.entries(ix.key ?? {})
+      const special = entries.map(([, v]) => v).find((v) => typeof v === 'string')
+      return {
+        name: String(ix.name ?? ''),
+        columns: entries.map(([k]) => k),
+        unique: !!ix.unique,
+        primary: ix.name === '_id_',
+        method: special != null ? String(special) : null
+      }
+    })
+
+    const rowEstimate = await coll.estimatedDocumentCount().catch(() => null)
+    let bytes: number | null = null
+    try {
+      const stats = (await db.command({ collStats: ref.name })) as { size?: number; storageSize?: number }
+      bytes = typeof stats.size === 'number' ? stats.size : typeof stats.storageSize === 'number' ? stats.storageSize : null
+    } catch {
+      bytes = null
+    }
+    const size: TableSize = { rowEstimate: typeof rowEstimate === 'number' ? rowEstimate : null, bytes }
+
+    // No foreign keys / constraints in MongoDB.
+    return { ref, columns, indexes, foreignKeys: [], referencedBy: [], constraints: [], size }
   }
 }

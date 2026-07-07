@@ -5,7 +5,7 @@ import type {
   LocalModel, CatalogModel, LlmConversation, LlmMessage, SsmTunnel, SsmTunnelInput, AwsInstance
 } from './domain'
 import type { QueryResult, RowEdit } from './query'
-import type { DbObject, ObjectRef, ColumnInfo, Relationship, TableColumns } from './schema'
+import type { DbObject, ObjectRef, ColumnInfo, Relationship, TableColumns, TableInfo } from './schema'
 
 export interface PingPayload {
   pong: string
@@ -43,6 +43,7 @@ export interface IpcChannels {
   'schema.columns': { req: { connectionId: string; ref: ObjectRef }; res: ColumnInfo[] }
   'schema.allColumns': { req: string; res: TableColumns[] }
   'schema.relationships': { req: string; res: Relationship[] }
+  'schema.tableInfo': { req: { connectionId: string; ref: ObjectRef }; res: TableInfo }
   'edits.apply': {
     req: { connectionId: string; table: { schema: string | null; name: string }; rows: RowEdit[] }
     res: { updated: number }

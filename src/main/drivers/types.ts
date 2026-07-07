@@ -1,9 +1,13 @@
 import type { ConnectionType } from '../../shared/domain'
 import type { MongoCommand } from './mongo/command'
 import type { ColumnMeta, QueryResult, EditableResult, RowEdit } from '../../shared/query'
-import type { DbObject, ObjectRef, ColumnInfo, Relationship } from '../../shared/schema'
+import type {
+  DbObject, ObjectRef, ColumnInfo, Relationship,
+  TableInfo, ColumnDetail, IndexInfo, ForeignKeyInfo, ConstraintInfo, TableSize
+} from '../../shared/schema'
 export type { ColumnMeta, QueryResult, EditableResult, RowEdit }
 export type { DbObject, ObjectRef, ColumnInfo, Relationship }
+export type { TableInfo, ColumnDetail, IndexInfo, ForeignKeyInfo, ConstraintInfo, TableSize }
 
 /** A batch of row edits against one table, sent from the renderer to a driver. */
 export interface TableEdits {
@@ -67,4 +71,8 @@ export interface DatabaseDriver {
   /** Declared foreign-key relationships between user tables (origin always 'declared'). Empty for
    *  engines without foreign keys (Mongo). For the schema diagram. */
   listRelationships(id: string): Promise<Relationship[]>
+  /** Full structure of one table/collection for the "Table info" tab: detailed columns, indexes,
+   *  foreign keys (both directions), constraints, and approximate size. Sections an engine lacks
+   *  (e.g. Mongo foreign keys/constraints) come back empty. */
+  describeTableInfo(id: string, ref: ObjectRef): Promise<TableInfo>
 }

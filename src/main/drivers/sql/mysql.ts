@@ -1,11 +1,20 @@
 import mysql from 'mysql2/promise'
 import type {
   DatabaseDriver, ConnectParams, RunOptions, QueryRequest, QueryResult, ColumnMeta,
-  DbObject, ObjectRef, ColumnInfo, EditableResult, TableEdits, Relationship
+  DbObject, ObjectRef, ColumnInfo, EditableResult, TableEdits, Relationship,
+  TableInfo, ColumnDetail, ConstraintInfo
 } from '../types'
 import type { ConnectionType } from '../../../shared/domain'
 import { buildEditableResult, isSingleTableScan, type PerColumnSource } from './edit-target'
 import { buildUpdate } from './update-builder'
+import { groupIndexes, groupForeignKeys } from './table-info-shape'
+
+/** mysql2 may return bigint sizes as strings (supportBigNumbers); coerce, garbage → null. */
+function numOrNull(v: unknown): number | null {
+  if (v === null || v === undefined) return null
+  const n = Number(v)
+  return Number.isFinite(n) ? n : null
+}
 
 /** MySQL/MariaDB driver (shared wire protocol) backed by a per-connection mysql2 pool.
  *  One class serves both — `type` is set per instance so the registry can hold both. */
@@ -247,5 +256,91 @@ export class MySqlDriver implements DatabaseDriver {
       fromSchema: null, fromTable: r.fromTable, fromColumn: r.fromColumn,
       toSchema: null, toTable: r.toTable, toColumn: r.toColumn, origin: 'declared' as const
     }))
+  }
+
+  async describeTableInfo(id: string, ref: ObjectRef): Promise<TableInfo> {
+    const pool = this.requirePool(id)
+    const a = [ref.name]
+
+    const [colRows] = await pool.query(
+      `SELECT COLUMN_NAME AS name, COLUMN_TYPE AS dataType, (IS_NULLABLE='YES') AS nullable,
+              COLUMN_DEFAULT AS def, (COLUMN_KEY='PRI') AS pk
+       FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION`,
+      a
+    )
+    const columns: ColumnDetail[] = (colRows as Record<string, unknown>[]).map((r) => ({
+      name: r.name as string, dataType: r.dataType as string, nullable: !!r.nullable,
+      default: (r.def as string | null) ?? null, primaryKey: !!r.pk
+    }))
+
+    const [ixRows] = await pool.query(
+      `SELECT INDEX_NAME AS name, COLUMN_NAME AS col, (NON_UNIQUE=0) AS uniq,
+              (INDEX_NAME='PRIMARY') AS prim, INDEX_TYPE AS method, SEQ_IN_INDEX AS ord
+       FROM information_schema.STATISTICS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? ORDER BY INDEX_NAME, SEQ_IN_INDEX`,
+      a
+    )
+    const indexes = groupIndexes((ixRows as Record<string, unknown>[]).map((r) => ({
+      name: r.name as string, column: r.col as string, unique: !!r.uniq, primary: !!r.prim,
+      method: (r.method as string | null) ?? null, ord: Number(r.ord)
+    })))
+
+    const [fkRows] = await pool.query(
+      `SELECT CONSTRAINT_NAME AS name, COLUMN_NAME AS col, REFERENCED_TABLE_NAME AS refTable,
+              REFERENCED_COLUMN_NAME AS refColumn, ORDINAL_POSITION AS ord
+       FROM information_schema.KEY_COLUMN_USAGE
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND REFERENCED_TABLE_NAME IS NOT NULL
+       ORDER BY CONSTRAINT_NAME, ORDINAL_POSITION`,
+      a
+    )
+    const foreignKeys = groupForeignKeys((fkRows as Record<string, unknown>[]).map((r) => ({
+      name: r.name as string, column: r.col as string, refSchema: null,
+      refTable: r.refTable as string, refColumn: r.refColumn as string, ord: Number(r.ord)
+    })))
+
+    // Incoming: refTable = the referencing table, refColumns = its FK columns, columns = our referenced columns.
+    const [refByRows] = await pool.query(
+      `SELECT CONSTRAINT_NAME AS name, REFERENCED_COLUMN_NAME AS col, TABLE_NAME AS refTable,
+              COLUMN_NAME AS refColumn, ORDINAL_POSITION AS ord
+       FROM information_schema.KEY_COLUMN_USAGE
+       WHERE REFERENCED_TABLE_SCHEMA = DATABASE() AND REFERENCED_TABLE_NAME = ?
+       ORDER BY CONSTRAINT_NAME, ORDINAL_POSITION`,
+      a
+    )
+    const referencedBy = groupForeignKeys((refByRows as Record<string, unknown>[]).map((r) => ({
+      name: r.name as string, column: r.col as string, refSchema: null,
+      refTable: r.refTable as string, refColumn: r.refColumn as string, ord: Number(r.ord)
+    })))
+
+    // CHECK constraints — best-effort (information_schema.CHECK_CONSTRAINTS is MySQL 8.0.16+ /
+    // recent MariaDB; on older servers the query throws and we return none). Unique constraints
+    // are surfaced as unique indexes above.
+    let constraints: ConstraintInfo[] = []
+    try {
+      const [ckRows] = await pool.query(
+        `SELECT tc.CONSTRAINT_NAME AS name, cc.CHECK_CLAUSE AS detail
+         FROM information_schema.TABLE_CONSTRAINTS tc
+         JOIN information_schema.CHECK_CONSTRAINTS cc
+           ON cc.CONSTRAINT_SCHEMA = tc.CONSTRAINT_SCHEMA AND cc.CONSTRAINT_NAME = tc.CONSTRAINT_NAME
+         WHERE tc.TABLE_SCHEMA = DATABASE() AND tc.TABLE_NAME = ? AND tc.CONSTRAINT_TYPE = 'CHECK'`,
+        a
+      )
+      constraints = (ckRows as Record<string, unknown>[]).map((r) => ({
+        name: r.name as string, type: 'check', detail: String(r.detail ?? '')
+      }))
+    } catch {
+      constraints = []
+    }
+
+    const [szRows] = await pool.query(
+      `SELECT TABLE_ROWS AS rowEstimate, (DATA_LENGTH + INDEX_LENGTH) AS bytes
+       FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?`,
+      a
+    )
+    const sz = (szRows as Record<string, unknown>[])[0]
+    const size = sz ? { rowEstimate: numOrNull(sz.rowEstimate), bytes: numOrNull(sz.bytes) } : null
+
+    return { ref, columns, indexes, foreignKeys, referencedBy, constraints, size }
   }
 }

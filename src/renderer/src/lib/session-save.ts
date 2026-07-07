@@ -3,13 +3,14 @@ import type { PaneId } from './panes'
 import type { QueryTabData } from '../state/store'
 
 /** Project the tab strip onto its persisted shape — text only, volatile state stays out.
- *  Diagram tabs are ephemeral and skipped. Each pane's active tab is flagged. */
+ *  Only query tabs persist; diagram and table-info tabs are ephemeral. Each pane's active tab
+ *  is flagged. */
 export function toSessionTabs(
   tabs: QueryTabData[],
   activeByPane: Record<PaneId, string | null>
 ): SessionTab[] {
   return tabs
-    .filter((t) => t.kind !== 'diagram')
+    .filter((t) => (t.kind ?? 'query') === 'query')
     .map((t) => ({
       id: t.id,
       connectionId: t.connectionId,

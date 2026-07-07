@@ -73,6 +73,17 @@ export function useRelationships(connectionId: string | null, enabled = true) {
   })
 }
 
+// ── Schema: one table's full structure (the "Table info" tab) ─────────────────
+
+export function useTableInfo(connectionId: string | null, ref: ObjectRef) {
+  return useQuery({
+    queryKey: ['tableInfo', connectionId, ref.schema, ref.name],
+    queryFn: () => window.api.schema.tableInfo(connectionId!, ref).then(unwrap),
+    enabled: connectionId != null,
+    retry: false,
+  })
+}
+
 // ── SSM tunnels ───────────────────────────────────────────────────────────────
 
 export function useSsmTunnels() {

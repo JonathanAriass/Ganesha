@@ -761,6 +761,31 @@ input[type="password"]::placeholder {
   font-size: 12px;
 }
 
+/* Hover-reveal "Table info" icon at the right of a tree row. */
+.tree-info {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  color: var(--text-2);
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.08s, color 0.08s, background 0.08s;
+}
+
+.tree-row:hover .tree-info {
+  opacity: 0.7;
+}
+
+.tree-info:hover {
+  opacity: 1;
+  color: var(--text);
+  background: var(--bg-3);
+}
+
 .tree-children {
   padding-left: 24px;
   border-left: 1px solid var(--border);
@@ -2170,3 +2195,252 @@ input[type="password"]::placeholder {
 [data-tooltip]:hover::after { opacity: 1; }
 /* Right-anchor for buttons near the window's right edge so the tooltip can't clip. */
 [data-tooltip][data-tip="right"]::after { left: auto; right: 0; transform: none; }
+
+/* ── Table info tab ── */
+.ti-view {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 18px 22px;
+}
+
+.ti-content {
+  max-width: 1680px;
+}
+
+.ti-status {
+  padding: 22px;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.ti-header {
+  margin-bottom: 16px;
+}
+
+.ti-name {
+  font-size: 17px;
+  font-weight: 650;
+  color: var(--text);
+  margin-bottom: 9px;
+}
+
+.ti-schema {
+  color: var(--text-2);
+  font-weight: 500;
+}
+
+.ti-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ti-chip {
+  font-size: 11.5px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.ti-chip.ti-chip-soft {
+  color: var(--text-2);
+}
+
+.ti-card {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+
+.ti-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg-3) 45%, transparent);
+}
+
+.ti-card-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--text);
+}
+
+.ti-card-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-2);
+  background: var(--bg-3);
+  border-radius: 999px;
+  padding: 0 8px;
+  min-width: 20px;
+  text-align: center;
+}
+
+.ti-empty {
+  padding: 12px 14px;
+  color: var(--text-2);
+  font-size: 12.5px;
+}
+
+.ti-mono {
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+}
+
+.ti-soft {
+  color: var(--text-2);
+}
+
+/* Columns flow into responsive sub-columns (1 / 2 / 3 by available width). */
+.ti-col-list {
+  column-width: 460px;
+  column-gap: 28px;
+  padding: 2px 0;
+}
+
+.ti-col-item {
+  display: grid;
+  grid-template-columns: minmax(0, 210px) minmax(0, 150px) 1fr;
+  gap: 0 12px;
+  align-items: center;
+  padding: 5px 14px;
+  break-inside: avoid;
+  border-bottom: 1px solid var(--bg-3);
+  font-size: 12.5px;
+}
+
+.ti-col-item:hover {
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+
+.ti-col-name {
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ti-col-type {
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ti-col-flags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+/* The smaller sections sit side by side, filling the width. */
+.ti-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.ti-cards-grid .ti-card {
+  margin-bottom: 0;
+}
+
+.ti-pill {
+  display: inline-block;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-right: 6px;
+  vertical-align: middle;
+  text-transform: uppercase;
+}
+
+.ti-pill.pk {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+  color: var(--text);
+}
+
+.ti-pill.fk {
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  color: var(--text);
+}
+
+.ti-pill.uniq {
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+}
+
+.ti-tag {
+  font-size: 11px;
+  color: var(--text-2);
+  margin-right: 12px;
+}
+
+/* Two-line entry (indexes, constraints): name + pills on top, detail below. */
+.ti-row2 {
+  padding: 7px 14px;
+}
+
+.ti-row2:not(:last-child) {
+  border-bottom: 1px solid var(--bg-3);
+}
+
+.ti-row2:hover {
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+
+.ti-row2-top {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.ti-row2-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.ti-row2-sub {
+  font-size: 11.5px;
+  margin-top: 2px;
+  word-break: break-word;
+}
+
+.ti-rel {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  padding: 7px 14px;
+  font-size: 12.5px;
+}
+
+.ti-rel:not(:last-child) {
+  border-bottom: 1px solid var(--bg-3);
+}
+
+.ti-rel:hover {
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+
+.ti-arrow {
+  color: var(--text-2);
+}

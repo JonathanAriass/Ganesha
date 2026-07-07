@@ -168,4 +168,31 @@ describe('MySqlDriver (integration, requires Docker)', () => {
     expect(rels).toContainEqual({ fromSchema: null, fromTable: 'rel_fk2', fromColumn: 'y', toSchema: null, toTable: 'rel_pk2', toColumn: 'b', origin: 'declared' })
     expect(rels.every((r) => r.origin === 'declared')).toBe(true)
   })
+
+  it('describeTableInfo returns columns, indexes, FKs (out + in), constraints, and size', async () => {
+    const opt = (q: string) => ({ maxRows: 1000, queryId: q, readOnly: false })
+    await driver.runQuery(id, { kind: 'sql', sql: 'CREATE TABLE ti_parent (id INT PRIMARY KEY, code VARCHAR(20) UNIQUE) ENGINE=InnoDB' }, opt('ti0'))
+    await driver.runQuery(id, { kind: 'sql', sql:
+      `CREATE TABLE ti_main (
+         id INT PRIMARY KEY, email VARCHAR(100) NOT NULL, status VARCHAR(20) DEFAULT 'active',
+         parent_id INT, FOREIGN KEY (parent_id) REFERENCES ti_parent(id),
+         CONSTRAINT ti_email_chk CHECK (email <> '')) ENGINE=InnoDB` }, opt('ti1'))
+    await driver.runQuery(id, { kind: 'sql', sql: 'CREATE UNIQUE INDEX ti_email_uq ON ti_main (email)' }, opt('ti2'))
+    await driver.runQuery(id, { kind: 'sql', sql: 'CREATE TABLE ti_child (id INT PRIMARY KEY, main_id INT, FOREIGN KEY (main_id) REFERENCES ti_main(id)) ENGINE=InnoDB' }, opt('ti3'))
+    await driver.runQuery(id, { kind: 'sql', sql: "INSERT INTO ti_main VALUES (1,'a@b.com','active',NULL),(2,'c@d.com','active',NULL)" }, opt('ti4'))
+
+    const info = await driver.describeTableInfo(id, { schema: null, name: 'ti_main' })
+
+    expect(info.columns.find((c) => c.name === 'id')).toMatchObject({ primaryKey: true, nullable: false })
+    expect(info.columns.find((c) => c.name === 'status')).toMatchObject({ nullable: true, primaryKey: false, default: expect.stringContaining('active') })
+
+    expect(info.indexes).toContainEqual(expect.objectContaining({ name: 'PRIMARY', columns: ['id'], unique: true, primary: true }))
+    expect(info.indexes).toContainEqual(expect.objectContaining({ name: 'ti_email_uq', columns: ['email'], unique: true, primary: false }))
+
+    expect(info.foreignKeys).toContainEqual(expect.objectContaining({ columns: ['parent_id'], refSchema: null, refTable: 'ti_parent', refColumns: ['id'] }))
+    expect(info.referencedBy).toContainEqual(expect.objectContaining({ refTable: 'ti_child', refColumns: ['main_id'], columns: ['id'] }))
+
+    expect(info.constraints.some((c) => c.type === 'check' && c.name === 'ti_email_chk')).toBe(true)
+    expect(typeof info.size?.bytes).toBe('number')
+  })
 })
