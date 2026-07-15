@@ -1,10 +1,22 @@
 import { useMemo, useState } from 'react'
+import JsonView from 'react18-json-view'
+import 'react18-json-view/src/style.css'
 import type { ColumnMeta, EditableResult } from '@shared/query'
 import { fieldView, rowJson, positionLabel } from '../lib/inspect'
 import { columnEditable, columnEditKey, editChangesValue } from '../lib/edit-staging'
-import { coerceMongoEditValue } from '../lib/mongo-edit-value'
+import { coerceMongoEditValue, coerceLibraryEditValue } from '../lib/mongo-edit-value'
+import { asJsonTree } from '../lib/json-field'
+import { getAtPath, setAtPath } from '../lib/doc-path'
+import { cellText } from '../lib/grid-text'
 import { useAppStore } from '../state/store'
 import EditingCell from './EditingCell'
+
+/** react18-json-view's onEdit payload (the bits we use), same shape as DocumentView's. */
+interface EditParams {
+  newValue: unknown
+  parentPath: (string | number)[]
+  indexOrName: string | number
+}
 
 interface Props {
   columns: ColumnMeta[]
@@ -60,7 +72,17 @@ export default function RowInspector({
         const key = rowIndex !== undefined ? columnEditKey(editable, rowIndex, i) : null
         const dirty = key !== null && Object.prototype.hasOwnProperty.call(edits, key)
         const value = dirty ? edits[key as string] : row[i]
-        return { key, dirty, canEdit: columnEditable(editable, readOnly, i), view: fieldView(value) }
+        // JSON containers render as an editable tree; the clone is stable per (row, edits) so the
+        // viewer keeps its expand/collapse state and doesn't re-clone every render.
+        const json = asJsonTree(value)
+        return {
+          key,
+          dirty,
+          canEdit: columnEditable(editable, readOnly, i),
+          view: fieldView(value),
+          json,
+          jsonSrc: json ? structuredClone(json.tree) : null,
+        }
       }),
     [columns, row, edits, editable, readOnly, rowIndex]
   )
@@ -79,6 +101,29 @@ export default function RowInspector({
     const stored = isMongo ? coerceMongoEditValue(value as string | null, original) : value
     store().setCellEdit(tabId, key, stored)
     if (!requireCommit) void store().commitEdits(tabId) // fast-commit: write immediately
+  }
+
+  /** A leaf edit from the JSON tree: rebuild the WHOLE field value with the leaf changed and stage
+   *  it at the field's column key. Keeps the value real JSON — object (Mongo/`jsonb`) or, for a
+   *  `json`-as-text field, a re-serialized JSON string — instead of the flat string the one-line
+   *  editor produced. */
+  function stageJson(i: number, params: EditParams): void {
+    const f = fields[i]
+    if (!tabId || !f.key || !f.json) return
+    const segs = [...params.parentPath, params.indexOrName].map(String)
+    if (segs.some((s) => s.startsWith('$'))) return // inside an EJSON wrapper ({$oid}/{$date}) — can't $set
+    const path = segs.join('.')
+    // The viewer hands back an already-parsed leaf; re-bias it to the original leaf's type.
+    const leaf = coerceLibraryEditValue(params.newValue, getAtPath(f.json.tree, path))
+    const next = setAtPath(f.json.tree, path, leaf)
+    const stored = f.json.wasString ? JSON.stringify(next) : next
+    // Edited back to the original whole value → drop any staged change instead of staging a no-op.
+    if (cellText(stored) === cellText(row[i])) {
+      if (Object.prototype.hasOwnProperty.call(edits, f.key)) store().resetCellEdit(tabId, f.key)
+      return
+    }
+    store().setCellEdit(tabId, f.key, stored)
+    if (!requireCommit) void store().commitEdits(tabId)
   }
 
   return (
@@ -140,7 +185,20 @@ export default function RowInspector({
                   ⧉
                 </button>
               </div>
-              {editing === i ? (
+              {f.json ? (
+                // JSON container → editable tree (leaf edits keep it real JSON, not a string).
+                <div className={`ri-json${f.dirty ? ' dirty' : ''}`}>
+                  <JsonView
+                    src={f.jsonSrc!}
+                    collapsed={2}
+                    ignoreLargeArray
+                    displaySize="collapsed"
+                    enableClipboard
+                    editable={f.canEdit ? { edit: true, add: false, delete: false } : false}
+                    onEdit={f.canEdit ? ((p: unknown) => stageJson(i, p as EditParams)) : undefined}
+                  />
+                </div>
+              ) : editing === i ? (
                 <EditingCell
                   initial={f.dirty ? edits[f.key as string] : row[i]}
                   onCommit={(v) => stage(i, v)}
