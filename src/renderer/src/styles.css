@@ -1570,6 +1570,20 @@ input[type="password"]::placeholder {
   word-break: break-word;
 }
 
+/* JSON container fields render as an editable react18-json-view tree in the inspector. */
+.ri-json {
+  max-height: 320px;
+  overflow: auto;
+  padding: 5px 7px;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.ri-json.dirty {
+  box-shadow: inset 2px 0 0 var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 35%, var(--border));
+}
+
 /* ── Editable inspector fields ── double-click the value to edit; dirty fields tint + show ↺. */
 .ri-value {
   border-radius: 4px;
