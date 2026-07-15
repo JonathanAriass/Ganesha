@@ -6,6 +6,7 @@ import type { QueryTabData } from '../state/store'
 const base = (over: Partial<QueryTabData> & { id: string; connectionId: string; pane: 'left' | 'right' }): QueryTabData => ({
   title: 'Q', text: 't', kind: undefined, epoch: 0, runOnOpen: false, running: false,
   queryId: null, result: null, resultQueryId: null, hasMore: false, loadingMore: false,
+  filter: '', filterView: null,
   error: null, scriptRun: null, edits: {}, editError: null, ...over,
 })
 

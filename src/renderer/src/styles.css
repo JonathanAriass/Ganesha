@@ -1222,6 +1222,13 @@ input[type="password"]::placeholder {
   outline: none;
 }
 
+/* Match count beside the filter box (searches the whole result). */
+.filter-count {
+  font-size: 12px;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
 .filter-input:focus {
   border-color: var(--accent);
 }

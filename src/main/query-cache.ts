@@ -1,8 +1,20 @@
+import { filterIndices } from './result-filter'
+
 /** A page of a cached result: the slice at the requested offset plus whether rows remain
  *  past it (so the renderer knows to keep offering "load more"). */
 export interface ResultPage {
   rows: unknown[][]
   documents: Record<string, unknown>[] | null
+  hasMore: boolean
+}
+
+/** A page of the FILTERED result: like ResultPage, plus each row's original result index (so edits
+ *  key by the real index) and the total match count (for the "N matches" label). */
+export interface FilterPage {
+  rows: unknown[][]
+  documents: Record<string, unknown>[] | null
+  indices: number[]
+  total: number
   hasMore: boolean
 }
 
@@ -46,6 +58,25 @@ export class ResultCache {
       rows: cached.rows.slice(offset, end),
       documents: cached.documents ? cached.documents.slice(offset, end) : null,
       hasMore: cached.rows.length > end,
+    }
+  }
+
+  /** A page of the rows matching `filter` (case-insensitive substring, any column) across the
+   *  WHOLE cached result — the fix for filtering only loaded rows. `indices` are the matches'
+   *  original result indexes; `total` is the full match count. Null on cache miss. Bumps LRU. */
+  filterPage(queryId: string, filter: string, offset: number, pageSize: number): FilterPage | null {
+    const cached = this.map.get(queryId)
+    if (!cached) return null
+    this.map.delete(queryId) // bump to MRU
+    this.map.set(queryId, cached)
+    const matched = filterIndices(cached.rows, filter)
+    const slice = matched.slice(offset, offset + pageSize)
+    return {
+      rows: slice.map((i) => cached.rows[i]),
+      documents: cached.documents ? slice.map((i) => cached.documents![i]) : null,
+      indices: slice,
+      total: matched.length,
+      hasMore: matched.length > offset + pageSize,
     }
   }
 

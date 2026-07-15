@@ -46,6 +46,9 @@ interface Props {
   /** Stable identity of the current result (the queryId). Selection/editing self-invalidate
    *  when it changes (new query) but survive row appends (same query, more rows). */
   resultKey?: string | null
+  /** When the rows are a FILTERED subset, the original result index per displayed row — so edits
+   *  key by the real index (stable across filter/clear). null = identity (rows[i] is result row i). */
+  rowIndices?: number[] | null
 }
 
 export default function ResultsGrid({
@@ -63,6 +66,7 @@ export default function ResultsGrid({
   loadingMore,
   onLoadMore,
   resultKey,
+  rowIndices,
 }: Props): JSX.Element {
   const [sorting, setSorting] = useState<SortingState>([])
   const selKey = resultKey ?? null
@@ -163,11 +167,12 @@ export default function ResultsGrid({
   const colEditable = (colIndex: number): boolean => columnEditable(editable, readOnly, colIndex)
   const cellKey = (rowIndex: number, colIndex: number): string | null => columnEditKey(editable, rowIndex, colIndex)
 
-  function stageCell(rowIndex: number, colIndex: number, value: unknown): void {
+  // `rowIndex` is the ORIGINAL result index (for the staging key); `original` is the displayed
+  // cell's un-staged value (passed in, since `rows` is position-indexed when filtered).
+  function stageCell(rowIndex: number, colIndex: number, value: unknown, original: unknown): void {
     const k = tabId && cellKey(rowIndex, colIndex)
     if (!tabId || !k) return
     setEditing(null)
-    const original = rows[rowIndex][colIndex]
     if (!editChangesValue(value, original)) {
       // No-op edit (or edited back to the original) — don't stage; drop any prior staged change.
       if (Object.prototype.hasOwnProperty.call(edits, k)) store().resetCellEdit(tabId, k)
@@ -296,7 +301,8 @@ export default function ResultsGrid({
           <div style={{ height: virtualizer.getTotalSize(), position: 'relative', minWidth: 'var(--grid-min)' }}>
             {virtualizer.getVirtualItems().map((virtualRow) => {
               const row = tableRows[virtualRow.index]
-              const rowIndex = Number(row.id)
+              const pos = Number(row.id) // position in the displayed (possibly filtered) rows
+              const rowIndex = rowIndices ? rowIndices[pos] : pos // original result index (edit keys)
               return (
                 <div
                   key={row.id}
@@ -332,7 +338,7 @@ export default function ResultsGrid({
                         <EditingCell
                           key={cell.id}
                           initial={raw}
-                          onCommit={(v) => stageCell(rowIndex, colIndex, v)}
+                          onCommit={(v) => stageCell(rowIndex, colIndex, v, cell.getValue())}
                           onCancel={() => setEditing(null)}
                         />
                       )
@@ -382,7 +388,7 @@ export default function ResultsGrid({
           key={selId}
           columns={columns}
           row={rows[Number(selId)]}
-          rowIndex={Number(selId)}
+          rowIndex={rowIndices ? rowIndices[Number(selId)] : Number(selId)}
           pos={selPos}
           total={tableRows.length}
           onPrev={() => step(-1)}

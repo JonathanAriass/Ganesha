@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useAppStore, type QueryTabData } from '../state/store'
 import { unwrap } from '../lib/result'
 import { useConnections } from '../lib/hooks'
@@ -6,7 +6,6 @@ import ResultsGrid from './ResultsGrid'
 import ScriptResults from './ScriptResults'
 import DocumentView from './DocumentView'
 import { toCsv, toJsonText, toJsonObjects, download } from '../lib/export'
-import { rowMatchesFilter } from '../lib/grid-text'
 import { dateColumnKind, type SqlDialect } from '../lib/date-format'
 import { mod } from '../lib/platform'
 import { truncationLabel, affectedRowsLabel } from '../lib/result-label'
@@ -22,26 +21,53 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
   // Only the explicit user choice is state; the panel mounts before any result
   // exists, so the default must be derived at render time once one arrives.
   const [userView, setUserView] = useState<View | null>(null)
-  const [filter, setFilter] = useState('')
+  const filter = tab.filter // store-owned so main-side filtering + paging coordinate
   const view: View = userView ?? (hasDocuments ? 'documents' : 'table')
   const { data: connections = [] } = useConnections()
   const connection = connections.find((c) => c.id === tab.connectionId)
   const openTableInfoTab = useAppStore((s) => s.openTableInfoTab)
   const pendingEdits = Object.keys(tab.edits).length
 
-  // Scroll load-more: fetch the next cached page and append it. Reads LIVE tab state (getState)
-  // so the callback identity is stable and a stale closure can't double-fetch; the store's
-  // loadingMore flag serializes concurrent scroll triggers.
+  // Scroll load-more: page the ACTIVE view — the filtered matches when a filter is on, else the raw
+  // result. Reads LIVE tab state (getState) so the callback identity is stable and a stale closure
+  // can't double-fetch; the store's loadingMore flag serializes concurrent scroll triggers.
   const loadMore = useCallback(() => {
-    const t = useAppStore.getState().tabs.find((x) => x.id === tab.id)
-    if (!t || !t.resultQueryId || !t.hasMore || t.loadingMore || !t.result) return
-    useAppStore.getState().setLoadingMore(tab.id, true)
-    void window.api.query
-      .fetchMore(t.resultQueryId, t.result.rows.length)
-      .then(unwrap)
-      .then((page) => useAppStore.getState().appendRows(tab.id, page))
-      .catch(() => useAppStore.getState().setLoadingMore(tab.id, false))
+    const store = useAppStore.getState()
+    const t = store.tabs.find((x) => x.id === tab.id)
+    if (!t || !t.resultQueryId || t.loadingMore) return
+    if (t.filter) {
+      if (!t.filterView || !t.filterView.hasMore) return
+      store.setLoadingMore(tab.id, true)
+      void window.api.query
+        .filter(t.resultQueryId, t.filter, t.filterView.rows.length)
+        .then(unwrap)
+        .then((page) => store.appendFilterRows(tab.id, t.filter, page))
+        .catch(() => store.setLoadingMore(tab.id, false))
+    } else {
+      if (!t.hasMore || !t.result) return
+      store.setLoadingMore(tab.id, true)
+      void window.api.query
+        .fetchMore(t.resultQueryId, t.result.rows.length)
+        .then(unwrap)
+        .then((page) => store.appendRows(tab.id, page))
+        .catch(() => store.setLoadingMore(tab.id, false))
+    }
   }, [tab.id])
+
+  // Apply the filter over the WHOLE cached result in main (debounced). The store's race guard drops
+  // a response whose filter the user has since changed.
+  const resultQueryId = tab.resultQueryId
+  useEffect(() => {
+    if (!filter || !resultQueryId) return
+    const handle = setTimeout(() => {
+      void window.api.query
+        .filter(resultQueryId, filter, 0)
+        .then(unwrap)
+        .then((page) => useAppStore.getState().applyFilterPage(tab.id, filter, page))
+        .catch(() => {})
+    }, 200)
+    return () => clearTimeout(handle)
+  }, [filter, resultQueryId, tab.id])
 
   // Before the running spinner: a script renders progressively while it executes.
   if (tab.scriptRun) {
@@ -84,6 +110,12 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
 
   const result = tab.result
   const filtering = view === 'table' && filter !== ''
+  // The active view: filtered matches (loaded from main) when filtering, else the raw result. `fv`
+  // is null during the brief debounce before the first matches arrive → the raw rows show meanwhile.
+  const fv = filtering ? tab.filterView : null
+  const shownRows = fv ? fv.rows : result.rows
+  const shownIndices = fv ? fv.indices : null
+  const shownHasMore = fv ? fv.hasMore : tab.hasMore
 
   // Day-first DISPLAY formatting for SQL date/time/timestamp columns (postgres OIDs / mysql
   // type codes). Per-column null = not a date (or a non-SQL connection) → the grid shows raw.
@@ -95,9 +127,9 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
         : null
   const columnKinds = dialect ? result.columns.map((c) => dateColumnKind(c.dataType, dialect)) : null
 
-  // Export what the grid shows: the filtered subset when a table filter is active.
+  // Export what the grid shows: the loaded matches when filtering, else the loaded rows.
   function exportRows(): unknown[][] {
-    return filtering ? result.rows.filter((r) => rowMatchesFilter(r, filter)) : result.rows
+    return shownRows
   }
 
   // A result with no columns is a write/command (UPDATE/INSERT/DELETE/DDL), never a
@@ -134,12 +166,19 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
           </div>
         )}
         {view === 'table' && (
-          <input
-            className="filter-input"
-            placeholder="Filter rows…"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-          />
+          <>
+            <input
+              className="filter-input"
+              placeholder="Filter all rows…"
+              value={filter}
+              onChange={(e) => useAppStore.getState().setFilter(tab.id, e.target.value)}
+            />
+            {filtering && (
+              <span className="filter-count">
+                {fv ? `${fv.total} match${fv.total === 1 ? '' : 'es'}` : '…'}
+              </span>
+            )}
+          </>
         )}
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
           {result.editable && (
@@ -180,8 +219,9 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
       {view === 'table' ? (
         <ResultsGrid
           columns={result.columns}
-          rows={result.rows}
-          globalFilter={filter}
+          rows={shownRows}
+          rowIndices={shownIndices}
+          globalFilter=""
           tabId={tab.id}
           editable={connection && !connection.readOnly ? result.editable : null}
           readOnly={connection?.readOnly ?? true}
@@ -189,10 +229,10 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
           isMongo={connection?.type === 'mongodb'}
           columnKinds={columnKinds}
           edits={tab.edits}
-          hasMore={tab.hasMore}
+          hasMore={shownHasMore}
           loadingMore={tab.loadingMore}
           onLoadMore={loadMore}
-          resultKey={tab.resultQueryId}
+          resultKey={`${tab.resultQueryId ?? ''}|${filter}`}
         />
       ) : (
         <DocumentView

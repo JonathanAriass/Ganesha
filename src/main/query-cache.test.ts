@@ -64,3 +64,43 @@ describe('ResultCache', () => {
     expect(p.hasMore).toBe(false)
   })
 })
+
+describe('ResultCache.filterPage', () => {
+  const c = new ResultCache()
+  // 5 rows; 'al' matches rows 0 (alpha) and 2 (alto) only.
+  c.store('q', {
+    rows: [['alpha'], ['banana'], ['alto'], ['cherry'], ['delta']],
+    documents: [{ n: 'alpha' }, { n: 'banana' }, { n: 'alto' }, { n: 'cherry' }, { n: 'delta' }],
+  })
+
+  it('returns matching rows with their ORIGINAL indexes + total', () => {
+    const p = c.filterPage('q', 'al', 0, 10)!
+    expect(p.rows).toEqual([['alpha'], ['alto']])
+    expect(p.indices).toEqual([0, 2]) // original result indexes, for stable edit keys
+    expect(p.documents).toEqual([{ n: 'alpha' }, { n: 'alto' }])
+    expect(p.total).toBe(2)
+    expect(p.hasMore).toBe(false)
+  })
+
+  it('pages the matches and reports hasMore at the boundary', () => {
+    const p1 = c.filterPage('q', '', 0, 2)! // empty filter matches all 5
+    expect(p1.rows).toHaveLength(2)
+    expect(p1.indices).toEqual([0, 1])
+    expect(p1.total).toBe(5)
+    expect(p1.hasMore).toBe(true)
+    const p2 = c.filterPage('q', '', 4, 2)!
+    expect(p2.indices).toEqual([4])
+    expect(p2.hasMore).toBe(false)
+  })
+
+  it('no matches → empty page, total 0', () => {
+    const p = c.filterPage('q', 'zzz', 0, 10)!
+    expect(p.rows).toEqual([])
+    expect(p.total).toBe(0)
+    expect(p.hasMore).toBe(false)
+  })
+
+  it('returns null on a cache miss', () => {
+    expect(c.filterPage('nope', 'a', 0, 10)).toBeNull()
+  })
+})

@@ -290,6 +290,7 @@ describe('hydrateTabs', () => {
       id: 'a', connectionId: 'c1', title: 'Query 1', text: 'SELECT 1', pane: 'left',
       epoch: 0, runOnOpen: false, running: false, queryId: null,
       result: null, resultQueryId: null, hasMore: false, loadingMore: false,
+      filter: '', filterView: null,
       error: null, scriptRun: null, edits: {}, editError: null
     })
     expect(s.activeTabId).toBe('b')
@@ -715,6 +716,7 @@ describe('split views — reorderTab (drag-and-drop)', () => {
   const mk = (id: string, connectionId: string, pane: 'left' | 'right') => ({
     id, connectionId, title: id, pane, text: '', epoch: 0, runOnOpen: false, running: false,
     queryId: null, result: null, resultQueryId: null, hasMore: false, loadingMore: false,
+    filter: '', filterView: null,
     error: null, scriptRun: null, edits: {}, editError: null,
   })
 
@@ -773,5 +775,51 @@ describe('split views — reorderTab (drag-and-drop)', () => {
     expect(s.activeTabByPane.left).toBe('a') // survivor
     expect(s.activeConnByPane.left).toBe('c1') // a's conn — NOT stale c2
     expect(s.activeConnectionId).toBe('c2') // b's conn (mirror = focused right)
+  })
+})
+
+describe('results filter view (main-side search)', () => {
+  beforeEach(() => {
+    useAppStore.setState({
+      tabs: [], activeTabId: null, _queryCounter: 0,
+      focusedPane: 'left', activeTabByPane: { left: null, right: null }, activeConnByPane: { left: null, right: null },
+    })
+    useAppStore.getState().openQueryTab({ connectionId: 'c1', text: 'select 1' })
+  })
+  const tab = () => useAppStore.getState().tabs[0]
+  const page = (over: Record<string, unknown> = {}) => ({
+    rows: [[1]] as unknown[][], documents: null, indices: [0], total: 1, hasMore: false, ...over,
+  })
+
+  it('setFilter sets the text; clearing it drops the filter view', () => {
+    const id = tab().id
+    useAppStore.getState().setFilter(id, 'ab')
+    expect(tab().filter).toBe('ab')
+    useAppStore.getState().applyFilterPage(id, 'ab', page())
+    expect(tab().filterView?.filter).toBe('ab')
+    useAppStore.getState().setFilter(id, '')
+    expect(tab().filter).toBe('')
+    expect(tab().filterView).toBeNull()
+  })
+
+  it('applyFilterPage is dropped when the filter has since changed (race guard)', () => {
+    const id = tab().id
+    useAppStore.getState().setFilter(id, 'abc')
+    useAppStore.getState().applyFilterPage(id, 'ab', page()) // stale response for an old filter
+    expect(tab().filterView).toBeNull()
+    useAppStore.getState().applyFilterPage(id, 'abc', page({ total: 3 }))
+    expect(tab().filterView?.total).toBe(3)
+  })
+
+  it('appendFilterRows appends matches + indices, and drops a stale-filter page', () => {
+    const id = tab().id
+    useAppStore.getState().setFilter(id, 'ab')
+    useAppStore.getState().applyFilterPage(id, 'ab', page({ rows: [[1]], indices: [0], total: 2, hasMore: true }))
+    useAppStore.getState().appendFilterRows(id, 'ab', page({ rows: [[2]], indices: [5], total: 2, hasMore: false }))
+    expect(tab().filterView?.rows).toEqual([[1], [2]])
+    expect(tab().filterView?.indices).toEqual([0, 5]) // original indexes preserved
+    expect(tab().filterView?.hasMore).toBe(false)
+    useAppStore.getState().appendFilterRows(id, 'xx', page({ rows: [[9]] })) // stale filter → ignored
+    expect(tab().filterView?.rows).toEqual([[1], [2]])
   })
 })

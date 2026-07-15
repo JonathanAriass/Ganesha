@@ -41,6 +41,57 @@ export interface ScriptRun {
   entries: ScriptStatementResult[]
 }
 
+/** The rows matching a tab's active filter, loaded page-by-page from main (which filters the whole
+ *  cached result). `indices` = each match's ORIGINAL result index, so edits key stably. */
+export interface FilterView {
+  filter: string
+  rows: unknown[][]
+  documents: Record<string, unknown>[] | null
+  indices: number[]
+  total: number
+  hasMore: boolean
+}
+
+/** Apply committed edits (keyed by ORIGINAL row index) onto a filter view, whose rows are indexed
+ *  by POSITION — `indices[pos]` is the original index. Mirrors applyResultEdits' per-row patch so a
+ *  committed edit on a filtered row shows its new value instead of reverting to the pre-edit cell. */
+function patchFilterView(
+  fv: FilterView,
+  edits: { rowIndex: number; path: string; value: unknown }[],
+  columns: { name: string }[],
+): FilterView {
+  const byIndex = new Map<number, { path: string; value: unknown }[]>()
+  for (const e of edits) {
+    const a = byIndex.get(e.rowIndex)
+    if (a) a.push(e)
+    else byIndex.set(e.rowIndex, [e])
+  }
+  const documents = fv.documents
+    ? fv.documents.map((doc, pos) => {
+        const es = byIndex.get(fv.indices[pos])
+        if (!es) return doc
+        let next = doc
+        for (const e of es) next = setAtPath(next, e.path, e.value)
+        return next
+      })
+    : null
+  const rows = fv.rows.map((row, pos) => {
+    const es = byIndex.get(fv.indices[pos])
+    if (!es) return row
+    if (documents) {
+      const doc = documents[pos]
+      return columns.map((c) => (c.name in doc ? doc[c.name] : null))
+    }
+    const nx = row.slice()
+    for (const e of es) {
+      const ci = columns.findIndex((c) => c.name === e.path)
+      if (ci >= 0) nx[ci] = e.value
+    }
+    return nx
+  })
+  return { ...fv, rows, documents }
+}
+
 export interface QueryTabData {
   id: string
   connectionId: string
@@ -67,6 +118,11 @@ export interface QueryTabData {
   hasMore: boolean
   /** A load-more fetch is in flight; suppresses duplicate triggers. */
   loadingMore: boolean
+  /** Active results filter text ('' = off). Searches the WHOLE cached result in main, not just
+   *  loaded rows. */
+  filter: string
+  /** The matches for the active `filter`, loaded page-by-page from main — null when `filter` is ''. */
+  filterView: FilterView | null
   error: string | null
   /** Exactly one of result/error/scriptRun is current — each run path clears the others. */
   scriptRun: ScriptRun | null
@@ -174,6 +230,12 @@ interface AppState {
   appendRows: (id: string, page: { rows: unknown[][]; documents: Record<string, unknown>[] | null; hasMore: boolean }) => void
   /** Toggle the in-flight flag around a load-more fetch, so duplicate scroll triggers no-op. */
   setLoadingMore: (id: string, loading: boolean) => void
+  /** Set the active results filter text ('' clears the filter view). */
+  setFilter: (id: string, filter: string) => void
+  /** Adopt page 1 of the filtered matches — dropped if `filter` is no longer the tab's current one. */
+  applyFilterPage: (id: string, filter: string, page: Omit<FilterView, 'filter'>) => void
+  /** Append a scroll-loaded page of matches — dropped if the tab's filter changed since the request. */
+  appendFilterRows: (id: string, filter: string, page: Omit<FilterView, 'filter'>) => void
   /** After a committed edit, write each value at its field path into the tab's result —
    *  the row cell (top-level column) and the documents array (nested path). Immutable. */
   applyResultEdits: (id: string, edits: { rowIndex: number; path: string; value: unknown }[]) => void
@@ -238,6 +300,8 @@ function blankTab(fields: {
     resultQueryId: null,
     hasMore: false,
     loadingMore: false,
+    filter: '',
+    filterView: null,
     error: null,
     scriptRun: null,
     edits: {},
@@ -631,7 +695,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       tabs: s.tabs.map((t) =>
         // scriptRun cleared: a single run supersedes a previous script's results.
         // Staged edits belong to the old result, so they're dropped on a new run.
-        t.id === id ? { ...t, running: true, error: null, queryId, runOnOpen: false, scriptRun: null, edits: {}, editError: null, resultQueryId: null, hasMore: false, loadingMore: false } : t
+        t.id === id ? { ...t, running: true, error: null, queryId, runOnOpen: false, scriptRun: null, edits: {}, editError: null, resultQueryId: null, hasMore: false, loadingMore: false, filter: '', filterView: null } : t
       ),
     })),
 
@@ -667,6 +731,42 @@ export const useAppStore = create<AppState>((set, get) => ({
   setLoadingMore: (id, loading) =>
     set((s) => ({ tabs: s.tabs.map((t) => (t.id === id ? { ...t, loadingMore: loading } : t)) })),
 
+  setFilter: (id, filter) =>
+    set((s) => ({
+      tabs: s.tabs.map((t) =>
+        // Keep the old matches visible until the new page lands (no flicker); clear on empty.
+        t.id === id ? { ...t, filter, filterView: filter === '' ? null : t.filterView, loadingMore: false } : t
+      ),
+    })),
+
+  applyFilterPage: (id, filter, page) =>
+    set((s) => ({
+      tabs: s.tabs.map((t) =>
+        // Race guard: a debounced response for a filter the user has since changed is dropped.
+        t.id === id && t.filter === filter ? { ...t, filterView: { filter, ...page }, loadingMore: false } : t
+      ),
+    })),
+
+  appendFilterRows: (id, filter, page) =>
+    set((s) => ({
+      tabs: s.tabs.map((t) => {
+        if (t.id !== id || !t.filterView || t.filterView.filter !== filter) return t
+        const fv = t.filterView
+        return {
+          ...t,
+          filterView: {
+            ...fv,
+            rows: [...fv.rows, ...page.rows],
+            documents: fv.documents ? [...fv.documents, ...(page.documents ?? [])] : fv.documents,
+            indices: [...fv.indices, ...page.indices],
+            total: page.total,
+            hasMore: page.hasMore,
+          },
+          loadingMore: false,
+        }
+      }),
+    })),
+
   applyResultEdits: (id, edits) =>
     set((s) => ({
       tabs: s.tabs.map((t) => {
@@ -700,7 +800,12 @@ export const useAppStore = create<AppState>((set, get) => ({
           }
           return next
         })
-        return { ...t, result: { ...result, rows, documents } }
+        return {
+          ...t,
+          result: { ...result, rows, documents },
+          // Reflect the committed edit in the filtered view too (positions map via `indices`).
+          filterView: t.filterView ? patchFilterView(t.filterView, edits, result.columns) : t.filterView,
+        }
       }),
     })),
 
@@ -728,7 +833,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     const editable = tab.result.editable
     const rows = tab.result.rows
     try {
-      const rowEdits = buildRowEdits(tab.edits, rows, editable)
+      // A filtered match's original index can be past the loaded raw rows — place the filtered rows
+      // at their original indexes so buildRowEdits reads each edit's real key columns for the WHERE.
+      let lookup = rows
+      if (tab.filterView) {
+        lookup = rows.slice()
+        tab.filterView.indices.forEach((origIdx, k) => { lookup[origIdx] = tab.filterView!.rows[k] })
+      }
+      const rowEdits = buildRowEdits(tab.edits, lookup, editable)
       await window.api.edits.apply({ connectionId: tab.connectionId, table: editable.table, rows: rowEdits }).then(unwrap)
       // The write succeeded against the rows the user saw. If a new query for this tab
       // finished mid-commit, it already replaced the result (and cleared edits) — don't
