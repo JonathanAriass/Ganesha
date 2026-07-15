@@ -1276,17 +1276,45 @@ input[type="password"]::placeholder {
   position: relative;
 }
 
+/* Sticky header stack: the column-name row + optional per-column filter row scroll-stick together. */
+.grid-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  min-width: var(--grid-min);
+}
 .grid-head {
   display: grid;
   grid-template-columns: var(--grid-cols);
   min-width: var(--grid-min);
-  position: sticky;
-  top: 0;
   background: var(--bg-2);
   border-bottom: 1px solid var(--border);
-  z-index: 1;
   font-size: 12px;
   color: var(--text-2);
+}
+.grid-filter-row {
+  display: grid;
+  grid-template-columns: var(--grid-cols);
+  min-width: var(--grid-min);
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--border);
+}
+.grid-filter-row .grid-cell {
+  padding: 2px 4px;
+}
+.col-filter-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 2px 5px;
+  font-size: 11px;
+  color: var(--text);
+  outline: none;
+}
+.col-filter-input:focus {
+  border-color: var(--accent);
 }
 
 .grid-head .grid-cell {

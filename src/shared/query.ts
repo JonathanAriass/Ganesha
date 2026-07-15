@@ -42,17 +42,55 @@ export interface QueryResult {
   hasMore?: boolean
 }
 
-/** A results-filter query: the raw box text plus the toggle modes. In `regex` mode `text` is a
- *  single regular expression tested per cell; otherwise `text` is parsed into terms (space = AND,
- *  `OR` = OR, `-term`/`!term` = negate, `"quoted"` = literal phrase). */
+/** A per-column constraint: an operator against one result column (`column` is its index).
+ *  `contains`/`ncontains` = substring / not-substring; `eq`/`ne` = equals (numeric when both sides
+ *  are numbers, else string); `gt`/`lt`/`ge`/`le` = numeric comparison. */
+export type ColumnOp = 'contains' | 'ncontains' | 'eq' | 'ne' | 'gt' | 'lt' | 'ge' | 'le'
+export interface ColumnFilter {
+  column: number
+  op: ColumnOp
+  value: string
+}
+
+/** A results-filter query: the raw box text + toggle modes (the global, any-column part) plus any
+ *  per-column constraints. In `regex` mode `text` is a single regex tested per cell; otherwise
+ *  `text` is parsed into terms (space = AND, `OR` = OR, `-term`/`!term` = negate, `"quoted"`). A row
+ *  matches when the global part matches AND every column constraint holds. */
 export interface FilterQuery {
   text: string
   caseSensitive: boolean
   wholeWord: boolean
   regex: boolean
+  columns: ColumnFilter[]
 }
 
 /** Stable identity of a filter query, for the store's race guard + as the fetch key. */
 export function filterKey(q: FilterQuery): string {
-  return JSON.stringify([q.text, q.caseSensitive, q.wholeWord, q.regex])
+  return JSON.stringify([q.text, q.caseSensitive, q.wholeWord, q.regex, q.columns])
+}
+
+/** Parse a filter-row / box-syntax column value into an op + value: a leading `>=` `<=` `>` `<` `=`
+ *  `!=` or `!` (not-contains), else plain `contains`. Null when there's nothing to match on. Shared
+ *  so the renderer can build ColumnFilters and main can (re)use it. */
+export function parseColumnInput(input: string): { op: ColumnOp; value: string } | null {
+  const m = input.trim().match(/^(>=|<=|!=|>|<|=|!)?\s*(.*)$/)
+  const opTok = m?.[1] ?? ''
+  const value = (m?.[2] ?? '').trim()
+  if (value === '') return null
+  const op: ColumnOp =
+    opTok === '>=' ? 'ge' : opTok === '<=' ? 'le' : opTok === '>' ? 'gt' : opTok === '<' ? 'lt'
+    : opTok === '=' ? 'eq' : opTok === '!=' ? 'ne' : opTok === '!' ? 'ncontains' : 'contains'
+  return { op, value }
+}
+
+/** Turn a per-column input map (colIndex → raw input) into constraints, dropping blank inputs and
+ *  sorting by column so the filter key is stable regardless of typing order. */
+export function buildColumnFilters(map: Record<number, string>): ColumnFilter[] {
+  return Object.entries(map)
+    .map(([col, input]) => {
+      const p = parseColumnInput(input)
+      return p ? { column: Number(col), op: p.op, value: p.value } : null
+    })
+    .filter((c): c is ColumnFilter => c !== null)
+    .sort((a, b) => a.column - b.column)
 }

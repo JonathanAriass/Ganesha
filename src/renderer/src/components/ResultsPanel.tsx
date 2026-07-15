@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useAppStore, type QueryTabData } from '../state/store'
-import { filterKey, type FilterQuery } from '@shared/query'
+import { filterKey, buildColumnFilters, type FilterQuery } from '@shared/query'
 import { unwrap } from '../lib/result'
 import { useConnections } from '../lib/hooks'
 import ResultsGrid from './ResultsGrid'
@@ -22,8 +22,12 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
   // Only the explicit user choice is state; the panel mounts before any result
   // exists, so the default must be derived at render time once one arrives.
   const [userView, setUserView] = useState<View | null>(null)
+  const [showFilterRow, setShowFilterRow] = useState(false) // per-column filter row visibility
   const filter = tab.filter // store-owned so main-side filtering + paging coordinate
   const mode = tab.filterMode // case / whole-word / regex toggles
+  const columnFilters = tab.columnFilters
+  const columns = buildColumnFilters(columnFilters) // per-column constraints (parsed)
+  const active = filter !== '' || columns.length > 0 // is any filter in effect?
   const view: View = userView ?? (hasDocuments ? 'documents' : 'table')
   const { data: connections = [] } = useConnections()
   const connection = connections.find((c) => c.id === tab.connectionId)
@@ -37,9 +41,10 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
     const store = useAppStore.getState()
     const t = store.tabs.find((x) => x.id === tab.id)
     if (!t || !t.resultQueryId || t.loadingMore) return
-    if (t.filter) {
+    const cols = buildColumnFilters(t.columnFilters)
+    if (t.filter || cols.length > 0) {
       if (!t.filterView || !t.filterView.hasMore) return
-      const query: FilterQuery = { text: t.filter, ...t.filterMode }
+      const query: FilterQuery = { text: t.filter, ...t.filterMode, columns: cols }
       store.setLoadingMore(tab.id, true)
       void window.api.query
         .filter(t.resultQueryId, query, t.filterView.rows.length)
@@ -57,12 +62,18 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
     }
   }, [tab.id])
 
-  // Apply the filter query (text + toggles) over the WHOLE cached result in main (debounced). The
-  // store's race guard drops a response whose query the user has since changed.
+  // Apply the filter query (text + toggles + per-column) over the WHOLE cached result in main
+  // (debounced). Clears the view when nothing is active. The store's race guard drops a response
+  // whose query the user has since changed.
   const resultQueryId = tab.resultQueryId
   useEffect(() => {
-    if (!filter || !resultQueryId) return
-    const query: FilterQuery = { text: filter, ...mode }
+    if (!resultQueryId) return
+    const cols = buildColumnFilters(columnFilters)
+    if (filter === '' && cols.length === 0) {
+      useAppStore.getState().clearFilterView(tab.id)
+      return
+    }
+    const query: FilterQuery = { text: filter, ...mode, columns: cols }
     const key = filterKey(query)
     const handle = setTimeout(() => {
       void window.api.query
@@ -72,8 +83,8 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
         .catch(() => {})
     }, 200)
     return () => clearTimeout(handle)
-    // `mode` is a stable ref until a toggle changes it (the store keeps it across other tab updates).
-  }, [filter, mode, resultQueryId, tab.id])
+    // `mode`/`columnFilters` are stable refs until they actually change (store keeps them otherwise).
+  }, [filter, mode, columnFilters, resultQueryId, tab.id])
 
   // Before the running spinner: a script renders progressively while it executes.
   if (tab.scriptRun) {
@@ -115,7 +126,7 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
   }
 
   const result = tab.result
-  const filtering = view === 'table' && filter !== ''
+  const filtering = view === 'table' && active
   // The active view: filtered matches (loaded from main) when filtering, else the raw result. `fv`
   // is null during the brief debounce before the first matches arrive → the raw rows show meanwhile.
   const fv = filtering ? tab.filterView : null
@@ -202,6 +213,13 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
               >
                 .*
               </button>
+              <button
+                className={`ft-toggle${showFilterRow || columns.length > 0 ? ' active' : ''}`}
+                title="Per-column filters (filter row)" aria-pressed={showFilterRow}
+                onClick={() => setShowFilterRow((v) => !v)}
+              >
+                ▤
+              </button>
             </div>
             {filtering && (
               <span className={`filter-count${fv?.invalid ? ' err' : ''}`}>
@@ -262,7 +280,10 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
           hasMore={shownHasMore}
           loadingMore={tab.loadingMore}
           onLoadMore={loadMore}
-          resultKey={`${tab.resultQueryId ?? ''}|${filter}`}
+          resultKey={`${tab.resultQueryId ?? ''}|${filtering ? filterKey({ text: filter, ...mode, columns }) : ''}`}
+          showFilterRow={showFilterRow}
+          columnFilters={columnFilters}
+          onColumnFilter={(col, val) => useAppStore.getState().setColumnFilter(tab.id, col, val)}
         />
       ) : (
         <DocumentView

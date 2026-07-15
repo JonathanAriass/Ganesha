@@ -6,7 +6,7 @@ const rows = (n: number): unknown[][] => Array.from({ length: n }, (_, i) => [i]
 describe('ResultCache', () => {
   it('pages a stored result and reports hasMore at the boundary', () => {
     const c = new ResultCache()
-    c.store('q', { rows: rows(2500), documents: null })
+    c.store('q', { rows: rows(2500), documents: null, columns: [] })
 
     const p1 = c.page('q', 0, 1000)!
     expect(p1.rows).toHaveLength(1000)
@@ -21,7 +21,7 @@ describe('ResultCache', () => {
 
   it('slices documents in lockstep with rows', () => {
     const c = new ResultCache()
-    c.store('q', { rows: rows(3), documents: [{ a: 0 }, { a: 1 }, { a: 2 }] })
+    c.store('q', { rows: rows(3), documents: [{ a: 0 }, { a: 1 }, { a: 2 }], columns: [] })
     const p = c.page('q', 1, 1)!
     expect(p.rows).toEqual([[1]])
     expect(p.documents).toEqual([{ a: 1 }])
@@ -30,7 +30,7 @@ describe('ResultCache', () => {
 
   it('returns null for an unknown / released id', () => {
     const c = new ResultCache()
-    c.store('q', { rows: rows(10), documents: null })
+    c.store('q', { rows: rows(10), documents: null, columns: [] })
     expect(c.page('nope', 0, 5)).toBeNull()
     c.release('q')
     expect(c.page('q', 0, 5)).toBeNull()
@@ -38,9 +38,9 @@ describe('ResultCache', () => {
 
   it('evicts the least-recently-used beyond the cap', () => {
     const c = new ResultCache(2)
-    c.store('a', { rows: rows(1), documents: null })
-    c.store('b', { rows: rows(1), documents: null })
-    c.store('c', { rows: rows(1), documents: null }) // evicts 'a'
+    c.store('a', { rows: rows(1), documents: null, columns: [] })
+    c.store('b', { rows: rows(1), documents: null, columns: [] })
+    c.store('c', { rows: rows(1), documents: null, columns: [] }) // evicts 'a'
     expect(c.page('a', 0, 1)).toBeNull()
     expect(c.page('b', 0, 1)).not.toBeNull()
     expect(c.size()).toBe(2)
@@ -48,17 +48,17 @@ describe('ResultCache', () => {
 
   it('page() bumps recency so a fresh insert evicts a different entry', () => {
     const c = new ResultCache(2)
-    c.store('a', { rows: rows(1), documents: null })
-    c.store('b', { rows: rows(1), documents: null })
+    c.store('a', { rows: rows(1), documents: null, columns: [] })
+    c.store('b', { rows: rows(1), documents: null, columns: [] })
     c.page('a', 0, 1) // 'a' becomes MRU, 'b' now oldest
-    c.store('c', { rows: rows(1), documents: null }) // evicts 'b', not 'a'
+    c.store('c', { rows: rows(1), documents: null, columns: [] }) // evicts 'b', not 'a'
     expect(c.page('a', 0, 1)).not.toBeNull()
     expect(c.page('b', 0, 1)).toBeNull()
   })
 
   it('an offset at/after the end yields an empty page with hasMore false', () => {
     const c = new ResultCache()
-    c.store('q', { rows: rows(10), documents: null })
+    c.store('q', { rows: rows(10), documents: null, columns: [] })
     const p = c.page('q', 10, 1000)!
     expect(p.rows).toEqual([])
     expect(p.hasMore).toBe(false)
@@ -66,12 +66,13 @@ describe('ResultCache', () => {
 })
 
 describe('ResultCache.filterPage', () => {
-  const q = (text: string, over = {}) => ({ text, caseSensitive: false, wholeWord: false, regex: false, ...over })
+  const q = (text: string, over = {}) => ({ text, caseSensitive: false, wholeWord: false, regex: false, columns: [], ...over })
   const c = new ResultCache()
   // 5 rows; 'al' matches rows 0 (alpha) and 2 (alto) only.
   c.store('q', {
     rows: [['alpha'], ['banana'], ['alto'], ['cherry'], ['delta']],
     documents: [{ n: 'alpha' }, { n: 'banana' }, { n: 'alto' }, { n: 'cherry' }, { n: 'delta' }],
+    columns: ['name'],
   })
 
   it('returns matching rows with their ORIGINAL indexes + total', () => {

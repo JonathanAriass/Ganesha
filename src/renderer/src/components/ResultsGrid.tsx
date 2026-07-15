@@ -49,6 +49,12 @@ interface Props {
   /** When the rows are a FILTERED subset, the original result index per displayed row — so edits
    *  key by the real index (stable across filter/clear). null = identity (rows[i] is result row i). */
   rowIndices?: number[] | null
+  /** Show the per-column filter row under the header. */
+  showFilterRow?: boolean
+  /** Current per-column filter inputs (colIndex → raw input). */
+  columnFilters?: Record<number, string>
+  /** Set/clear a column's filter input. */
+  onColumnFilter?: (column: number, value: string) => void
 }
 
 export default function ResultsGrid({
@@ -67,6 +73,9 @@ export default function ResultsGrid({
   onLoadMore,
   resultKey,
   rowIndices,
+  showFilterRow,
+  columnFilters,
+  onColumnFilter,
 }: Props): JSX.Element {
   const [sorting, setSorting] = useState<SortingState>([])
   const selKey = resultKey ?? null
@@ -266,7 +275,8 @@ export default function ResultsGrid({
     <div className="grid-area">
       <div className="grid-col">
         <div className="grid-wrap" ref={parentRef} style={wrapStyle}>
-          {/* sticky header */}
+          {/* sticky header stack: column names + optional per-column filter row */}
+          <div className="grid-header">
           <div className="grid-head">
             {table.getHeaderGroups()[0]?.headers.map((header) => {
               const sorted = header.column.getIsSorted()
@@ -295,6 +305,26 @@ export default function ResultsGrid({
                 </div>
               )
             })}
+          </div>
+
+          {showFilterRow && (
+            <div className="grid-filter-row">
+              {table.getHeaderGroups()[0]?.headers.map((header) => {
+                const colIndex = Number(header.column.id)
+                return (
+                  <div className="grid-cell" key={header.id}>
+                    <input
+                      className="col-filter-input"
+                      value={columnFilters?.[colIndex] ?? ''}
+                      placeholder="filter…"
+                      title="e.g. >30 · =active · !=x · !foo · or plain text (contains)"
+                      onChange={(e) => onColumnFilter?.(colIndex, e.target.value)}
+                    />
+                  </div>
+                )
+              })}
+            </div>
+          )}
           </div>
 
           {/* virtualized rows */}

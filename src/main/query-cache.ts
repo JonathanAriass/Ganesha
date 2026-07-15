@@ -26,6 +26,8 @@ export interface FilterPage {
 export interface CachedResult {
   rows: unknown[][]
   documents: Record<string, unknown>[] | null
+  /** Column names, so `colname op value` box syntax can resolve a column to its index. */
+  columns: string[]
 }
 
 /**
@@ -72,7 +74,7 @@ export class ResultCache {
     if (!cached) return null
     this.map.delete(queryId) // bump to MRU
     this.map.set(queryId, cached)
-    const compiled = compileQuery(query)
+    const compiled = compileQuery(query, cached.columns)
     if (compiled.invalid) return { rows: [], documents: null, indices: [], total: 0, hasMore: false, invalid: true }
     const matched: number[] = []
     for (let i = 0; i < cached.rows.length; i++) if (compiled.match(cached.rows[i])) matched.push(i)

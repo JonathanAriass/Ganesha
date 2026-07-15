@@ -291,7 +291,7 @@ describe('hydrateTabs', () => {
       id: 'a', connectionId: 'c1', title: 'Query 1', text: 'SELECT 1', pane: 'left',
       epoch: 0, runOnOpen: false, running: false, queryId: null,
       result: null, resultQueryId: null, hasMore: false, loadingMore: false,
-      filter: '', filterMode: { caseSensitive: false, wholeWord: false, regex: false }, filterView: null,
+      filter: '', filterMode: { caseSensitive: false, wholeWord: false, regex: false }, columnFilters: {}, filterView: null,
       error: null, scriptRun: null, edits: {}, editError: null
     })
     expect(s.activeTabId).toBe('b')
@@ -717,7 +717,7 @@ describe('split views — reorderTab (drag-and-drop)', () => {
   const mk = (id: string, connectionId: string, pane: 'left' | 'right') => ({
     id, connectionId, title: id, pane, text: '', epoch: 0, runOnOpen: false, running: false,
     queryId: null, result: null, resultQueryId: null, hasMore: false, loadingMore: false,
-    filter: '', filterMode: { caseSensitive: false, wholeWord: false, regex: false }, filterView: null,
+    filter: '', filterMode: { caseSensitive: false, wholeWord: false, regex: false }, columnFilters: {}, filterView: null,
     error: null, scriptRun: null, edits: {}, editError: null,
   })
 
@@ -792,17 +792,29 @@ describe('results filter view (main-side search)', () => {
     rows: [[1]] as unknown[][], documents: null, indices: [0], total: 1, hasMore: false, invalid: false, ...over,
   })
   // key for a plain (default-mode) query on `text`
-  const key = (text: string, over = {}) => filterKey({ text, caseSensitive: false, wholeWord: false, regex: false, ...over })
+  const key = (text: string, over = {}) => filterKey({ text, caseSensitive: false, wholeWord: false, regex: false, columns: [], ...over })
 
-  it('setFilter sets the text; clearing it drops the filter view', () => {
+  it('setFilter records text; clearFilterView drops the matches', () => {
     const id = tab().id
     useAppStore.getState().setFilter(id, 'ab')
     expect(tab().filter).toBe('ab')
     useAppStore.getState().applyFilterPage(id, key('ab'), page())
     expect(tab().filterView?.key).toBe(key('ab'))
+    // The panel effect clears the view when nothing is active (setFilter only records the text).
     useAppStore.getState().setFilter(id, '')
     expect(tab().filter).toBe('')
+    useAppStore.getState().clearFilterView(id)
     expect(tab().filterView).toBeNull()
+  })
+
+  it('setColumnFilter records/removes per-column inputs', () => {
+    const id = tab().id
+    useAppStore.getState().setColumnFilter(id, 1, '>30')
+    expect(tab().columnFilters).toEqual({ 1: '>30' })
+    useAppStore.getState().setColumnFilter(id, 2, '=active')
+    expect(tab().columnFilters).toEqual({ 1: '>30', 2: '=active' })
+    useAppStore.getState().setColumnFilter(id, 1, '') // blank removes it
+    expect(tab().columnFilters).toEqual({ 2: '=active' })
   })
 
   it('applyFilterPage is dropped when the query has since changed (race guard)', () => {

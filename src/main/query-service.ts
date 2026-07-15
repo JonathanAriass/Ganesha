@@ -63,7 +63,7 @@ export async function runUserQuery(args: RunArgs): Promise<QueryResult> {
     addHistory(db, { connectionId: config.id, query, ranAt: started, durationMs: full.durationMs, success: true })
     // Retain everything main fetched; hand back only the first page plus a flag that more is
     // cached (paged in via query.fetchMore) so a huge result doesn't cross the IPC boundary at once.
-    cache.store(queryId, { rows: full.rows, documents: full.documents })
+    cache.store(queryId, { rows: full.rows, documents: full.documents, columns: full.columns.map((c) => c.name) })
     const page = cache.page(queryId, 0, PAGE_SIZE)
     return page ? { ...full, rows: page.rows, documents: page.documents, hasMore: page.hasMore } : full
   } catch (e) {

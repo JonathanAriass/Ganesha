@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { SessionTab } from '@shared/domain'
 import type { QueryResult } from '@shared/query'
-import { filterKey } from '@shared/query'
+import { filterKey, buildColumnFilters } from '@shared/query'
 import { buildRowEdits } from '../lib/edit-staging'
 import { parseEditKey, setAtPath } from '../lib/doc-path'
 import { unwrap } from '../lib/result'
@@ -133,6 +133,8 @@ export interface QueryTabData {
   filter: string
   /** Filter toggle modes (case/whole-word/regex); with `filter` forms the query sent to main. */
   filterMode: FilterMode
+  /** Per-column filter inputs, colIndex → raw input (e.g. '>30', '=active'); '' / absent = none. */
+  columnFilters: Record<number, string>
   /** The matches for the active filter query, loaded page-by-page from main — null when off. */
   filterView: FilterView | null
   error: string | null
@@ -246,6 +248,10 @@ interface AppState {
   setFilter: (id: string, filter: string) => void
   /** Merge filter toggle modes (case-sensitive / whole-word / regex). */
   setFilterMode: (id: string, patch: Partial<FilterMode>) => void
+  /** Set/clear a per-column filter input (empty value removes it). */
+  setColumnFilter: (id: string, column: number, value: string) => void
+  /** Drop the filter view (used when no filter is active). */
+  clearFilterView: (id: string) => void
   /** Adopt page 1 of the filtered matches — dropped if the query (`key`) is no longer current. */
   applyFilterPage: (id: string, key: string, page: Omit<FilterView, 'key'>) => void
   /** Append a scroll-loaded page of matches — dropped if the query changed since the request. */
@@ -316,6 +322,7 @@ function blankTab(fields: {
     loadingMore: false,
     filter: '',
     filterMode: { caseSensitive: false, wholeWord: false, regex: false },
+    columnFilters: {},
     filterView: null,
     error: null,
     scriptRun: null,
@@ -710,7 +717,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       tabs: s.tabs.map((t) =>
         // scriptRun cleared: a single run supersedes a previous script's results.
         // Staged edits belong to the old result, so they're dropped on a new run.
-        t.id === id ? { ...t, running: true, error: null, queryId, runOnOpen: false, scriptRun: null, edits: {}, editError: null, resultQueryId: null, hasMore: false, loadingMore: false, filter: '', filterView: null } : t
+        t.id === id ? { ...t, running: true, error: null, queryId, runOnOpen: false, scriptRun: null, edits: {}, editError: null, resultQueryId: null, hasMore: false, loadingMore: false, filter: '', columnFilters: {}, filterView: null } : t
       ),
     })),
 
@@ -746,24 +753,35 @@ export const useAppStore = create<AppState>((set, get) => ({
   setLoadingMore: (id, loading) =>
     set((s) => ({ tabs: s.tabs.map((t) => (t.id === id ? { ...t, loadingMore: loading } : t)) })),
 
+  // The ResultsPanel debounce effect owns the filter view (fetch when active, clear when not), so
+  // setFilter/setColumnFilter just record the input.
   setFilter: (id, filter) =>
-    set((s) => ({
-      tabs: s.tabs.map((t) =>
-        // Keep the old matches visible until the new page lands (no flicker); clear on empty.
-        t.id === id ? { ...t, filter, filterView: filter === '' ? null : t.filterView, loadingMore: false } : t
-      ),
-    })),
+    set((s) => ({ tabs: s.tabs.map((t) => (t.id === id ? { ...t, filter } : t)) })),
 
   setFilterMode: (id, patch) =>
     set((s) => ({
       tabs: s.tabs.map((t) => (t.id === id ? { ...t, filterMode: { ...t.filterMode, ...patch } } : t)),
     })),
 
+  setColumnFilter: (id, column, value) =>
+    set((s) => ({
+      tabs: s.tabs.map((t) => {
+        if (t.id !== id) return t
+        const columnFilters = { ...t.columnFilters }
+        if (value.trim() === '') delete columnFilters[column]
+        else columnFilters[column] = value
+        return { ...t, columnFilters }
+      }),
+    })),
+
+  clearFilterView: (id) =>
+    set((s) => ({ tabs: s.tabs.map((t) => (t.id === id ? { ...t, filterView: null, loadingMore: false } : t)) })),
+
   applyFilterPage: (id, key, page) =>
     set((s) => ({
       tabs: s.tabs.map((t) =>
         // Race guard: a debounced response for a query the user has since changed is dropped.
-        t.id === id && filterKey({ text: t.filter, ...t.filterMode }) === key
+        t.id === id && filterKey({ text: t.filter, ...t.filterMode, columns: buildColumnFilters(t.columnFilters) }) === key
           ? { ...t, filterView: { key, ...page }, loadingMore: false }
           : t
       ),

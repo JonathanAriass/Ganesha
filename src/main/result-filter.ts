@@ -1,4 +1,4 @@
-import type { FilterQuery } from '../shared/query'
+import type { FilterQuery, ColumnFilter, ColumnOp } from '../shared/query'
 
 /** Stringify a cell for matching — JSON for objects/arrays, `String` otherwise (covers BigInt:
  *  `String(9007199254740993n)` → '9007199254740993'). Display formatting stays in the renderer. */
@@ -74,13 +74,9 @@ function termMatcher(term: string, q: FilterQuery): (cell: string) => boolean {
   return (cell) => (q.caseSensitive ? cell : cell.toLowerCase()).includes(needle)
 }
 
-/**
- * Compile a filter query into a row matcher. Empty text matches everything. `regex` mode tests the
- * whole `text` as one RegExp per cell (invalid → matches nothing, `invalid: true`). Otherwise the
- * text is parsed into terms: positives combine by AND (or OR if an `OR` token is present), and any
- * negated term excludes the row. A term matches a row when any cell contains/word-matches it.
- */
-export function compileQuery(q: FilterQuery): Compiled {
+/** The GLOBAL (any-column) part of a query: the box text + toggles. Empty text matches everything;
+ *  `regex` mode is one RegExp per cell; else parsed terms (AND/OR + negation). */
+function compileGlobal(q: FilterQuery): Compiled {
   if (q.text.trim() === '') return { match: () => true, invalid: false }
   if (q.regex) {
     let re: RegExp
@@ -102,6 +98,75 @@ export function compileQuery(q: FilterQuery): Compiled {
       const posOk = pos.length === 0 ? true : op === 'or' ? pos.some(rowHas) : pos.every(rowHas)
       return posOk && !neg.some(rowHas)
     },
+  }
+}
+
+/** A finite number from a cell/value, else null (a blank string is NOT 0). */
+function asNum(v: unknown): number | null {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null
+  const s = String(v).trim()
+  if (s === '') return null
+  const n = Number(s)
+  return Number.isFinite(n) ? n : null
+}
+
+/** Does one cell satisfy a column constraint? */
+function matchColumn(cell: unknown, cf: ColumnFilter, caseSensitive: boolean): boolean {
+  if (cf.op === 'gt' || cf.op === 'lt' || cf.op === 'ge' || cf.op === 'le') {
+    const a = asNum(cell)
+    const b = asNum(cf.value)
+    if (a === null || b === null) return false
+    return cf.op === 'gt' ? a > b : cf.op === 'lt' ? a < b : cf.op === 'ge' ? a >= b : a <= b
+  }
+  if (cf.op === 'eq' || cf.op === 'ne') {
+    const a = asNum(cell)
+    const b = asNum(cf.value)
+    const eq = a !== null && b !== null ? a === b : caseSensitive
+      ? stringify(cell) === cf.value
+      : stringify(cell).toLowerCase() === cf.value.toLowerCase()
+    return cf.op === 'eq' ? eq : !eq
+  }
+  const hay = caseSensitive ? stringify(cell) : stringify(cell).toLowerCase()
+  const needle = caseSensitive ? cf.value : cf.value.toLowerCase()
+  return cf.op === 'contains' ? hay.includes(needle) : !hay.includes(needle)
+}
+
+/** Pull `colname<op>value` terms (where colname is a known column) out of the box text — the box
+ *  syntax — returning them as column constraints plus the leftover GLOBAL text. Separators: `=`
+ *  `!=` `>` `<` `>=` `<=` (compare) and `:` (contains). Unknown columns / plain terms stay global. */
+export function splitBoxColumns(text: string, columnNames: string[]): { globalText: string; columns: ColumnFilter[] } {
+  const index = new Map(columnNames.map((n, i) => [n.toLowerCase(), i]))
+  const columns: ColumnFilter[] = []
+  const global: string[] = []
+  for (const tok of tokenize(text)) {
+    const m = tok.match(/^(\w+)(>=|<=|!=|>|<|=|:)(.+)$/)
+    const col = m ? index.get(m[1].toLowerCase()) : undefined
+    if (m && col !== undefined) {
+      const sep = m[2]
+      const value = unquote(m[3])
+      const op: ColumnOp =
+        sep === '>=' ? 'ge' : sep === '<=' ? 'le' : sep === '>' ? 'gt' : sep === '<' ? 'lt'
+        : sep === '=' ? 'eq' : sep === '!=' ? 'ne' : 'contains'
+      columns.push({ column: col, op, value })
+    } else {
+      global.push(tok)
+    }
+  }
+  return { globalText: global.join(' '), columns }
+}
+
+/** Compile a full query — the global part AND every per-column constraint (from the filter row AND
+ *  `colname op value` box syntax, resolved against `columnNames`). */
+export function compileQuery(q: FilterQuery, columnNames: string[] = []): Compiled {
+  // Box column-syntax only in non-regex mode (in regex mode the whole text is one pattern).
+  const box = q.regex ? { globalText: q.text, columns: [] } : splitBoxColumns(q.text, columnNames)
+  const global = compileGlobal({ ...q, text: box.globalText })
+  if (global.invalid) return { match: () => false, invalid: true }
+  const cols = [...box.columns, ...(q.columns ?? [])]
+  if (cols.length === 0) return global
+  return {
+    invalid: false,
+    match: (row) => global.match(row) && cols.every((cf) => matchColumn(row[cf.column], cf, q.caseSensitive)),
   }
 }
 
