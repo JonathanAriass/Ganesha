@@ -284,6 +284,12 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
           showFilterRow={showFilterRow}
           columnFilters={columnFilters}
           onColumnFilter={(col, val) => useAppStore.getState().setColumnFilter(tab.id, col, val)}
+          highlight={
+            fv && fv.highlight.length > 0
+              ? { terms: fv.highlight, regex: mode.regex, caseSensitive: mode.caseSensitive, wholeWord: mode.wholeWord }
+              : null
+          }
+          matchTotal={fv?.total}
         />
       ) : (
         <DocumentView

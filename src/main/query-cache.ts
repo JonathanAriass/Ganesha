@@ -1,4 +1,4 @@
-import { compileQuery } from './result-filter'
+import { compileQuery, highlightTerms } from './result-filter'
 import type { FilterQuery } from '../shared/query'
 
 /** A page of a cached result: the slice at the requested offset plus whether rows remain
@@ -19,6 +19,8 @@ export interface FilterPage {
   hasMore: boolean
   /** True when the query was `regex` mode with an invalid pattern — the UI says so, total is 0. */
   invalid: boolean
+  /** The positive global terms to highlight in matched cells (or [regexSource] in regex mode). */
+  highlight: string[]
 }
 
 /** The full (up to the hard cap) result set retained so the renderer can page through it
@@ -75,7 +77,8 @@ export class ResultCache {
     this.map.delete(queryId) // bump to MRU
     this.map.set(queryId, cached)
     const compiled = compileQuery(query, cached.columns)
-    if (compiled.invalid) return { rows: [], documents: null, indices: [], total: 0, hasMore: false, invalid: true }
+    const highlight = highlightTerms(query, cached.columns)
+    if (compiled.invalid) return { rows: [], documents: null, indices: [], total: 0, hasMore: false, invalid: true, highlight }
     const matched: number[] = []
     for (let i = 0; i < cached.rows.length; i++) if (compiled.match(cached.rows[i])) matched.push(i)
     const slice = matched.slice(offset, offset + pageSize)
@@ -86,6 +89,7 @@ export class ResultCache {
       total: matched.length,
       hasMore: matched.length > offset + pageSize,
       invalid: false,
+      highlight,
     }
   }
 

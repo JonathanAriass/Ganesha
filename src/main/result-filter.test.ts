@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { tokenize, parseTerms, compileQuery, filterIndices, splitBoxColumns } from './result-filter'
+import { tokenize, parseTerms, compileQuery, filterIndices, splitBoxColumns, highlightTerms } from './result-filter'
 import { parseColumnInput } from '../shared/query'
 import type { FilterQuery } from '../shared/query'
 
@@ -165,5 +165,18 @@ describe('compileQuery — box syntax resolves against column names', () => {
   it('ignores box syntax in regex mode (text is one pattern)', () => {
     // 'age>30' as a regex has no column meaning; it just tests each cell as a pattern.
     expect(compileQuery(q('age', { regex: true }), names).match(['age-column-note', 1])).toBe(true)
+  })
+})
+
+describe('highlightTerms', () => {
+  it('returns the positive global terms (negation + column-syntax excluded)', () => {
+    expect(highlightTerms(q('error timeout'))).toEqual(['error', 'timeout'])
+    expect(highlightTerms(q('error -timeout'))).toEqual(['error'])
+    expect(highlightTerms(q('status=active foo'), ['status'])).toEqual(['foo'])
+  })
+  it('returns the regex source in regex mode; empty for a blank/column-only query', () => {
+    expect(highlightTerms(q('^a.*', { regex: true }))).toEqual(['^a.*'])
+    expect(highlightTerms(q(''))).toEqual([])
+    expect(highlightTerms(q('status=active'), ['status'])).toEqual([]) // only a column term
   })
 })

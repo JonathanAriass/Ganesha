@@ -789,7 +789,7 @@ describe('results filter view (main-side search)', () => {
   })
   const tab = () => useAppStore.getState().tabs[0]
   const page = (over: Record<string, unknown> = {}) => ({
-    rows: [[1]] as unknown[][], documents: null, indices: [0], total: 1, hasMore: false, invalid: false, ...over,
+    rows: [[1]] as unknown[][], documents: null, indices: [0], total: 1, hasMore: false, invalid: false, highlight: [], ...over,
   })
   // key for a plain (default-mode) query on `text`
   const key = (text: string, over = {}) => filterKey({ text, caseSensitive: false, wholeWord: false, regex: false, columns: [], ...over })

@@ -227,7 +227,7 @@ export function registerIpcHandlers(): void {
   // A page of rows matching `filter` across the WHOLE cached result (not just loaded rows). A miss
   // returns an empty page so the renderer stops paging gracefully.
   handle('query.filter', ({ queryId, query, offset }) =>
-    ok(resultCache.filterPage(queryId, query, offset, PAGE_SIZE) ?? { rows: [], documents: null, indices: [], total: 0, hasMore: false, invalid: false })
+    ok(resultCache.filterPage(queryId, query, offset, PAGE_SIZE) ?? { rows: [], documents: null, indices: [], total: 0, hasMore: false, invalid: false, highlight: [] })
   )
   handle('query.cancel', async ({ connectionId, queryId }) => {
     const c = conns.getConnection(store().db, connectionId)

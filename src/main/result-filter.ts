@@ -170,6 +170,15 @@ export function compileQuery(q: FilterQuery, columnNames: string[] = []): Compil
   }
 }
 
+/** The terms to visually highlight in matched cells: the positive GLOBAL terms (column-qualified
+ *  and negated terms excluded) — or the regex source in regex mode. Empty when there's nothing to
+ *  highlight (empty / column-only / negation-only query). */
+export function highlightTerms(q: FilterQuery, columnNames: string[] = []): string[] {
+  if (q.text.trim() === '') return []
+  if (q.regex) return [q.text]
+  return parseTerms(splitBoxColumns(q.text, columnNames).globalText).positives
+}
+
 /** Original indexes of the rows matching the query — used to page matches + key edits stably. */
 export function filterIndices(rows: unknown[][], q: FilterQuery): number[] {
   const c = compileQuery(q)

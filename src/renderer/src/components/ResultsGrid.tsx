@@ -15,6 +15,7 @@ import { buildGridTemplate, gridMinWidth, clampColumnWidth, autoFitWidth } from 
 import { columnEditable, columnEditKey, editChangesValue } from '../lib/edit-staging'
 import { coerceMongoEditValue } from '../lib/mongo-edit-value'
 import { shouldLoadMore } from '../lib/load-more'
+import { highlightSegments } from '../lib/highlight'
 import { useAppStore } from '../state/store'
 import EditingCell from './EditingCell'
 import RowInspector from './RowInspector'
@@ -55,6 +56,10 @@ interface Props {
   columnFilters?: Record<number, string>
   /** Set/clear a column's filter input. */
   onColumnFilter?: (column: number, value: string) => void
+  /** When filtering, the terms to highlight in matched cells (+ the mode to match them). */
+  highlight?: { terms: string[]; regex: boolean; caseSensitive: boolean; wholeWord: boolean } | null
+  /** Total match count, for the "X / N" next/prev navigator (shown when highlighting). */
+  matchTotal?: number
 }
 
 export default function ResultsGrid({
@@ -76,6 +81,8 @@ export default function ResultsGrid({
   showFilterRow,
   columnFilters,
   onColumnFilter,
+  highlight,
+  matchTotal,
 }: Props): JSX.Element {
   const [sorting, setSorting] = useState<SortingState>([])
   const selKey = resultKey ?? null
@@ -95,12 +102,15 @@ export default function ResultsGrid({
   // survive grid churn); `edits` is this tab's map. Only `editing` (which cell is open
   // for editing) is local; it self-invalidates when a new result replaces `rows`.
   const [editing, setEditing] = useState<{ rowIndex: number; colIndex: number } | null>(null)
-  // Close an open cell editor when the RESULT changes (new query) — not on a scroll-append,
-  // which keeps the same result identity so an in-progress edit isn't dropped.
+  // The current match for next/prev navigation (index into the displayed rows; -1 = none).
+  const [matchCursor, setMatchCursor] = useState(-1)
+  // Close an open cell editor + reset the match cursor when the RESULT/QUERY changes — not on a
+  // scroll-append, which keeps the same result identity so an in-progress edit isn't dropped.
   const keyRef = useRef(selKey)
   if (keyRef.current !== selKey) {
     keyRef.current = selKey
     if (editing) setEditing(null)
+    if (matchCursor !== -1) setMatchCursor(-1)
   }
   const store = useAppStore.getState
 
@@ -209,6 +219,20 @@ export default function ResultsGrid({
       onLoadMore()
     }
   }, [lastIndex, tableRows.length, hasMore, loadingMore, onLoadMore, globalFilter])
+
+  // Next/prev match navigation: step the cursor through the (filtered) rows, scrolling it into view
+  // and loading more when stepping past the loaded set.
+  function goMatch(delta: number): void {
+    if (tableRows.length === 0) return
+    const from = matchCursor < 0 ? (delta > 0 ? -1 : tableRows.length) : matchCursor
+    const next = Math.min(Math.max(from + delta, 0), tableRows.length - 1)
+    if (next >= tableRows.length - 1 && hasMore) onLoadMore?.()
+    setMatchCursor(next)
+  }
+  useEffect(() => {
+    if (matchCursor >= 0 && matchCursor < tableRows.length) virtualizer.scrollToIndex(matchCursor, { align: 'center' })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- scroll only when the cursor moves
+  }, [matchCursor])
 
   // The grid template + scroll min-width live in CSS variables on .grid-wrap, so the header
   // and every row pick them up via CSS — a drag updates one property on the node (below)
@@ -336,7 +360,7 @@ export default function ResultsGrid({
               return (
                 <div
                   key={row.id}
-                  className={`grid-row${virtualRow.index % 2 === 1 ? ' odd' : ''}${row.id === selId ? ' selected' : ''}`}
+                  className={`grid-row${virtualRow.index % 2 === 1 ? ' odd' : ''}${row.id === selId ? ' selected' : ''}${virtualRow.index === matchCursor ? ' match-current' : ''}`}
                   style={{ transform: `translateY(${virtualRow.start}px)` }}
                   onClick={(e) => {
                     if (selTimer.current !== null) {
@@ -386,6 +410,16 @@ export default function ResultsGrid({
                       >
                         {raw === null || raw === undefined ? (
                           <span className="cell-null">NULL</span>
+                        ) : highlight ? (
+                          highlightSegments(display, highlight.terms, highlight).map((s, k) =>
+                            s.hit ? (
+                              <mark key={k} className="hl">
+                                {s.text}
+                              </mark>
+                            ) : (
+                              <span key={k}>{s.text}</span>
+                            ),
+                          )
                         ) : (
                           display
                         )}
@@ -412,6 +446,20 @@ export default function ResultsGrid({
         </div>
         {loadingMore && <div className="grid-loading-more">Loading more…</div>}
       </div>
+
+      {highlight && matchTotal !== undefined && matchTotal > 0 && (
+        <div className="match-nav">
+          <button className="btn ghost" title="Previous match" onClick={() => goMatch(-1)}>
+            ↑
+          </button>
+          <button className="btn ghost" title="Next match" onClick={() => goMatch(1)}>
+            ↓
+          </button>
+          <span className="match-nav-count">
+            {matchCursor >= 0 ? matchCursor + 1 : 0} / {matchTotal}
+          </span>
+        </div>
+      )}
 
       {selId !== null && (
         <RowInspector

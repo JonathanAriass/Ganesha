@@ -37,7 +37,7 @@ export interface IpcChannels {
   'query.run': { req: { connectionId: string; query: string; queryId: string }; res: QueryResult }
   'query.cancel': { req: { connectionId: string; queryId: string }; res: null }
   'query.fetchMore': { req: { queryId: string; offset: number }; res: { rows: unknown[][]; documents: Record<string, unknown>[] | null; hasMore: boolean } }
-  'query.filter': { req: { queryId: string; query: FilterQuery; offset: number }; res: { rows: unknown[][]; documents: Record<string, unknown>[] | null; indices: number[]; total: number; hasMore: boolean; invalid: boolean } }
+  'query.filter': { req: { queryId: string; query: FilterQuery; offset: number }; res: { rows: unknown[][]; documents: Record<string, unknown>[] | null; indices: number[]; total: number; hasMore: boolean; invalid: boolean; highlight: string[] } }
   'connections.test': { req: { input: ConnectionInput; password: string | null; id?: string; sshSecrets?: Record<string, string> }; res: null }
   'connections.disconnect': { req: string; res: null }
   'schema.objects': { req: string; res: DbObject[] }

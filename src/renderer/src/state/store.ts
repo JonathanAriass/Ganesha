@@ -60,6 +60,8 @@ export interface FilterView {
   total: number
   hasMore: boolean
   invalid: boolean
+  /** Positive global terms to highlight in matched cells (or [regexSource] in regex mode). */
+  highlight: string[]
 }
 
 /** Apply committed edits (keyed by ORIGINAL row index) onto a filter view, whose rows are indexed
