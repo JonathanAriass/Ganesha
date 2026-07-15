@@ -36,6 +36,7 @@ export interface DbClientApi {
   query: {
     run(connectionId: string, query: string, queryId: string): Promise<IpcResult<'query.run'>>
     cancel(connectionId: string, queryId: string): Promise<IpcResult<'query.cancel'>>
+    fetchMore(queryId: string, offset: number): Promise<IpcResult<'query.fetchMore'>>
   }
   schema: {
     objects(connectionId: string): Promise<IpcResult<'schema.objects'>>

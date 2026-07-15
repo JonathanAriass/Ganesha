@@ -14,6 +14,7 @@ import { displayCellText, cellMatchesDateAware, type DateKind } from '../lib/dat
 import { buildGridTemplate, gridMinWidth, clampColumnWidth, autoFitWidth } from '../lib/column-size'
 import { columnEditable, columnEditKey, editChangesValue } from '../lib/edit-staging'
 import { coerceMongoEditValue } from '../lib/mongo-edit-value'
+import { shouldLoadMore } from '../lib/load-more'
 import { useAppStore } from '../state/store'
 import EditingCell from './EditingCell'
 import RowInspector from './RowInspector'
@@ -36,6 +37,15 @@ interface Props {
   columnKinds?: (DateKind | null)[] | null
   /** Staged edits for this tab (store-owned, keyed `row<SEP>path`). */
   edits?: Record<string, unknown>
+  /** More rows are cached in main past the loaded ones (scroll auto-loads them). */
+  hasMore?: boolean
+  /** A load-more fetch is in flight — shows the footer, suppresses re-triggers. */
+  loadingMore?: boolean
+  /** Fetch + append the next page. Called when scrolled near the end. */
+  onLoadMore?: () => void
+  /** Stable identity of the current result (the queryId). Selection/editing self-invalidate
+   *  when it changes (new query) but survive row appends (same query, more rows). */
+  resultKey?: string | null
 }
 
 export default function ResultsGrid({
@@ -49,24 +59,34 @@ export default function ResultsGrid({
   isMongo,
   columnKinds,
   edits = {},
+  hasMore,
+  loadingMore,
+  onLoadMore,
+  resultKey,
 }: Props): JSX.Element {
   const [sorting, setSorting] = useState<SortingState>([])
+  const selKey = resultKey ?? null
 
   // Row inspector selection. The id is the TanStack row id — the ORIGINAL data
   // index — so the selection follows its row through re-sorts and filters. The
   // rows reference is captured alongside it: when a new result lands, the pair
   // no longer matches and the selection self-invalidates (no effect needed).
-  const [sel, setSel] = useState<{ rows: unknown[][]; id: string } | null>(null)
-  if (sel !== null && sel.rows !== rows) setSel(null)
-  const selId = sel !== null && sel.rows === rows ? sel.id : null
+  // Keyed by the RESULT identity (queryId), not the rows array: a scroll-append makes a new
+  // rows array but keeps the same result, so the inspector selection must survive it. A new
+  // query changes selKey and self-invalidates the selection.
+  const [sel, setSel] = useState<{ key: string | null; id: string } | null>(null)
+  if (sel !== null && sel.key !== selKey) setSel(null)
+  const selId = sel !== null && sel.key === selKey ? sel.id : null
 
   // Staged edits live in the store (so ⌘S / the commit bar can reach them and they
   // survive grid churn); `edits` is this tab's map. Only `editing` (which cell is open
   // for editing) is local; it self-invalidates when a new result replaces `rows`.
   const [editing, setEditing] = useState<{ rowIndex: number; colIndex: number } | null>(null)
-  const rowsRef = useRef(rows)
-  if (rowsRef.current !== rows) {
-    rowsRef.current = rows
+  // Close an open cell editor when the RESULT changes (new query) — not on a scroll-append,
+  // which keeps the same result identity so an in-progress edit isn't dropped.
+  const keyRef = useRef(selKey)
+  if (keyRef.current !== selKey) {
+    keyRef.current = selKey
     if (editing) setEditing(null)
   }
   const store = useAppStore.getState
@@ -136,7 +156,7 @@ export default function ResultsGrid({
   const selPos = selId === null ? -1 : tableRows.findIndex((r) => r.id === selId)
   const step = (delta: number): void => {
     const next = tableRows[selPos + delta]
-    if (next) setSel({ rows, id: next.id })
+    if (next) setSel({ key: selKey, id: next.id })
   }
 
   // ── Editing helpers (shared with the row inspector, so they agree on editability) ──
@@ -165,6 +185,16 @@ export default function ResultsGrid({
     estimateSize: () => 26,
     overscan: 10,
   })
+
+  // Auto-load the next page when scrolled near the end. Skipped while a filter is active: the
+  // filter only sees loaded rows, so paging to satisfy it would quietly pull the whole cap.
+  const virtualItems = virtualizer.getVirtualItems()
+  const lastIndex = virtualItems.length ? virtualItems[virtualItems.length - 1].index : -1
+  useEffect(() => {
+    if (!globalFilter && onLoadMore && shouldLoadMore(lastIndex, tableRows.length, !!hasMore, !!loadingMore)) {
+      onLoadMore()
+    }
+  }, [lastIndex, tableRows.length, hasMore, loadingMore, onLoadMore, globalFilter])
 
   // The grid template + scroll min-width live in CSS variables on .grid-wrap, so the header
   // and every row pick them up via CSS — a drag updates one property on the node (below)
@@ -278,14 +308,14 @@ export default function ResultsGrid({
                       selTimer.current = null
                     }
                     if (selId !== null) {
-                      setSel({ rows, id: row.id })
+                      setSel({ key: selKey, id: row.id })
                       return
                     }
                     if (e.detail !== 1) return // part of a double-click: leave the layout alone
                     const id = row.id
                     selTimer.current = window.setTimeout(() => {
                       selTimer.current = null
-                      setSel({ rows, id })
+                      setSel({ key: selKey, id })
                     }, 250)
                   }}
                 >
@@ -344,6 +374,7 @@ export default function ResultsGrid({
             })}
           </div>
         </div>
+        {loadingMore && <div className="grid-loading-more">Loading more…</div>}
       </div>
 
       {selId !== null && (

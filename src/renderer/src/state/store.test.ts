@@ -289,7 +289,8 @@ describe('hydrateTabs', () => {
     expect(s.tabs[0]).toEqual({
       id: 'a', connectionId: 'c1', title: 'Query 1', text: 'SELECT 1', pane: 'left',
       epoch: 0, runOnOpen: false, running: false, queryId: null,
-      result: null, error: null, scriptRun: null, edits: {}, editError: null
+      result: null, resultQueryId: null, hasMore: false, loadingMore: false,
+      error: null, scriptRun: null, edits: {}, editError: null
     })
     expect(s.activeTabId).toBe('b')
   })
@@ -713,7 +714,8 @@ describe('split views — close', () => {
 describe('split views — reorderTab (drag-and-drop)', () => {
   const mk = (id: string, connectionId: string, pane: 'left' | 'right') => ({
     id, connectionId, title: id, pane, text: '', epoch: 0, runOnOpen: false, running: false,
-    queryId: null, result: null, error: null, scriptRun: null, edits: {}, editError: null,
+    queryId: null, result: null, resultQueryId: null, hasMore: false, loadingMore: false,
+    error: null, scriptRun: null, edits: {}, editError: null,
   })
 
   it('reorders within a pane and keeps the tab active', () => {

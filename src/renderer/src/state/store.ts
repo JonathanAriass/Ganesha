@@ -60,6 +60,13 @@ export interface QueryTabData {
   running: boolean
   queryId: string | null
   result: QueryResult | null
+  /** queryId behind the current `result`, kept so `query.fetchMore` can page it (finishRun
+   *  nulls `queryId`). null when there's no pageable result. */
+  resultQueryId: string | null
+  /** More rows are cached in main past the loaded ones — drives scroll load-more. */
+  hasMore: boolean
+  /** A load-more fetch is in flight; suppresses duplicate triggers. */
+  loadingMore: boolean
   error: string | null
   /** Exactly one of result/error/scriptRun is current — each run path clears the others. */
   scriptRun: ScriptRun | null
@@ -163,6 +170,10 @@ interface AppState {
   focusPane: (pane: PaneId) => void
   startRun: (id: string, queryId: string) => void
   finishRun: (id: string, payload: { result: QueryResult } | { error: string }) => void
+  /** Append a scroll-loaded page onto the current result (rows + mongo documents) and update hasMore. */
+  appendRows: (id: string, page: { rows: unknown[][]; documents: Record<string, unknown>[] | null; hasMore: boolean }) => void
+  /** Toggle the in-flight flag around a load-more fetch, so duplicate scroll triggers no-op. */
+  setLoadingMore: (id: string, loading: boolean) => void
   /** After a committed edit, write each value at its field path into the tab's result —
    *  the row cell (top-level column) and the documents array (nested path). Immutable. */
   applyResultEdits: (id: string, edits: { rowIndex: number; path: string; value: unknown }[]) => void
@@ -224,6 +235,9 @@ function blankTab(fields: {
     running: false,
     queryId: null,
     result: null,
+    resultQueryId: null,
+    hasMore: false,
+    loadingMore: false,
     error: null,
     scriptRun: null,
     edits: {},
@@ -617,7 +631,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       tabs: s.tabs.map((t) =>
         // scriptRun cleared: a single run supersedes a previous script's results.
         // Staged edits belong to the old result, so they're dropped on a new run.
-        t.id === id ? { ...t, running: true, error: null, queryId, runOnOpen: false, scriptRun: null, edits: {}, editError: null } : t
+        t.id === id ? { ...t, running: true, error: null, queryId, runOnOpen: false, scriptRun: null, edits: {}, editError: null, resultQueryId: null, hasMore: false, loadingMore: false } : t
       ),
     })),
 
@@ -626,10 +640,32 @@ export const useAppStore = create<AppState>((set, get) => ({
       tabs: s.tabs.map((t) => {
         if (t.id !== id) return t
         if ('result' in payload)
-          return { ...t, running: false, queryId: null, result: payload.result, error: null, scriptRun: null, edits: {}, editError: null }
-        return { ...t, running: false, queryId: null, error: payload.error, result: null, scriptRun: null, edits: {}, editError: null }
+          // Keep the finished queryId as resultQueryId so scroll load-more can page it.
+          return { ...t, running: false, queryId: null, resultQueryId: t.queryId, hasMore: payload.result.hasMore ?? false, loadingMore: false, result: payload.result, error: null, scriptRun: null, edits: {}, editError: null }
+        return { ...t, running: false, queryId: null, resultQueryId: null, hasMore: false, loadingMore: false, error: payload.error, result: null, scriptRun: null, edits: {}, editError: null }
       }),
     })),
+
+  appendRows: (id, page) =>
+    set((s) => ({
+      tabs: s.tabs.map((t) => {
+        // Result cleared (a new run landed while paging) — drop the stale page.
+        if (t.id !== id || !t.result) return t
+        return {
+          ...t,
+          result: {
+            ...t.result,
+            rows: [...t.result.rows, ...page.rows],
+            documents: t.result.documents ? [...t.result.documents, ...(page.documents ?? [])] : t.result.documents,
+          },
+          hasMore: page.hasMore,
+          loadingMore: false,
+        }
+      }),
+    })),
+
+  setLoadingMore: (id, loading) =>
+    set((s) => ({ tabs: s.tabs.map((t) => (t.id === id ? { ...t, loadingMore: loading } : t)) })),
 
   applyResultEdits: (id, edits) =>
     set((s) => ({

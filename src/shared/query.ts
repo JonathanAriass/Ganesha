@@ -36,4 +36,8 @@ export interface QueryResult {
   /** Present only for a result over one editable table/collection whose key is in the
    *  result. null = the grid is read-only. */
   editable: EditableResult | null
+  /** Row-returning results only: more rows are cached in main past the ones returned here,
+   *  fetchable page-by-page via `query.fetchMore`. Absent/false = this is everything (up to
+   *  the hard cap; `truncated` still flags rows dropped beyond it). */
+  hasMore?: boolean
 }

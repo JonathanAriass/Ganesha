@@ -13,7 +13,8 @@ import { DriverManager } from './drivers/registry'
 import { PostgresDriver } from './drivers/sql/postgres'
 import { MySqlDriver } from './drivers/sql/mysql'
 import { MongoDriver } from './drivers/mongo/mongo'
-import { runUserQuery } from './query-service'
+import { runUserQuery, PAGE_SIZE } from './query-service'
+import { ResultCache } from './query-cache'
 import { SshTunnelManager } from './ssh/tunnel-manager'
 import { connectVia, disconnectVia, openTunnel } from './connection-runtime'
 import { buildConnectParams } from './drivers/params'
@@ -44,6 +45,8 @@ drivers.register(new MongoDriver())
 const tunnels = new SshTunnelManager({ onDrop: (connId) => void drivers.disconnectAll(connId) })
 const engine = new LlmEngine()
 const activeGenerations = new Map<string, AbortController>()
+// Retains full result sets (LRU-bounded) so the grid can page more rows on scroll without re-querying.
+const resultCache = new ResultCache()
 
 // SSM tunnel processes. Output/status are broadcast to every window (they aren't tied to a request).
 const broadcastSsm = (channel: 'ssm:output' | 'ssm:status', payload: unknown): void => {
@@ -213,9 +216,14 @@ export function registerIpcHandlers(): void {
     const { db, secrets } = store()
     const c = conns.getConnection(db, connectionId)
     if (!c) throw new Error(`Connection not found: ${connectionId}`)
-    const result = await runUserQuery({ db, secrets, driver: drivers.get(c.type), connectionId, query, queryId, tunnels, now: () => Date.now() })
+    const result = await runUserQuery({ db, secrets, driver: drivers.get(c.type), connectionId, query, queryId, tunnels, now: () => Date.now(), cache: resultCache })
     return ok(result)
   })
+  // Next page of a cached result (scroll load-more). A miss (evicted / unknown id) returns an
+  // empty final page so the renderer stops paging gracefully.
+  handle('query.fetchMore', ({ queryId, offset }) =>
+    ok(resultCache.page(queryId, offset, PAGE_SIZE) ?? { rows: [], documents: null, hasMore: false })
+  )
   handle('query.cancel', async ({ connectionId, queryId }) => {
     const c = conns.getConnection(store().db, connectionId)
     if (c && drivers.has(c.type)) await drivers.get(c.type).cancel(connectionId, queryId)

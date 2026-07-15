@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useAppStore, type QueryTabData } from '../state/store'
+import { unwrap } from '../lib/result'
 import { useConnections } from '../lib/hooks'
 import ResultsGrid from './ResultsGrid'
 import ScriptResults from './ScriptResults'
@@ -27,6 +28,20 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
   const connection = connections.find((c) => c.id === tab.connectionId)
   const openTableInfoTab = useAppStore((s) => s.openTableInfoTab)
   const pendingEdits = Object.keys(tab.edits).length
+
+  // Scroll load-more: fetch the next cached page and append it. Reads LIVE tab state (getState)
+  // so the callback identity is stable and a stale closure can't double-fetch; the store's
+  // loadingMore flag serializes concurrent scroll triggers.
+  const loadMore = useCallback(() => {
+    const t = useAppStore.getState().tabs.find((x) => x.id === tab.id)
+    if (!t || !t.resultQueryId || !t.hasMore || t.loadingMore || !t.result) return
+    useAppStore.getState().setLoadingMore(tab.id, true)
+    void window.api.query
+      .fetchMore(t.resultQueryId, t.result.rows.length)
+      .then(unwrap)
+      .then((page) => useAppStore.getState().appendRows(tab.id, page))
+      .catch(() => useAppStore.getState().setLoadingMore(tab.id, false))
+  }, [tab.id])
 
   // Before the running spinner: a script renders progressively while it executes.
   if (tab.scriptRun) {
@@ -174,6 +189,10 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
           isMongo={connection?.type === 'mongodb'}
           columnKinds={columnKinds}
           edits={tab.edits}
+          hasMore={tab.hasMore}
+          loadingMore={tab.loadingMore}
+          onLoadMore={loadMore}
+          resultKey={tab.resultQueryId}
         />
       ) : (
         <DocumentView

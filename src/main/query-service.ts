@@ -9,8 +9,13 @@ import { assertMongoCommandWritable } from './drivers/mongo/command'
 import { connectVia } from './connection-runtime'
 import type { SshTunnelManager } from './ssh/tunnel-manager'
 import { readFileSync } from 'fs'
+import type { ResultCache } from './query-cache'
 
-const DEFAULT_MAX_ROWS = 1000
+/** Rows main retains per result (the paging ceiling). Beyond it `truncated` stays true — the
+ *  driver already fetched more than this only if the underlying query returned more. */
+const HARD_CAP = 50000
+/** Rows returned on the first run and per `query.fetchMore` page. */
+export const PAGE_SIZE = 1000
 
 interface RunArgs {
   db: DB
@@ -23,12 +28,14 @@ interface RunArgs {
   tunnels: SshTunnelManager
   /** Injected clock for deterministic history timestamps. */
   now: () => number
+  /** Retains the full result so the renderer can page it via `query.fetchMore`. */
+  cache: ResultCache
 }
 
 /** Orchestrate a run: load config+secret, connect, dispatch by type (SQL vs Mongo) through the
  *  read-only guard, run on the driver, and log history on success or failure. */
 export async function runUserQuery(args: RunArgs): Promise<QueryResult> {
-  const { db, secrets, driver, connectionId, query, queryId, tunnels, now } = args
+  const { db, secrets, driver, connectionId, query, queryId, tunnels, now, cache } = args
   const config = getConnection(db, connectionId)
   if (!config) throw new Error(`Connection not found: ${connectionId}`)
 
@@ -50,11 +57,15 @@ export async function runUserQuery(args: RunArgs): Promise<QueryResult> {
       assertSqlWritable(query, config.readOnly)
       request = { kind: 'sql', sql: query }
     }
-    const result = await driver.runQuery(config.id, request, {
-      maxRows: DEFAULT_MAX_ROWS, queryId, readOnly: config.readOnly
+    const full = await driver.runQuery(config.id, request, {
+      maxRows: HARD_CAP, queryId, readOnly: config.readOnly
     })
-    addHistory(db, { connectionId: config.id, query, ranAt: started, durationMs: result.durationMs, success: true })
-    return result
+    addHistory(db, { connectionId: config.id, query, ranAt: started, durationMs: full.durationMs, success: true })
+    // Retain everything main fetched; hand back only the first page plus a flag that more is
+    // cached (paged in via query.fetchMore) so a huge result doesn't cross the IPC boundary at once.
+    cache.store(queryId, { rows: full.rows, documents: full.documents })
+    const page = cache.page(queryId, 0, PAGE_SIZE)
+    return page ? { ...full, rows: page.rows, documents: page.documents, hasMore: page.hasMore } : full
   } catch (e) {
     addHistory(db, { connectionId: config.id, query, ranAt: started, durationMs: null, success: false })
     throw e
