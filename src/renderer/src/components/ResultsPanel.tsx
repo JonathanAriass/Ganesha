@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useAppStore, type QueryTabData } from '../state/store'
+import { filterKey, type FilterQuery } from '@shared/query'
 import { unwrap } from '../lib/result'
 import { useConnections } from '../lib/hooks'
 import ResultsGrid from './ResultsGrid'
@@ -22,6 +23,7 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
   // exists, so the default must be derived at render time once one arrives.
   const [userView, setUserView] = useState<View | null>(null)
   const filter = tab.filter // store-owned so main-side filtering + paging coordinate
+  const mode = tab.filterMode // case / whole-word / regex toggles
   const view: View = userView ?? (hasDocuments ? 'documents' : 'table')
   const { data: connections = [] } = useConnections()
   const connection = connections.find((c) => c.id === tab.connectionId)
@@ -37,11 +39,12 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
     if (!t || !t.resultQueryId || t.loadingMore) return
     if (t.filter) {
       if (!t.filterView || !t.filterView.hasMore) return
+      const query: FilterQuery = { text: t.filter, ...t.filterMode }
       store.setLoadingMore(tab.id, true)
       void window.api.query
-        .filter(t.resultQueryId, t.filter, t.filterView.rows.length)
+        .filter(t.resultQueryId, query, t.filterView.rows.length)
         .then(unwrap)
-        .then((page) => store.appendFilterRows(tab.id, t.filter, page))
+        .then((page) => store.appendFilterRows(tab.id, filterKey(query), page))
         .catch(() => store.setLoadingMore(tab.id, false))
     } else {
       if (!t.hasMore || !t.result) return
@@ -54,20 +57,23 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
     }
   }, [tab.id])
 
-  // Apply the filter over the WHOLE cached result in main (debounced). The store's race guard drops
-  // a response whose filter the user has since changed.
+  // Apply the filter query (text + toggles) over the WHOLE cached result in main (debounced). The
+  // store's race guard drops a response whose query the user has since changed.
   const resultQueryId = tab.resultQueryId
   useEffect(() => {
     if (!filter || !resultQueryId) return
+    const query: FilterQuery = { text: filter, ...mode }
+    const key = filterKey(query)
     const handle = setTimeout(() => {
       void window.api.query
-        .filter(resultQueryId, filter, 0)
+        .filter(resultQueryId, query, 0)
         .then(unwrap)
-        .then((page) => useAppStore.getState().applyFilterPage(tab.id, filter, page))
+        .then((page) => useAppStore.getState().applyFilterPage(tab.id, key, page))
         .catch(() => {})
     }, 200)
     return () => clearTimeout(handle)
-  }, [filter, resultQueryId, tab.id])
+    // `mode` is a stable ref until a toggle changes it (the store keeps it across other tab updates).
+  }, [filter, mode, resultQueryId, tab.id])
 
   // Before the running spinner: a script renders progressively while it executes.
   if (tab.scriptRun) {
@@ -171,11 +177,35 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
               className="filter-input"
               placeholder="Filter all rows…"
               value={filter}
+              title={'Space = AND · OR · -term negates · "quoted phrase"'}
               onChange={(e) => useAppStore.getState().setFilter(tab.id, e.target.value)}
             />
+            <div className="filter-toggles">
+              <button
+                className={`ft-toggle${mode.caseSensitive ? ' active' : ''}`}
+                title="Match case" aria-pressed={mode.caseSensitive}
+                onClick={() => useAppStore.getState().setFilterMode(tab.id, { caseSensitive: !mode.caseSensitive })}
+              >
+                Aa
+              </button>
+              <button
+                className={`ft-toggle${mode.wholeWord ? ' active' : ''}`}
+                title="Whole word" aria-pressed={mode.wholeWord}
+                onClick={() => useAppStore.getState().setFilterMode(tab.id, { wholeWord: !mode.wholeWord, regex: false })}
+              >
+                \b
+              </button>
+              <button
+                className={`ft-toggle${mode.regex ? ' active' : ''}`}
+                title="Regular expression" aria-pressed={mode.regex}
+                onClick={() => useAppStore.getState().setFilterMode(tab.id, { regex: !mode.regex, wholeWord: false })}
+              >
+                .*
+              </button>
+            </div>
             {filtering && (
-              <span className="filter-count">
-                {fv ? `${fv.total} match${fv.total === 1 ? '' : 'es'}` : '…'}
+              <span className={`filter-count${fv?.invalid ? ' err' : ''}`}>
+                {!fv ? '…' : fv.invalid ? 'invalid regex' : `${fv.total} match${fv.total === 1 ? '' : 'es'}`}
               </span>
             )}
           </>

@@ -41,3 +41,18 @@ export interface QueryResult {
    *  the hard cap; `truncated` still flags rows dropped beyond it). */
   hasMore?: boolean
 }
+
+/** A results-filter query: the raw box text plus the toggle modes. In `regex` mode `text` is a
+ *  single regular expression tested per cell; otherwise `text` is parsed into terms (space = AND,
+ *  `OR` = OR, `-term`/`!term` = negate, `"quoted"` = literal phrase). */
+export interface FilterQuery {
+  text: string
+  caseSensitive: boolean
+  wholeWord: boolean
+  regex: boolean
+}
+
+/** Stable identity of a filter query, for the store's race guard + as the fetch key. */
+export function filterKey(q: FilterQuery): string {
+  return JSON.stringify([q.text, q.caseSensitive, q.wholeWord, q.regex])
+}

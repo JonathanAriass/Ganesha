@@ -1,4 +1,5 @@
-import { filterIndices } from './result-filter'
+import { compileQuery } from './result-filter'
+import type { FilterQuery } from '../shared/query'
 
 /** A page of a cached result: the slice at the requested offset plus whether rows remain
  *  past it (so the renderer knows to keep offering "load more"). */
@@ -16,6 +17,8 @@ export interface FilterPage {
   indices: number[]
   total: number
   hasMore: boolean
+  /** True when the query was `regex` mode with an invalid pattern — the UI says so, total is 0. */
+  invalid: boolean
 }
 
 /** The full (up to the hard cap) result set retained so the renderer can page through it
@@ -64,12 +67,15 @@ export class ResultCache {
   /** A page of the rows matching `filter` (case-insensitive substring, any column) across the
    *  WHOLE cached result — the fix for filtering only loaded rows. `indices` are the matches'
    *  original result indexes; `total` is the full match count. Null on cache miss. Bumps LRU. */
-  filterPage(queryId: string, filter: string, offset: number, pageSize: number): FilterPage | null {
+  filterPage(queryId: string, query: FilterQuery, offset: number, pageSize: number): FilterPage | null {
     const cached = this.map.get(queryId)
     if (!cached) return null
     this.map.delete(queryId) // bump to MRU
     this.map.set(queryId, cached)
-    const matched = filterIndices(cached.rows, filter)
+    const compiled = compileQuery(query)
+    if (compiled.invalid) return { rows: [], documents: null, indices: [], total: 0, hasMore: false, invalid: true }
+    const matched: number[] = []
+    for (let i = 0; i < cached.rows.length; i++) if (compiled.match(cached.rows[i])) matched.push(i)
     const slice = matched.slice(offset, offset + pageSize)
     return {
       rows: slice.map((i) => cached.rows[i]),
@@ -77,6 +83,7 @@ export class ResultCache {
       indices: slice,
       total: matched.length,
       hasMore: matched.length > offset + pageSize,
+      invalid: false,
     }
   }
 

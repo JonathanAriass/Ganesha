@@ -66,6 +66,7 @@ describe('ResultCache', () => {
 })
 
 describe('ResultCache.filterPage', () => {
+  const q = (text: string, over = {}) => ({ text, caseSensitive: false, wholeWord: false, regex: false, ...over })
   const c = new ResultCache()
   // 5 rows; 'al' matches rows 0 (alpha) and 2 (alto) only.
   c.store('q', {
@@ -74,33 +75,46 @@ describe('ResultCache.filterPage', () => {
   })
 
   it('returns matching rows with their ORIGINAL indexes + total', () => {
-    const p = c.filterPage('q', 'al', 0, 10)!
+    const p = c.filterPage('q', q('al'), 0, 10)!
     expect(p.rows).toEqual([['alpha'], ['alto']])
     expect(p.indices).toEqual([0, 2]) // original result indexes, for stable edit keys
     expect(p.documents).toEqual([{ n: 'alpha' }, { n: 'alto' }])
     expect(p.total).toBe(2)
     expect(p.hasMore).toBe(false)
+    expect(p.invalid).toBe(false)
   })
 
   it('pages the matches and reports hasMore at the boundary', () => {
-    const p1 = c.filterPage('q', '', 0, 2)! // empty filter matches all 5
+    const p1 = c.filterPage('q', q(''), 0, 2)! // empty filter matches all 5
     expect(p1.rows).toHaveLength(2)
     expect(p1.indices).toEqual([0, 1])
     expect(p1.total).toBe(5)
     expect(p1.hasMore).toBe(true)
-    const p2 = c.filterPage('q', '', 4, 2)!
+    const p2 = c.filterPage('q', q(''), 4, 2)!
     expect(p2.indices).toEqual([4])
     expect(p2.hasMore).toBe(false)
   })
 
+  it('applies operators (negation) through the query', () => {
+    const p = c.filterPage('q', q('-al'), 0, 10)! // rows WITHOUT 'al' → banana, cherry, delta
+    expect(p.indices).toEqual([1, 3, 4])
+  })
+
+  it('flags an invalid regex query', () => {
+    const p = c.filterPage('q', q('[', { regex: true }), 0, 10)!
+    expect(p.invalid).toBe(true)
+    expect(p.total).toBe(0)
+    expect(p.rows).toEqual([])
+  })
+
   it('no matches → empty page, total 0', () => {
-    const p = c.filterPage('q', 'zzz', 0, 10)!
+    const p = c.filterPage('q', q('zzz'), 0, 10)!
     expect(p.rows).toEqual([])
     expect(p.total).toBe(0)
     expect(p.hasMore).toBe(false)
   })
 
   it('returns null on a cache miss', () => {
-    expect(c.filterPage('nope', 'a', 0, 10)).toBeNull()
+    expect(c.filterPage('nope', q('a'), 0, 10)).toBeNull()
   })
 })

@@ -1228,6 +1228,34 @@ input[type="password"]::placeholder {
   color: var(--text-2);
   white-space: nowrap;
 }
+.filter-count.err {
+  color: var(--danger-text);
+}
+
+/* Filter mode toggles: Aa (case), \b (whole word), .* (regex). */
+.filter-toggles {
+  display: flex;
+  gap: 2px;
+}
+.ft-toggle {
+  min-width: 24px;
+  padding: 3px 5px;
+  font-size: 11px;
+  font-family: ui-monospace, 'SF Mono', monospace;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.ft-toggle:hover {
+  color: var(--text);
+}
+.ft-toggle.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
 
 .filter-input:focus {
   border-color: var(--accent);

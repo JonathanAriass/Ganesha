@@ -1,6 +1,7 @@
 import type { IpcResult, LlmTokenEvent, LlmDownloadEvent, LlmContextEvent, SsmOutputEvent, SsmStatusEvent } from './ipc'
 import type { ConnectionInput, HistoryEntryInput, SavedQueryInput, SavedQueryPatch, SessionTab, SsmTunnelInput } from './domain'
 import type { ObjectRef } from './schema'
+import type { FilterQuery } from './query'
 
 export interface DbClientApi {
   ping(message: string): Promise<IpcResult<'ping'>>
@@ -37,7 +38,7 @@ export interface DbClientApi {
     run(connectionId: string, query: string, queryId: string): Promise<IpcResult<'query.run'>>
     cancel(connectionId: string, queryId: string): Promise<IpcResult<'query.cancel'>>
     fetchMore(queryId: string, offset: number): Promise<IpcResult<'query.fetchMore'>>
-    filter(queryId: string, filter: string, offset: number): Promise<IpcResult<'query.filter'>>
+    filter(queryId: string, query: FilterQuery, offset: number): Promise<IpcResult<'query.filter'>>
   }
   schema: {
     objects(connectionId: string): Promise<IpcResult<'schema.objects'>>

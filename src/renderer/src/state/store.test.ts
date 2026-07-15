@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import type { SessionTab } from '@shared/domain'
+import { filterKey } from '@shared/query'
 import { useAppStore } from './store'
 import { editKey } from '../lib/doc-path'
 
@@ -290,7 +291,7 @@ describe('hydrateTabs', () => {
       id: 'a', connectionId: 'c1', title: 'Query 1', text: 'SELECT 1', pane: 'left',
       epoch: 0, runOnOpen: false, running: false, queryId: null,
       result: null, resultQueryId: null, hasMore: false, loadingMore: false,
-      filter: '', filterView: null,
+      filter: '', filterMode: { caseSensitive: false, wholeWord: false, regex: false }, filterView: null,
       error: null, scriptRun: null, edits: {}, editError: null
     })
     expect(s.activeTabId).toBe('b')
@@ -716,7 +717,7 @@ describe('split views — reorderTab (drag-and-drop)', () => {
   const mk = (id: string, connectionId: string, pane: 'left' | 'right') => ({
     id, connectionId, title: id, pane, text: '', epoch: 0, runOnOpen: false, running: false,
     queryId: null, result: null, resultQueryId: null, hasMore: false, loadingMore: false,
-    filter: '', filterView: null,
+    filter: '', filterMode: { caseSensitive: false, wholeWord: false, regex: false }, filterView: null,
     error: null, scriptRun: null, edits: {}, editError: null,
   })
 
@@ -788,38 +789,50 @@ describe('results filter view (main-side search)', () => {
   })
   const tab = () => useAppStore.getState().tabs[0]
   const page = (over: Record<string, unknown> = {}) => ({
-    rows: [[1]] as unknown[][], documents: null, indices: [0], total: 1, hasMore: false, ...over,
+    rows: [[1]] as unknown[][], documents: null, indices: [0], total: 1, hasMore: false, invalid: false, ...over,
   })
+  // key for a plain (default-mode) query on `text`
+  const key = (text: string, over = {}) => filterKey({ text, caseSensitive: false, wholeWord: false, regex: false, ...over })
 
   it('setFilter sets the text; clearing it drops the filter view', () => {
     const id = tab().id
     useAppStore.getState().setFilter(id, 'ab')
     expect(tab().filter).toBe('ab')
-    useAppStore.getState().applyFilterPage(id, 'ab', page())
-    expect(tab().filterView?.filter).toBe('ab')
+    useAppStore.getState().applyFilterPage(id, key('ab'), page())
+    expect(tab().filterView?.key).toBe(key('ab'))
     useAppStore.getState().setFilter(id, '')
     expect(tab().filter).toBe('')
     expect(tab().filterView).toBeNull()
   })
 
-  it('applyFilterPage is dropped when the filter has since changed (race guard)', () => {
+  it('applyFilterPage is dropped when the query has since changed (race guard)', () => {
     const id = tab().id
     useAppStore.getState().setFilter(id, 'abc')
-    useAppStore.getState().applyFilterPage(id, 'ab', page()) // stale response for an old filter
+    useAppStore.getState().applyFilterPage(id, key('ab'), page()) // stale response for an old query
     expect(tab().filterView).toBeNull()
-    useAppStore.getState().applyFilterPage(id, 'abc', page({ total: 3 }))
+    useAppStore.getState().applyFilterPage(id, key('abc'), page({ total: 3 }))
     expect(tab().filterView?.total).toBe(3)
   })
 
-  it('appendFilterRows appends matches + indices, and drops a stale-filter page', () => {
+  it('a filter-mode change also invalidates a stale page (key includes the toggles)', () => {
     const id = tab().id
     useAppStore.getState().setFilter(id, 'ab')
-    useAppStore.getState().applyFilterPage(id, 'ab', page({ rows: [[1]], indices: [0], total: 2, hasMore: true }))
-    useAppStore.getState().appendFilterRows(id, 'ab', page({ rows: [[2]], indices: [5], total: 2, hasMore: false }))
+    useAppStore.getState().setFilterMode(id, { regex: true })
+    useAppStore.getState().applyFilterPage(id, key('ab'), page()) // default-mode key, but mode is now regex
+    expect(tab().filterView).toBeNull()
+    useAppStore.getState().applyFilterPage(id, key('ab', { regex: true }), page({ total: 2 }))
+    expect(tab().filterView?.total).toBe(2)
+  })
+
+  it('appendFilterRows appends matches + indices, and drops a stale-query page', () => {
+    const id = tab().id
+    useAppStore.getState().setFilter(id, 'ab')
+    useAppStore.getState().applyFilterPage(id, key('ab'), page({ rows: [[1]], indices: [0], total: 2, hasMore: true }))
+    useAppStore.getState().appendFilterRows(id, key('ab'), page({ rows: [[2]], indices: [5], total: 2, hasMore: false }))
     expect(tab().filterView?.rows).toEqual([[1], [2]])
     expect(tab().filterView?.indices).toEqual([0, 5]) // original indexes preserved
     expect(tab().filterView?.hasMore).toBe(false)
-    useAppStore.getState().appendFilterRows(id, 'xx', page({ rows: [[9]] })) // stale filter → ignored
+    useAppStore.getState().appendFilterRows(id, key('xx'), page({ rows: [[9]] })) // stale query → ignored
     expect(tab().filterView?.rows).toEqual([[1], [2]])
   })
 })

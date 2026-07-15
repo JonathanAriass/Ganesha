@@ -1,44 +1,90 @@
 import { describe, it, expect } from 'vitest'
-import { cellMatchesFilter, rowMatchesFilter, filterIndices } from './result-filter'
+import { tokenize, parseTerms, compileQuery, filterIndices } from './result-filter'
+import type { FilterQuery } from '../shared/query'
 
-describe('cellMatchesFilter', () => {
-  it('matches case-insensitively as a substring', () => {
-    expect(cellMatchesFilter('Hello World', 'hello')).toBe(true)
-    expect(cellMatchesFilter('Hello World', 'WOR')).toBe(true)
-    expect(cellMatchesFilter('Hello', 'xyz')).toBe(false)
-  })
-  it('stringifies numbers, bigints, and objects', () => {
-    expect(cellMatchesFilter(42, '4')).toBe(true)
-    expect(cellMatchesFilter(9007199254740993n, '740993')).toBe(true)
-    expect(cellMatchesFilter({ city: 'Oviedo' }, 'oviedo')).toBe(true)
-    expect(cellMatchesFilter([1, 2, 3], '2')).toBe(true)
-  })
-  it('treats null/undefined as empty and an empty needle as match-all', () => {
-    expect(cellMatchesFilter(null, 'x')).toBe(false)
-    expect(cellMatchesFilter(undefined, 'x')).toBe(false)
-    expect(cellMatchesFilter(null, '')).toBe(true)
+const q = (text: string, over: Partial<FilterQuery> = {}): FilterQuery => ({
+  text, caseSensitive: false, wholeWord: false, regex: false, ...over,
+})
+const hit = (fq: FilterQuery, row: unknown[]): boolean => compileQuery(fq).match(row)
+
+describe('tokenize', () => {
+  it('keeps quoted spans and leading -/! attached', () => {
+    expect(tokenize('foo -"a b" OR !bar')).toEqual(['foo', '-"a b"', 'OR', '!bar'])
   })
 })
 
-describe('rowMatchesFilter', () => {
-  it('matches when any cell contains the needle', () => {
-    expect(rowMatchesFilter(['a', 'b', 'c'], 'b')).toBe(true)
-    expect(rowMatchesFilter(['a', 'b', 'c'], 'z')).toBe(false)
+describe('parseTerms', () => {
+  it('separates positives/negatives and detects OR', () => {
+    expect(parseTerms('foo -bar')).toEqual({ positives: ['foo'], negatives: ['bar'], op: 'and' })
+    expect(parseTerms('a OR b')).toEqual({ positives: ['a', 'b'], negatives: [], op: 'or' })
+    expect(parseTerms('"x y" !z')).toEqual({ positives: ['x y'], negatives: ['z'], op: 'and' })
   })
-  it('empty needle matches every row', () => {
-    expect(rowMatchesFilter([null, null], '')).toBe(true)
+})
+
+describe('compileQuery — substring + case', () => {
+  it('is a case-insensitive substring by default', () => {
+    expect(hit(q('LO'), ['hello'])).toBe(true)
+    expect(hit(q('xyz'), ['hello'])).toBe(false)
+  })
+  it('respects the case-sensitive toggle', () => {
+    expect(hit(q('LO', { caseSensitive: true }), ['hello'])).toBe(false)
+    expect(hit(q('lo', { caseSensitive: true }), ['hello'])).toBe(true)
+  })
+  it('empty text matches everything', () => {
+    expect(hit(q('   '), ['whatever'])).toBe(true)
+  })
+})
+
+describe('compileQuery — AND / OR / negation (any cell)', () => {
+  it('AND: every positive term must match some cell', () => {
+    expect(hit(q('a b'), ['a x', 'b y'])).toBe(true) // a in cell0, b in cell1
+    expect(hit(q('a z'), ['a', 'b'])).toBe(false) // z absent
+  })
+  it('OR: any positive term matching is enough', () => {
+    expect(hit(q('z OR a'), ['a'])).toBe(true)
+    expect(hit(q('z OR w'), ['a'])).toBe(false)
+  })
+  it('negation excludes rows containing the term', () => {
+    expect(hit(q('-secret'), ['public'])).toBe(true)
+    expect(hit(q('-secret'), ['secret data'])).toBe(false)
+    expect(hit(q('a -b'), ['a', 'c'])).toBe(true)
+    expect(hit(q('a -b'), ['a', 'b'])).toBe(false)
+  })
+})
+
+describe('compileQuery — whole word', () => {
+  it('matches only at word boundaries', () => {
+    expect(hit(q('cat', { wholeWord: true }), ['category'])).toBe(false)
+    expect(hit(q('cat', { wholeWord: true }), ['a cat sat'])).toBe(true)
+  })
+})
+
+describe('compileQuery — regex', () => {
+  it('tests the whole text as a regex per cell', () => {
+    expect(hit(q('^h.*o$', { regex: true }), ['hello'])).toBe(true)
+    expect(hit(q('\\d+', { regex: true }), [42])).toBe(true) // stringified
+    expect(hit(q('^x', { regex: true }), ['hello'])).toBe(false)
+  })
+  it('flags an invalid regex and matches nothing', () => {
+    const c = compileQuery(q('[', { regex: true }))
+    expect(c.invalid).toBe(true)
+    expect(c.match(['anything'])).toBe(false)
+  })
+})
+
+describe('compileQuery — quoted phrase', () => {
+  it('matches the phrase literally (spaces kept)', () => {
+    expect(hit(q('"a b"'), ['x a b y'])).toBe(true)
+    expect(hit(q('"a b"'), ['ab'])).toBe(false)
   })
 })
 
 describe('filterIndices', () => {
-  it('returns the original indexes of matching rows', () => {
-    const rows = [['apple'], ['banana'], ['apricot'], ['cherry']]
-    expect(filterIndices(rows, 'ap')).toEqual([0, 2]) // apple, apricot
+  it('returns original indexes of matching rows', () => {
+    const rows = [['alpha'], ['banana'], ['alto']]
+    expect(filterIndices(rows, q('al'))).toEqual([0, 2])
   })
-  it('empty needle returns all indexes in order', () => {
-    expect(filterIndices([['a'], ['b'], ['c']], '')).toEqual([0, 1, 2])
-  })
-  it('no match returns empty', () => {
-    expect(filterIndices([['a'], ['b']], 'z')).toEqual([])
+  it('empty query returns all', () => {
+    expect(filterIndices([['a'], ['b']], q(''))).toEqual([0, 1])
   })
 })

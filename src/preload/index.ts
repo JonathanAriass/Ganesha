@@ -41,7 +41,7 @@ const api: DbClientApi = {
     run: (connectionId, query, queryId) => invoke('query.run', { connectionId, query, queryId }),
     cancel: (connectionId, queryId) => invoke('query.cancel', { connectionId, queryId }),
     fetchMore: (queryId, offset) => invoke('query.fetchMore', { queryId, offset }),
-    filter: (queryId, filter, offset) => invoke('query.filter', { queryId, filter, offset })
+    filter: (queryId, query, offset) => invoke('query.filter', { queryId, query, offset })
   },
   schema: {
     objects: (connectionId) => invoke('schema.objects', connectionId),

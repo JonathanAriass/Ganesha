@@ -4,7 +4,7 @@ import type {
   SavedQuery, SavedQueryInput, SavedQueryPatch, SessionTab,
   LocalModel, CatalogModel, LlmConversation, LlmMessage, SsmTunnel, SsmTunnelInput, AwsInstance
 } from './domain'
-import type { QueryResult, RowEdit } from './query'
+import type { QueryResult, RowEdit, FilterQuery } from './query'
 import type { DbObject, ObjectRef, ColumnInfo, Relationship, TableColumns, TableInfo } from './schema'
 
 export interface PingPayload {
@@ -37,7 +37,7 @@ export interface IpcChannels {
   'query.run': { req: { connectionId: string; query: string; queryId: string }; res: QueryResult }
   'query.cancel': { req: { connectionId: string; queryId: string }; res: null }
   'query.fetchMore': { req: { queryId: string; offset: number }; res: { rows: unknown[][]; documents: Record<string, unknown>[] | null; hasMore: boolean } }
-  'query.filter': { req: { queryId: string; filter: string; offset: number }; res: { rows: unknown[][]; documents: Record<string, unknown>[] | null; indices: number[]; total: number; hasMore: boolean } }
+  'query.filter': { req: { queryId: string; query: FilterQuery; offset: number }; res: { rows: unknown[][]; documents: Record<string, unknown>[] | null; indices: number[]; total: number; hasMore: boolean; invalid: boolean } }
   'connections.test': { req: { input: ConnectionInput; password: string | null; id?: string; sshSecrets?: Record<string, string> }; res: null }
   'connections.disconnect': { req: string; res: null }
   'schema.objects': { req: string; res: DbObject[] }

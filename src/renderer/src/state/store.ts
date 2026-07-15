@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { SessionTab } from '@shared/domain'
 import type { QueryResult } from '@shared/query'
+import { filterKey } from '@shared/query'
 import { buildRowEdits } from '../lib/edit-staging'
 import { parseEditKey, setAtPath } from '../lib/doc-path'
 import { unwrap } from '../lib/result'
@@ -41,15 +42,24 @@ export interface ScriptRun {
   entries: ScriptStatementResult[]
 }
 
+/** The toggle modes for the results filter; paired with the box text to form a FilterQuery. */
+export interface FilterMode {
+  caseSensitive: boolean
+  wholeWord: boolean
+  regex: boolean
+}
+
 /** The rows matching a tab's active filter, loaded page-by-page from main (which filters the whole
- *  cached result). `indices` = each match's ORIGINAL result index, so edits key stably. */
+ *  cached result). `indices` = each match's ORIGINAL result index, so edits key stably. `key` is the
+ *  filterKey of the query these matches are for (race guard). */
 export interface FilterView {
-  filter: string
+  key: string
   rows: unknown[][]
   documents: Record<string, unknown>[] | null
   indices: number[]
   total: number
   hasMore: boolean
+  invalid: boolean
 }
 
 /** Apply committed edits (keyed by ORIGINAL row index) onto a filter view, whose rows are indexed
@@ -121,7 +131,9 @@ export interface QueryTabData {
   /** Active results filter text ('' = off). Searches the WHOLE cached result in main, not just
    *  loaded rows. */
   filter: string
-  /** The matches for the active `filter`, loaded page-by-page from main — null when `filter` is ''. */
+  /** Filter toggle modes (case/whole-word/regex); with `filter` forms the query sent to main. */
+  filterMode: FilterMode
+  /** The matches for the active filter query, loaded page-by-page from main — null when off. */
   filterView: FilterView | null
   error: string | null
   /** Exactly one of result/error/scriptRun is current — each run path clears the others. */
@@ -232,10 +244,12 @@ interface AppState {
   setLoadingMore: (id: string, loading: boolean) => void
   /** Set the active results filter text ('' clears the filter view). */
   setFilter: (id: string, filter: string) => void
-  /** Adopt page 1 of the filtered matches — dropped if `filter` is no longer the tab's current one. */
-  applyFilterPage: (id: string, filter: string, page: Omit<FilterView, 'filter'>) => void
-  /** Append a scroll-loaded page of matches — dropped if the tab's filter changed since the request. */
-  appendFilterRows: (id: string, filter: string, page: Omit<FilterView, 'filter'>) => void
+  /** Merge filter toggle modes (case-sensitive / whole-word / regex). */
+  setFilterMode: (id: string, patch: Partial<FilterMode>) => void
+  /** Adopt page 1 of the filtered matches — dropped if the query (`key`) is no longer current. */
+  applyFilterPage: (id: string, key: string, page: Omit<FilterView, 'key'>) => void
+  /** Append a scroll-loaded page of matches — dropped if the query changed since the request. */
+  appendFilterRows: (id: string, key: string, page: Omit<FilterView, 'key'>) => void
   /** After a committed edit, write each value at its field path into the tab's result —
    *  the row cell (top-level column) and the documents array (nested path). Immutable. */
   applyResultEdits: (id: string, edits: { rowIndex: number; path: string; value: unknown }[]) => void
@@ -301,6 +315,7 @@ function blankTab(fields: {
     hasMore: false,
     loadingMore: false,
     filter: '',
+    filterMode: { caseSensitive: false, wholeWord: false, regex: false },
     filterView: null,
     error: null,
     scriptRun: null,
@@ -739,18 +754,25 @@ export const useAppStore = create<AppState>((set, get) => ({
       ),
     })),
 
-  applyFilterPage: (id, filter, page) =>
+  setFilterMode: (id, patch) =>
+    set((s) => ({
+      tabs: s.tabs.map((t) => (t.id === id ? { ...t, filterMode: { ...t.filterMode, ...patch } } : t)),
+    })),
+
+  applyFilterPage: (id, key, page) =>
     set((s) => ({
       tabs: s.tabs.map((t) =>
-        // Race guard: a debounced response for a filter the user has since changed is dropped.
-        t.id === id && t.filter === filter ? { ...t, filterView: { filter, ...page }, loadingMore: false } : t
+        // Race guard: a debounced response for a query the user has since changed is dropped.
+        t.id === id && filterKey({ text: t.filter, ...t.filterMode }) === key
+          ? { ...t, filterView: { key, ...page }, loadingMore: false }
+          : t
       ),
     })),
 
-  appendFilterRows: (id, filter, page) =>
+  appendFilterRows: (id, key, page) =>
     set((s) => ({
       tabs: s.tabs.map((t) => {
-        if (t.id !== id || !t.filterView || t.filterView.filter !== filter) return t
+        if (t.id !== id || !t.filterView || t.filterView.key !== key) return t
         const fv = t.filterView
         return {
           ...t,
@@ -761,6 +783,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             indices: [...fv.indices, ...page.indices],
             total: page.total,
             hasMore: page.hasMore,
+            invalid: page.invalid,
           },
           loadingMore: false,
         }
