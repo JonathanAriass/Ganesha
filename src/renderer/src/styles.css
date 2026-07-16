@@ -1577,12 +1577,30 @@ mark.hl {
 }
 
 .row-inspector {
-  width: 340px;
+  width: 340px; /* fallback; the inline style (persisted, resizable) wins */
   flex-shrink: 0;
+  position: relative;
   display: flex;
   flex-direction: column;
   border-left: 1px solid var(--border);
   background: var(--bg-2);
+}
+/* Drag the left edge to resize the inspector (mirrors the assistant panel). */
+.ri-resizer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  z-index: 2;
+  cursor: col-resize;
+  touch-action: none;
+  background: linear-gradient(var(--border), var(--border)) center / 1px 100% no-repeat;
+}
+.ri-resizer:hover,
+.ri-resizer:focus-visible {
+  background: linear-gradient(var(--accent), var(--accent)) center / 2px 100% no-repeat;
+  outline: none;
 }
 
 .ri-head {

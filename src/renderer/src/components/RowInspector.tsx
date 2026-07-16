@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import JsonView from 'react18-json-view'
 import 'react18-json-view/src/style.css'
 import type { ColumnMeta, EditableResult } from '@shared/query'
@@ -8,6 +8,7 @@ import { coerceMongoEditValue, coerceLibraryEditValue } from '../lib/mongo-edit-
 import { asJsonTree } from '../lib/json-field'
 import { getAtPath, setAtPath } from '../lib/doc-path'
 import { cellText } from '../lib/grid-text'
+import { clampWidth, dragWidth, loadWidth, saveWidth, DEFAULT_WIDTH, MIN_WIDTH, MAX_WIDTH } from '../lib/inspector-width'
 import { useAppStore } from '../state/store'
 import EditingCell from './EditingCell'
 
@@ -62,6 +63,38 @@ export default function RowInspector({
 }: Props): JSX.Element {
   const store = useAppStore.getState
   const [editing, setEditing] = useState<number | null>(null) // which field's editor is open
+
+  // ── Horizontal resize (drag the left edge) — mirrors the assistant panel ──
+  const panelRef = useRef<HTMLDivElement>(null)
+  const [width, setWidth] = useState(() => loadWidth())
+  const widthRef = useRef(width) // leads every commit so same-tick key repeats accumulate
+  function commitWidth(w: number): void {
+    widthRef.current = w
+    setWidth(w)
+    saveWidth(w)
+  }
+  function onResizePointerDown(e: React.PointerEvent<HTMLDivElement>): void {
+    if (e.button !== 0) return
+    e.preventDefault()
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+  function onResizePointerMove(e: React.PointerEvent<HTMLDivElement>): void {
+    if (!e.currentTarget.hasPointerCapture(e.pointerId) || !panelRef.current) return
+    // Direct DOM write during the drag; commit to state + localStorage on pointerup (a re-render
+    // per move would re-render the field list / any open JSON tree each frame).
+    panelRef.current.style.width = `${dragWidth(e.clientX, panelRef.current.getBoundingClientRect().right)}px`
+  }
+  function onResizePointerEnd(e: React.PointerEvent<HTMLDivElement>): void {
+    if (!e.currentTarget.hasPointerCapture(e.pointerId) || !panelRef.current) return
+    commitWidth(clampWidth(panelRef.current.getBoundingClientRect().width))
+  }
+  function onResizeKeyDown(e: React.KeyboardEvent<HTMLDivElement>): void {
+    // Left edge of a right-docked panel: ArrowLeft widens, ArrowRight narrows.
+    const step = e.key === 'ArrowLeft' ? 24 : e.key === 'ArrowRight' ? -24 : null
+    if (step === null) return
+    e.preventDefault()
+    commitWidth(clampWidth(widthRef.current + step))
+  }
 
   // Per-field view of the EFFECTIVE value (the staged edit if dirty, else the row's cell). Memoized:
   // the virtualizer re-renders the owning grid on every scroll frame, and re-projecting a multi-MB
@@ -127,7 +160,24 @@ export default function RowInspector({
   }
 
   return (
-    <div className="row-inspector">
+    <div className="row-inspector" ref={panelRef} style={{ width }}>
+      <div
+        className="ri-resizer"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize inspector"
+        aria-valuemin={MIN_WIDTH}
+        aria-valuemax={MAX_WIDTH}
+        aria-valuenow={Math.round(width)}
+        tabIndex={0}
+        title="Drag to resize · double-click to reset · ←/→ to adjust"
+        onPointerDown={onResizePointerDown}
+        onPointerMove={onResizePointerMove}
+        onPointerUp={onResizePointerEnd}
+        onPointerCancel={onResizePointerEnd}
+        onDoubleClick={() => commitWidth(DEFAULT_WIDTH)}
+        onKeyDown={onResizeKeyDown}
+      />
       <div className="ri-head">
         <span className="ri-title">{positionLabel(pos, total)}</span>
         <button
