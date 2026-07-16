@@ -5,6 +5,7 @@ import {
   useConnections,
   useSaveConnection,
   useDeleteConnection,
+  useDuplicateConnection,
   useTestConnection,
 } from '../lib/hooks'
 import SshHopEditor from './SshHopEditor'
@@ -59,6 +60,7 @@ type TestStatus =
 export default function ConnectionModal(): JSX.Element {
   const modal = useAppStore((s) => s.connectionModal)
   const closeModal = useAppStore((s) => s.closeModal)
+  const openModal = useAppStore((s) => s.openModal)
   const setActiveConnection = useAppStore((s) => s.setActiveConnection)
 
   const isEdit = modal?.mode === 'edit'
@@ -105,6 +107,7 @@ export default function ConnectionModal(): JSX.Element {
 
   const save = useSaveConnection()
   const del = useDeleteConnection()
+  const dup = useDuplicateConnection()
   const test = useTestConnection()
 
   function setField<K extends keyof ConnectionInput>(key: K, value: ConnectionInput[K]) {
@@ -192,6 +195,17 @@ export default function ConnectionModal(): JSX.Element {
         if (useAppStore.getState().activeConnectionId === editId) setActiveConnection(null)
         closeModal()
       },
+    })
+  }
+
+  // Copy this connection (incl. password + SSH secrets, in main) and reopen the editor on the copy
+  // so the user only tweaks what differs.
+  function handleDuplicate() {
+    if (!editId) return
+    setSaveError(null)
+    dup.mutate(editId, {
+      onSuccess: (copy) => openModal({ mode: 'edit', id: copy.id }),
+      onError: (e) => setSaveError(e instanceof Error ? e.message : String(e)),
     })
   }
 
@@ -446,6 +460,17 @@ export default function ConnectionModal(): JSX.Element {
               disabled={del.isPending}
             >
               {del.isPending ? 'Deleting…' : 'Delete'}
+            </button>
+          )}
+
+          {isEdit && (
+            <button
+              className="btn ghost"
+              onClick={handleDuplicate}
+              disabled={dup.isPending}
+              title="Create a copy of this connection (keeps the password) and edit it"
+            >
+              {dup.isPending ? 'Duplicating…' : 'Duplicate'}
             </button>
           )}
 

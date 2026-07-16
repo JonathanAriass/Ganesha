@@ -22,6 +22,7 @@ export interface IpcChannels {
   'connections.create': { req: { input: ConnectionInput; password: string | null; sshSecrets?: Record<string, string> }; res: ConnectionConfig }
   'connections.update': { req: { id: string; patch: Partial<ConnectionInput>; password?: string | null; sshSecrets?: Record<string, string> }; res: ConnectionConfig }
   'connections.delete': { req: string; res: null }
+  'connections.duplicate': { req: string; res: ConnectionConfig }
   'history.add': { req: HistoryEntryInput; res: HistoryEntry }
   'history.list': { req: { connectionId: string; limit?: number }; res: HistoryEntry[] }
   'savedQueries.list': { req: string; res: SavedQuery[] }

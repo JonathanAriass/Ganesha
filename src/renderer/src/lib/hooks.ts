@@ -159,6 +159,16 @@ export function useDeleteConnection() {
   })
 }
 
+/** Duplicate a connection (config + password + SSH secrets, copied in main) as a new
+ *  "… (copy)"; returns the new connection so the caller can open it for editing. */
+export function useDuplicateConnection() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => window.api.connections.duplicate(id).then(unwrap),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['connections'] }),
+  })
+}
+
 export function useTestConnection() {
   return useMutation({
     mutationFn: ({

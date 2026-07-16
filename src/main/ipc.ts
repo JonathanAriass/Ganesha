@@ -160,6 +160,24 @@ export function registerIpcHandlers(): void {
     conns.deleteConnection(db, id)
     return ok(null)
   })
+  // Copy a connection (config + its password + SSH hop secrets, so the duplicate connects without
+  // re-entering credentials) as a new "… (copy)" connection. The renderer then opens it for editing.
+  handle('connections.duplicate', (id) => {
+    const { db, secrets } = store()
+    const src = conns.getConnection(db, id)
+    if (!src) throw new Error(`Connection not found: ${id}`)
+    const { id: _id, createdAt: _ca, updatedAt: _ua, ...input } = src
+    const copy = conns.createConnection(db, { ...input, name: `${src.name} (copy)` }, now())
+    const pw = secrets.getPassword(id)
+    if (pw !== null) secrets.setPassword(copy.id, pw)
+    if (src.ssh) {
+      for (const hop of src.ssh.hops) {
+        const s = secrets.getSecret(id, `ssh:${hop.id}`)
+        if (s !== null) secrets.setSecret(copy.id, `ssh:${hop.id}`, s)
+      }
+    }
+    return ok(copy)
+  })
 
   handle('history.add', (entry) => ok(hist.addHistory(store().db, entry)))
   handle('history.list', ({ connectionId, limit }) => ok(hist.listHistory(store().db, connectionId, limit)))

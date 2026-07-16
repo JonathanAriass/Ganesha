@@ -14,6 +14,7 @@ const api: DbClientApi = {
     create: (input, password, sshSecrets) => invoke('connections.create', { input, password, sshSecrets }),
     update: (id, patch, password, sshSecrets) => invoke('connections.update', { id, patch, password, sshSecrets }),
     delete: (id) => invoke('connections.delete', id),
+    duplicate: (id) => invoke('connections.duplicate', id),
     test: (input, password, id, sshSecrets) => invoke('connections.test', { input, password, id, sshSecrets }),
     disconnect: (id) => invoke('connections.disconnect', id)
   },
