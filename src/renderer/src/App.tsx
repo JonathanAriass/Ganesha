@@ -18,6 +18,7 @@ import SaveQueryModal from './components/SaveQueryModal'
 import CommitChangesModal from './components/CommitChangesModal'
 import AssistantPanel from './components/AssistantPanel'
 import ModelManagerModal from './components/ModelManagerModal'
+import UpdateBanner from './components/UpdateBanner'
 import { useSettings } from './lib/hooks'
 import { applyTheme } from './lib/theme'
 import { useGlobalShortcuts } from './lib/use-global-shortcuts'
@@ -73,6 +74,7 @@ function AppShell(): JSX.Element {
   return (
     <div className="app">
       <TopBar />
+      <UpdateBanner />
       <div className="app-body">
         <aside className="sidebar">
           <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>

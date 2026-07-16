@@ -110,6 +110,39 @@ button, input, select, textarea {
   overflow: hidden;
 }
 
+/* ── Update-available banner (under the top bar) ── */
+.update-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  background: color-mix(in srgb, var(--accent) 18%, var(--bg-2));
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--text);
+}
+.update-cmd {
+  font-family: ui-monospace, 'SF Mono', monospace;
+  font-size: 12px;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+.update-dismiss {
+  background: none;
+  border: none;
+  color: var(--text-2);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}
+.update-dismiss:hover {
+  color: var(--text);
+}
+
 /* ── Top bar ── */
 .topbar {
   display: flex;

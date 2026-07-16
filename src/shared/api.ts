@@ -63,6 +63,12 @@ export interface DbClientApi {
     pickDirectory(): Promise<IpcResult<'dialog.pickDirectory'>>
     openFile(title?: string): Promise<IpcResult<'dialog.openFile'>>
   }
+  shell: {
+    openExternal(url: string): Promise<IpcResult<'shell.openExternal'>>
+  }
+  update: {
+    check(): Promise<IpcResult<'update.check'>>
+  }
   llm: {
     listModels(): Promise<IpcResult<'llm.models.list'>>
     downloadModel(uri: string): Promise<IpcResult<'llm.models.download'>>

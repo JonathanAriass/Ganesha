@@ -62,6 +62,12 @@ const api: DbClientApi = {
     pickDirectory: () => invoke('dialog.pickDirectory', undefined),
     openFile: (title) => invoke('dialog.openFile', { title })
   },
+  shell: {
+    openExternal: (url) => invoke('shell.openExternal', url)
+  },
+  update: {
+    check: () => invoke('update.check', undefined)
+  },
   llm: {
     listModels: () => invoke('llm.models.list', undefined),
     downloadModel: (uri) => invoke('llm.models.download', { uri }),

@@ -1,4 +1,5 @@
-import { ipcMain, clipboard, dialog, BrowserWindow } from 'electron'
+import { ipcMain, clipboard, dialog, BrowserWindow, app, shell, net } from 'electron'
+import { checkForUpdate } from './update-check'
 import type { ChannelName, Req, Res } from '../shared/ipc'
 import type { ConnectionConfig } from '../shared/domain'
 import { ok, err, type Result } from '../shared/result'
@@ -322,6 +323,24 @@ export function registerIpcHandlers(): void {
 
   // navigator.clipboard is permission-gated in the sandboxed renderer; route via main.
   handle('clipboard.copy', (text) => { clipboard.writeText(text); return ok(null) })
+
+  // Open an external URL in the default browser (the window itself denies window.open). http/https only.
+  handle('shell.openExternal', (url) => {
+    if (/^https?:\/\//i.test(url)) void shell.openExternal(url)
+    return ok(null)
+  })
+
+  // Check GitHub for a newer release than the running app. Only in packaged builds (app.getVersion()
+  // is the real version there); dev returns null so it never nags during development.
+  handle('update.check', async () => {
+    if (!app.isPackaged) return ok(null)
+    const result = await checkForUpdate(app.getVersion(), 'JonathanAriass/Ganesha', async (url) => {
+      const res = await net.fetch(url, { headers: { 'User-Agent': 'Ganesha', Accept: 'application/vnd.github+json' } })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      return res.json() as Promise<{ tag_name?: string; html_url?: string }>
+    })
+    return ok(result)
+  })
 
   handle('dialog.pickDirectory', async () => {
     const win = BrowserWindow.getFocusedWindow()

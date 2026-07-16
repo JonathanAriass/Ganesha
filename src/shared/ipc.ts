@@ -54,6 +54,8 @@ export interface IpcChannels {
   'clipboard.copy': { req: string; res: null }
   'dialog.pickDirectory': { req: void; res: string | null }
   'dialog.openFile': { req: { title?: string }; res: string | null }
+  'shell.openExternal': { req: string; res: null }
+  'update.check': { req: void; res: { version: string; url: string } | null }
   'llm.models.list': { req: void; res: { downloaded: LocalModel[]; catalog: CatalogModel[]; activeModelId: string | null } }
   'llm.models.download': { req: { uri: string }; res: null }
   'llm.models.delete': { req: { id: string }; res: null }
