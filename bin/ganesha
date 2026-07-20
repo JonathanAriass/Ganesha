@@ -1,0 +1,24 @@
+#!/bin/bash
+# Ganesha CLI launcher.
+#
+# Homebrew's cask symlinks this to <brew-prefix>/bin/ganesha (on your PATH) via a `binary`
+# stanza. It resolves its own location — following the Homebrew symlink — back to the
+# Ganesha.app bundle it ships inside, then hands that bundle to `open`, so typing `ganesha`
+# launches the app (or focuses it if already running). Any arguments are forwarded.
+set -e
+
+src="${BASH_SOURCE[0]}"
+# Follow a chain of symlinks (the Homebrew bin symlink, plus any others) to the real file.
+while [ -h "$src" ]; do
+  dir="$(cd -P "$(dirname "$src")" && pwd)"
+  src="$(readlink "$src")"
+  case "$src" in
+    /*) ;;                # absolute target — use as-is
+    *) src="$dir/$src" ;; # relative target — resolve against the link's directory
+  esac
+done
+
+resources="$(cd -P "$(dirname "$src")" && pwd)"   # …/Ganesha.app/Contents/Resources
+app="$(cd "$resources/../.." && pwd)"             # …/Ganesha.app
+
+exec open "$app" --args "$@"

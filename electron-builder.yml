@@ -12,6 +12,12 @@ files:
 asarUnpack:
   - "**/node_modules/node-llama-cpp/**"
   - "**/node_modules/@node-llama-cpp/**"
+# Ship the `ganesha` CLI launcher inside the bundle (→ Ganesha.app/Contents/Resources/ganesha).
+# The Homebrew cask symlinks it onto the user's PATH with a `binary` stanza so `ganesha` opens
+# the app from a terminal.
+extraResources:
+  - from: bin/ganesha
+    to: ganesha
 mac:
   # zip, not dmg: on the macos-15-intel runner electron-builder's dmg finalize step
   # (`hdiutil detach`) reliably fails with "Resource busy", and macos-13 (the old Intel
