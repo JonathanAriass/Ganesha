@@ -2886,5 +2886,5 @@ mark.hl {
   text-align: left;
 }
 .tele-related-row:hover { background: var(--hover-overlay); }
-.tele-related-icon { flex: 0 0 auto; }
 .tele-related-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.tele-related-time { flex: 0 0 auto; font-family: var(--mono, ui-monospace, monospace); font-size: 11px; color: var(--text-2); }

@@ -3,7 +3,7 @@ import type { TelescopeEntry, EntryDetailContent } from '@shared/telescope'
 import { useTelescopeEntry, useTelescopeRelated } from '../lib/hooks'
 import { detailTabs } from '../lib/telescope-types'
 import { entryTitle, entryIcon, entryBadge, entrySecondary, entryPrimary } from '../lib/telescope-present'
-import { formatAbsoluteTime } from '../lib/telescope-format'
+import { formatAbsoluteTime, formatDuration } from '../lib/telescope-format'
 import { Badge, KeyVals, JsonBlock, Code, MaybeJson, EmptyHint } from './telescope-ui'
 
 interface Props {
@@ -196,10 +196,15 @@ function RelatedEntries({ connectionId, entry, onSelectEntry }: { connectionId: 
     <div className="tele-related">
       {related.map((r) => {
         const badge = entryBadge(r)
+        // Show how long timed operations took — query execution time, and redis command time.
+        const time =
+          r.summary.type === 'query' ? formatDuration(r.summary.duration)
+            : r.summary.type === 'redis' ? `${r.summary.duration}ms`
+              : null
         return (
           <button key={r.uuid} className="tele-related-row" onClick={() => onSelectEntry(r)}>
-            <span className="tele-related-icon" aria-hidden="true">{entryIcon(r)}</span>
             <span className="tele-related-text">{entryPrimary(r)}</span>
+            {time && <span className="tele-related-time">{time}</span>}
             {badge && <Badge tone={badge.tone}>{badge.text}</Badge>}
           </button>
         )
