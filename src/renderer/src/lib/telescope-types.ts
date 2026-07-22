@@ -13,24 +13,26 @@ export interface TypeConfig {
   color: string
 }
 
+// Colors chosen to step clearly around the hue wheel (no two neighbours share a family) so the 17
+// types stay distinguishable as small dots + faint row tints on both themes.
 export const TYPE_CONFIGS: TypeConfig[] = [
-  { type: 'request', label: 'Requests', icon: '🌐', color: '#3b82f6' },
-  { type: 'exception', label: 'Exceptions', icon: '⚠️', color: '#ef4444' },
-  { type: 'query', label: 'Queries', icon: '🗃️', color: '#06b6d4' },
-  { type: 'log', label: 'Logs', icon: '📋', color: '#8b5cf6' },
-  { type: 'job', label: 'Jobs', icon: '⚙️', color: '#f59e0b' },
-  { type: 'mail', label: 'Mail', icon: '✉️', color: '#ec4899' },
-  { type: 'notification', label: 'Notifications', icon: '🔔', color: '#0ea5e9' },
-  { type: 'cache', label: 'Cache', icon: '💾', color: '#22c55e' },
-  { type: 'dump', label: 'Dumps', icon: '🔻', color: '#94a3b8' },
-  { type: 'schedule', label: 'Schedule', icon: '⏰', color: '#6366f1' },
-  { type: 'command', label: 'Commands', icon: '⌘', color: '#fb923c' },
-  { type: 'gate', label: 'Gates', icon: '🔑', color: '#f43f5e' },
-  { type: 'model', label: 'Models', icon: '📦', color: '#10b981' },
-  { type: 'event', label: 'Events', icon: '📡', color: '#a855f7' },
-  { type: 'view', label: 'Views', icon: '👁️', color: '#84cc16' },
-  { type: 'redis', label: 'Redis', icon: '🔺', color: '#f97316' },
-  { type: 'batch', label: 'Batches', icon: '🎛️', color: '#14b8a6' }
+  { type: 'request', label: 'Requests', icon: '🌐', color: '#2196f3' }, // blue
+  { type: 'exception', label: 'Exceptions', icon: '⚠️', color: '#ef5350' }, // red
+  { type: 'query', label: 'Queries', icon: '🗃️', color: '#00bcd4' }, // cyan
+  { type: 'log', label: 'Logs', icon: '📋', color: '#ab47bc' }, // purple
+  { type: 'job', label: 'Jobs', icon: '⚙️', color: '#ff9800' }, // orange
+  { type: 'mail', label: 'Mail', icon: '✉️', color: '#ec407a' }, // pink
+  { type: 'notification', label: 'Notifications', icon: '🔔', color: '#26a69a' }, // teal
+  { type: 'cache', label: 'Cache', icon: '💾', color: '#4caf50' }, // green
+  { type: 'dump', label: 'Dumps', icon: '🔻', color: '#9e9e9e' }, // gray
+  { type: 'schedule', label: 'Schedule', icon: '⏰', color: '#3f51b5' }, // indigo
+  { type: 'command', label: 'Commands', icon: '⌘', color: '#ffca28' }, // amber
+  { type: 'gate', label: 'Gates', icon: '🔑', color: '#d500f9' }, // magenta
+  { type: 'model', label: 'Models', icon: '📦', color: '#9ccc65' }, // light green
+  { type: 'event', label: 'Events', icon: '📡', color: '#7e57c2' }, // deep purple
+  { type: 'view', label: 'Views', icon: '👁️', color: '#29b6f6' }, // light blue
+  { type: 'redis', label: 'Redis', icon: '🔺', color: '#ff7043' }, // deep orange
+  { type: 'batch', label: 'Batches', icon: '🎛️', color: '#8d6e63' } // brown
 ]
 
 const CONFIG_BY_TYPE = new Map(TYPE_CONFIGS.map((c) => [c.type, c]))
