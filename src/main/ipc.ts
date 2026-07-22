@@ -15,6 +15,7 @@ import { PostgresDriver } from './drivers/sql/postgres'
 import { MySqlDriver } from './drivers/sql/mysql'
 import { MongoDriver } from './drivers/mongo/mongo'
 import { runUserQuery, PAGE_SIZE } from './query-service'
+import * as telescope from './telescope/telescope-service'
 import { ResultCache } from './query-cache'
 import { SshTunnelManager } from './ssh/tunnel-manager'
 import { connectVia, disconnectVia, openTunnel } from './connection-runtime'
@@ -311,6 +312,49 @@ export function registerIpcHandlers(): void {
     await connectStored(driver, c, secrets)
     return ok(await driver.describeTableInfo(c.id, ref))
   })
+
+  // ── Telescope inspector (read-only over the Laravel Telescope tables) ──
+  handle('telescope.detect', async (connectionId) => {
+    const { db, secrets } = store()
+    const c = conns.getConnection(db, connectionId)
+    if (!c) throw new Error(`Connection not found: ${connectionId}`)
+    const driver = drivers.get(c.type)
+    await connectStored(driver, c, secrets)
+    return ok(await telescope.detectTelescope(driver, c.id))
+  })
+  handle('telescope.entries', async ({ connectionId, type, tag, search, beforeSequence, limit }) => {
+    const { db, secrets } = store()
+    const c = conns.getConnection(db, connectionId)
+    if (!c) throw new Error(`Connection not found: ${connectionId}`)
+    const driver = drivers.get(c.type)
+    await connectStored(driver, c, secrets)
+    return ok(await telescope.listEntries(driver, c.id, { type, tag, search, beforeSequence, limit }))
+  })
+  handle('telescope.entry', async ({ connectionId, uuid }) => {
+    const { db, secrets } = store()
+    const c = conns.getConnection(db, connectionId)
+    if (!c) throw new Error(`Connection not found: ${connectionId}`)
+    const driver = drivers.get(c.type)
+    await connectStored(driver, c, secrets)
+    return ok(await telescope.getEntry(driver, c.id, uuid))
+  })
+  handle('telescope.related', async ({ connectionId, batchId, excludeUuid }) => {
+    const { db, secrets } = store()
+    const c = conns.getConnection(db, connectionId)
+    if (!c) throw new Error(`Connection not found: ${connectionId}`)
+    const driver = drivers.get(c.type)
+    await connectStored(driver, c, secrets)
+    return ok(await telescope.getRelated(driver, c.id, batchId, excludeUuid))
+  })
+  handle('telescope.tags', async (connectionId) => {
+    const { db, secrets } = store()
+    const c = conns.getConnection(db, connectionId)
+    if (!c) throw new Error(`Connection not found: ${connectionId}`)
+    const driver = drivers.get(c.type)
+    await connectStored(driver, c, secrets)
+    return ok(await telescope.getTags(driver, c.id))
+  })
+
   handle('edits.apply', async ({ connectionId, table, rows }) => {
     const { db, secrets } = store()
     const c = conns.getConnection(db, connectionId)

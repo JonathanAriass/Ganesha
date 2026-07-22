@@ -213,6 +213,24 @@ export class MySqlDriver implements DatabaseDriver {
     return pool
   }
 
+  /** Parameterized, read-only object-row query (named columns) for the Telescope inspector.
+   *  Wrapped in START TRANSACTION READ ONLY so it can never mutate, even by mistake. Returns
+   *  plain row objects (default mysql2 mode) — JSON columns parsed, BIGINT exact per poolConfig. */
+  async queryRaw(id: string, sql: string, params: unknown[] = []): Promise<Record<string, unknown>[]> {
+    const conn = await this.requirePool(id).getConnection()
+    try {
+      await conn.query('START TRANSACTION READ ONLY')
+      const [rows] = await conn.query(sql, params)
+      await conn.query('COMMIT')
+      return (Array.isArray(rows) ? rows : []) as Record<string, unknown>[]
+    } catch (e) {
+      try { await conn.query('ROLLBACK') } catch { /* already aborted */ }
+      throw e
+    } finally {
+      conn.release()
+    }
+  }
+
   async listDatabases(id: string): Promise<string[]> {
     const [rows] = await this.requirePool(id).query(
       `SELECT SCHEMA_NAME AS name FROM information_schema.SCHEMATA

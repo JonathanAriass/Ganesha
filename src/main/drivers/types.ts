@@ -75,4 +75,8 @@ export interface DatabaseDriver {
    *  foreign keys (both directions), constraints, and approximate size. Sections an engine lacks
    *  (e.g. Mongo foreign keys/constraints) come back empty. */
   describeTableInfo(id: string, ref: ObjectRef): Promise<TableInfo>
+  /** Run a parameterized, READ-ONLY SELECT and return object-mode rows (named columns).
+   *  Optional — only the SQL drivers implement it; used by the Telescope inspector, which
+   *  needs safe bind parameters and named fields (not runQuery's positional arrays). */
+  queryRaw?(id: string, sql: string, params?: unknown[]): Promise<Record<string, unknown>[]>
 }

@@ -52,6 +52,13 @@ const api: DbClientApi = {
     relationships: (connectionId) => invoke('schema.relationships', connectionId),
     tableInfo: (connectionId, ref) => invoke('schema.tableInfo', { connectionId, ref })
   },
+  telescope: {
+    detect: (connectionId) => invoke('telescope.detect', connectionId),
+    entries: (req) => invoke('telescope.entries', req),
+    entry: (connectionId, uuid) => invoke('telescope.entry', { connectionId, uuid }),
+    related: (connectionId, batchId, excludeUuid) => invoke('telescope.related', { connectionId, batchId, excludeUuid }),
+    tags: (connectionId) => invoke('telescope.tags', connectionId)
+  },
   edits: {
     apply: (req) => invoke('edits.apply', req)
   },

@@ -2,6 +2,7 @@ import type { IpcResult, LlmTokenEvent, LlmDownloadEvent, LlmContextEvent, SsmOu
 import type { ConnectionInput, HistoryEntryInput, SavedQueryInput, SavedQueryPatch, SessionTab, SsmTunnelInput } from './domain'
 import type { ObjectRef } from './schema'
 import type { FilterQuery } from './query'
+import type { TelescopeFilter } from './telescope'
 
 export interface DbClientApi {
   ping(message: string): Promise<IpcResult<'ping'>>
@@ -48,6 +49,13 @@ export interface DbClientApi {
     allColumns(connectionId: string): Promise<IpcResult<'schema.allColumns'>>
     relationships(connectionId: string): Promise<IpcResult<'schema.relationships'>>
     tableInfo(connectionId: string, ref: ObjectRef): Promise<IpcResult<'schema.tableInfo'>>
+  }
+  telescope: {
+    detect(connectionId: string): Promise<IpcResult<'telescope.detect'>>
+    entries(req: { connectionId: string } & TelescopeFilter): Promise<IpcResult<'telescope.entries'>>
+    entry(connectionId: string, uuid: string): Promise<IpcResult<'telescope.entry'>>
+    related(connectionId: string, batchId: string, excludeUuid?: string): Promise<IpcResult<'telescope.related'>>
+    tags(connectionId: string): Promise<IpcResult<'telescope.tags'>>
   }
   edits: {
     apply(req: {

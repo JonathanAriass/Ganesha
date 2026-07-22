@@ -6,6 +6,7 @@ import type {
 } from './domain'
 import type { QueryResult, RowEdit, FilterQuery } from './query'
 import type { DbObject, ObjectRef, ColumnInfo, Relationship, TableColumns, TableInfo } from './schema'
+import type { TelescopeEntry, TelescopeEntryDetail, TelescopePage, TelescopeDetectResult, TelescopeFilter } from './telescope'
 
 export interface PingPayload {
   pong: string
@@ -47,6 +48,12 @@ export interface IpcChannels {
   'schema.allColumns': { req: string; res: TableColumns[] }
   'schema.relationships': { req: string; res: Relationship[] }
   'schema.tableInfo': { req: { connectionId: string; ref: ObjectRef }; res: TableInfo }
+  // ── Telescope inspector (read-only over the Laravel Telescope tables) ──
+  'telescope.detect': { req: string; res: TelescopeDetectResult }
+  'telescope.entries': { req: { connectionId: string } & TelescopeFilter; res: TelescopePage }
+  'telescope.entry': { req: { connectionId: string; uuid: string }; res: TelescopeEntryDetail | null }
+  'telescope.related': { req: { connectionId: string; batchId: string; excludeUuid?: string }; res: TelescopeEntry[] }
+  'telescope.tags': { req: string; res: string[] }
   'edits.apply': {
     req: { connectionId: string; table: { schema: string | null; name: string }; rows: RowEdit[] }
     res: { updated: number }
