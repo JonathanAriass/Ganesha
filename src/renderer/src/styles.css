@@ -2885,12 +2885,13 @@ mark.hl {
   padding: 6px 8px;
   border: none;
   border-radius: var(--radius);
-  background: transparent;
+  /* Subtle per-type tint (--tele-row-color is set inline per row); falls back to no tint. */
+  background: color-mix(in srgb, var(--tele-row-color, transparent) 10%, transparent);
   color: var(--text);
   cursor: pointer;
   text-align: left;
 }
-.tele-related-row:hover { background: var(--hover-overlay); }
+.tele-related-row:hover { background: color-mix(in srgb, var(--tele-row-color, transparent) 24%, var(--hover-overlay)); }
 .tele-related-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
 .tele-related-time { flex: 0 0 auto; font-family: var(--mono, ui-monospace, monospace); font-size: 11px; color: var(--text-2); }
 .tele-related-dot { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; }

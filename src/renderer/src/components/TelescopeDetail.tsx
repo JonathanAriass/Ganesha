@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import type { TelescopeEntry, EntryDetailContent } from '@shared/telescope'
 import { useTelescopeEntry, useTelescopeRelated } from '../lib/hooks'
 import { detailTabs, typeConfig } from '../lib/telescope-types'
@@ -196,14 +196,20 @@ function RelatedEntries({ connectionId, entry, onSelectEntry }: { connectionId: 
     <div className="tele-related">
       {related.map((r) => {
         const badge = entryBadge(r)
+        const color = typeConfig(r.type).color
         // Show how long timed operations took — query execution time, and redis command time.
         const time =
           r.summary.type === 'query' ? formatDuration(r.summary.duration)
             : r.summary.type === 'redis' ? `${r.summary.duration}ms`
               : null
         return (
-          <button key={r.uuid} className="tele-related-row" onClick={() => onSelectEntry(r)}>
-            <span className="tele-related-dot" style={{ background: typeConfig(r.type).color }} title={r.type} aria-hidden="true" />
+          <button
+            key={r.uuid}
+            className="tele-related-row"
+            style={{ ['--tele-row-color']: color } as CSSProperties}
+            onClick={() => onSelectEntry(r)}
+          >
+            <span className="tele-related-dot" style={{ background: color }} title={r.type} aria-hidden="true" />
             <span className="tele-related-text">{entryPrimary(r)}</span>
             {time && <span className="tele-related-time">{time}</span>}
             {badge && <Badge tone={badge.tone}>{badge.text}</Badge>}
