@@ -26,7 +26,7 @@ describe('buildEntriesQuery — search branch (type dropped)', () => {
     const { sql, params } = buildEntriesQuery({ type: 'request', search: 'boom' })
     expect(params).toEqual(['boom', DEFAULT_LIST_LIMIT])
     expect(sql).toContain("CONCAT('%', ?, '%')")
-    expect(sql).toContain('MAX(sequence) - 10000')
+    expect(sql).toContain('e.sequence + 10000 > (SELECT MAX(sequence) FROM telescope_entries)')
     expect(sql).not.toContain('e.`type` = ?') // type filter dropped when searching
   })
   it('search + cursor → [search, cursor, limit]', () => {

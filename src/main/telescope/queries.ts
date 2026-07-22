@@ -42,7 +42,10 @@ export function buildEntriesQuery(filter: TelescopeFilter): Sql {
     if (hasTag) { where.push('t.tag = ?'); params.push(tag) }
     if (hasSearch) {
       where.push("e.content LIKE CONCAT('%', ?, '%')"); params.push(search)
-      where.push(`e.sequence > (SELECT MAX(sequence) - ${SEARCH_WINDOW} FROM telescope_entries)`)
+      // Limit the (unindexed) LIKE scan to the most recent ~SEARCH_WINDOW entries. Written as
+      // `sequence + WINDOW > MAX` rather than telescope2's `sequence > MAX - WINDOW` so it never
+      // underflows BIGINT UNSIGNED when the table has fewer than WINDOW rows (MAX - WINDOW < 0).
+      where.push(`e.sequence + ${SEARCH_WINDOW} > (SELECT MAX(sequence) FROM telescope_entries)`)
     }
     // A text search searches ALL types (type filter dropped); a tag-only filter keeps the type.
     if (!hasSearch && filter.type) { where.push('e.`type` = ?'); params.push(filter.type) }
