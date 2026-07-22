@@ -204,28 +204,30 @@ function RelatedEntries({ connectionId, entry, onSelectEntry }: { connectionId: 
           </span>
         ))}
       </div>
-      {related.map((r) => {
-        const badge = entryBadge(r)
-        const color = typeConfig(r.type).color
-        // Show how long timed operations took — query execution time, and redis command time.
-        const time =
-          r.summary.type === 'query' ? formatDuration(r.summary.duration)
-            : r.summary.type === 'redis' ? `${r.summary.duration}ms`
-              : null
-        return (
-          <button
-            key={r.uuid}
-            className="tele-related-row"
-            style={{ ['--tele-row-color']: color } as CSSProperties}
-            onClick={() => onSelectEntry(r)}
-          >
-            <span className="tele-related-dot" style={{ background: color }} title={r.type} aria-hidden="true" />
-            <span className="tele-related-text">{entryPrimary(r)}</span>
-            {time && <span className="tele-related-time">{time}</span>}
-            {badge && <Badge tone={badge.tone}>{badge.text}</Badge>}
-          </button>
-        )
-      })}
+      <div className="tele-related-list">
+        {related.map((r) => {
+          const badge = entryBadge(r)
+          const color = typeConfig(r.type).color
+          // Show how long timed operations took — query execution time, and redis command time.
+          const time =
+            r.summary.type === 'query' ? formatDuration(r.summary.duration)
+              : r.summary.type === 'redis' ? `${r.summary.duration}ms`
+                : null
+          return (
+            <button
+              key={r.uuid}
+              className="tele-related-row"
+              style={{ ['--tele-row-color']: color } as CSSProperties}
+              onClick={() => onSelectEntry(r)}
+            >
+              <span className="tele-related-dot" style={{ background: color }} title={r.type} aria-hidden="true" />
+              <span className="tele-related-text">{entryPrimary(r)}</span>
+              {time && <span className="tele-related-time">{time}</span>}
+              {badge && <Badge tone={badge.tone}>{badge.text}</Badge>}
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }

@@ -2876,8 +2876,10 @@ mark.hl {
 .tele-frame-loc { font-family: var(--mono, ui-monospace, monospace); font-size: 12px; color: var(--accent); word-break: break-all; }
 .tele-frame-fn { font-size: 11px; color: var(--text-2); }
 
-/* Related entries */
-.tele-related { display: flex; flex-direction: column; gap: 2px; }
+/* Related entries — fixed legend header + independently scrolling row list (fills the detail body,
+   so rows scroll only inside the list and never render outside it / behind the legend). */
+.tele-related { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.tele-related-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
 .tele-related-row {
   display: flex;
   align-items: center;
@@ -2896,18 +2898,12 @@ mark.hl {
 .tele-related-time { flex: 0 0 auto; font-family: var(--mono, ui-monospace, monospace); font-size: 11px; color: var(--text-2); }
 .tele-related-dot { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; }
 .tele-related-legend {
+  flex: 0 0 auto;
   display: flex;
   flex-wrap: wrap;
   gap: 4px 12px;
-  /* Full-bleed sticky header: negative margins cancel the .tele-detail-body 12px padding so the bar
-     spans the whole scroll width AND covers the top padding band (which overflow-clipping would
-     otherwise let rows scroll through, above where a plain top:0 sticky pins). */
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  margin: -12px -12px 4px;
-  padding: 10px 12px 8px;
-  background: var(--bg);
+  padding-bottom: 8px;
+  margin-bottom: 6px;
   border-bottom: 1px solid var(--border);
   font-size: 11px;
   color: var(--text-2);
