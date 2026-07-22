@@ -2899,13 +2899,14 @@ mark.hl {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 12px;
-  /* Pin to the top of the detail's scroll area (.tele-detail-body) so it stays visible while the
-     related rows scroll under it; the solid background hides them passing beneath. */
+  /* Full-bleed sticky header: negative margins cancel the .tele-detail-body 12px padding so the bar
+     spans the whole scroll width AND covers the top padding band (which overflow-clipping would
+     otherwise let rows scroll through, above where a plain top:0 sticky pins). */
   position: sticky;
   top: 0;
-  z-index: 1;
-  padding: 6px 4px 8px;
-  margin-bottom: 4px;
+  z-index: 2;
+  margin: -12px -12px 4px;
+  padding: 10px 12px 8px;
   background: var(--bg);
   border-bottom: 1px solid var(--border);
   font-size: 11px;
