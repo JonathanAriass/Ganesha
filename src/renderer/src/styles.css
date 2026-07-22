@@ -2718,8 +2718,20 @@ mark.hl {
 
 /* List / detail split */
 .tele-content { flex: 1; min-height: 0; display: flex; }
-.tele-listpane { flex: 1; min-width: 0; display: flex; }
+.tele-listpane { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .tele-content.with-detail .tele-listpane { flex: 0 0 44%; border-right: 1px solid var(--border); }
+.tele-newbanner {
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--accent) 18%, var(--bg-2));
+  color: var(--text);
+  padding: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+.tele-newbanner:hover { background: color-mix(in srgb, var(--accent) 26%, var(--bg-2)); }
 .tele-detailpane { flex: 1; min-width: 0; display: flex; }
 
 /* Entry list */

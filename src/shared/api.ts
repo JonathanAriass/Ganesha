@@ -2,7 +2,7 @@ import type { IpcResult, LlmTokenEvent, LlmDownloadEvent, LlmContextEvent, SsmOu
 import type { ConnectionInput, HistoryEntryInput, SavedQueryInput, SavedQueryPatch, SessionTab, SsmTunnelInput } from './domain'
 import type { ObjectRef } from './schema'
 import type { FilterQuery } from './query'
-import type { TelescopeFilter } from './telescope'
+import type { TelescopeFilter, TelescopeNewEntriesEvent } from './telescope'
 
 export interface DbClientApi {
   ping(message: string): Promise<IpcResult<'ping'>>
@@ -56,6 +56,9 @@ export interface DbClientApi {
     entry(connectionId: string, uuid: string): Promise<IpcResult<'telescope.entry'>>
     related(connectionId: string, batchId: string, excludeUuid?: string): Promise<IpcResult<'telescope.related'>>
     tags(connectionId: string): Promise<IpcResult<'telescope.tags'>>
+    startTail(connectionId: string): Promise<IpcResult<'telescope.startTail'>>
+    stopTail(connectionId: string): Promise<IpcResult<'telescope.stopTail'>>
+    onNewEntries(cb: (e: TelescopeNewEntriesEvent) => void): () => void
   }
   edits: {
     apply(req: {

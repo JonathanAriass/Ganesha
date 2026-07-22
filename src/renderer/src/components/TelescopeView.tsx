@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import type { TelescopeEntry, TelescopeType } from '@shared/telescope'
-import { useTelescopeEntries, useTelescopeTags } from '../lib/hooks'
+import { useTelescopeEntries, useTelescopeTags, useTelescopeTail } from '../lib/hooks'
 import { TYPE_CONFIGS, typeConfig } from '../lib/telescope-types'
 import TelescopeEntryList from './TelescopeEntryList'
 import TelescopeDetail from './TelescopeDetail'
@@ -31,6 +32,16 @@ export default function TelescopeView({ connectionId }: { connectionId: string }
   const { data, isLoading, isError, error, hasNextPage, isFetchingNextPage, fetchNextPage } = useTelescopeEntries(connectionId, filter)
   const { data: tags = [] } = useTelescopeTags(connectionId)
   const entries = useMemo(() => data?.pages.flatMap((p) => p.entries) ?? [], [data])
+
+  // Live tail: buffered new entries, surfaced via a banner (count scoped to the current view).
+  const qc = useQueryClient()
+  const { newEntries, clear } = useTelescopeTail(connectionId)
+  const bannerCount = searchActive ? newEntries.length : newEntries.filter((e) => e.type === selectedType).length
+  function showNewEntries(): void {
+    void qc.resetQueries({ queryKey: ['telescope', 'entries', connectionId] })
+    clear()
+    setSelected(null)
+  }
 
   // Reset the open entry when the filter changes (the selected one may no longer be listed).
   useEffect(() => { setSelected(null) }, [selectedType, tag, search])
@@ -78,6 +89,11 @@ export default function TelescopeView({ connectionId }: { connectionId: string }
 
         <div className={`tele-content${selected ? ' with-detail' : ''}`}>
           <div className="tele-listpane">
+            {bannerCount > 0 && (
+              <button className="tele-newbanner" onClick={showNewEntries}>
+                Show {bannerCount > 500 ? '500+' : bannerCount} new {bannerCount === 1 ? 'entry' : 'entries'}
+              </button>
+            )}
             <TelescopeEntryList
               entries={entries}
               selectedUuid={selected?.uuid ?? null}

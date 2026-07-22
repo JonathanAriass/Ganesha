@@ -16,6 +16,7 @@ import { MySqlDriver } from './drivers/sql/mysql'
 import { MongoDriver } from './drivers/mongo/mongo'
 import { runUserQuery, PAGE_SIZE } from './query-service'
 import * as telescope from './telescope/telescope-service'
+import { TelescopeTailManager } from './telescope/tail'
 import { ResultCache } from './query-cache'
 import { SshTunnelManager } from './ssh/tunnel-manager'
 import { connectVia, disconnectVia, openTunnel } from './connection-runtime'
@@ -35,6 +36,7 @@ import { SsmRunner } from './ssm/runner'
 import { runAws, listAwsProfiles, parseArn, parseInstances } from './ssm/aws'
 import { getModelsDir } from './persistence/paths'
 import type { LlmTokenEvent, LlmDownloadEvent, LlmContextEvent } from '../shared/ipc'
+import type { TelescopeNewEntriesEvent } from '../shared/telescope'
 
 const drivers = new DriverManager()
 drivers.register(new PostgresDriver())
@@ -61,9 +63,30 @@ const ssmRunner = new SsmRunner(
   (id) => broadcastSsm('ssm:status', { id, running: true, ready: true })
 )
 
+// Telescope live-tail: one poller per subscribed connection pushes new entries to every window.
+const broadcastTelescope = (payload: TelescopeNewEntriesEvent): void => {
+  for (const w of BrowserWindow.getAllWindows()) if (!w.webContents.isDestroyed()) w.webContents.send('telescope:new-entries', payload)
+}
+const telescopeTail = new TelescopeTailManager({
+  emit: broadcastTelescope,
+  fetchSince: async (connectionId, lastSequence) => {
+    const { db, secrets } = store()
+    const c = conns.getConnection(db, connectionId)
+    if (!c) return []
+    const driver = drivers.get(c.type)
+    await connectStored(driver, c, secrets)
+    return telescope.tailSince(driver, c.id, lastSequence)
+  }
+})
+
 /** Close every live SSH tunnel — called on app quit. */
 export function closeAllTunnels(): Promise<void> {
   return tunnels.closeAll()
+}
+
+/** Stop every Telescope live-tail poller — called on app quit. */
+export function stopTelescopeTails(): void {
+  telescopeTail.stopAll()
 }
 
 /** Free the loaded LLM model (native memory) — called on app quit. */
@@ -354,6 +377,11 @@ export function registerIpcHandlers(): void {
     await connectStored(driver, c, secrets)
     return ok(await telescope.getTags(driver, c.id))
   })
+  handle('telescope.startTail', async (connectionId) => { await telescopeTail.start(connectionId); return ok(null) })
+  handle('telescope.stopTail', (connectionId) => { telescopeTail.stop(connectionId); return ok(null) })
+  // Pause polling while the app is in the background; resume on focus (saves idle DB round-trips).
+  app.on('browser-window-blur', () => telescopeTail.pauseAll())
+  app.on('browser-window-focus', () => telescopeTail.resumeAll())
 
   handle('edits.apply', async ({ connectionId, table, rows }) => {
     const { db, secrets } = store()

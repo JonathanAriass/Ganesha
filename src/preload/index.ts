@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { ChannelName, Req, IpcResult, LlmTokenEvent, LlmDownloadEvent, LlmContextEvent, SsmOutputEvent, SsmStatusEvent } from '../shared/ipc'
 import type { DbClientApi } from '../shared/api'
+import type { TelescopeNewEntriesEvent } from '../shared/telescope'
 
 function invoke<K extends ChannelName>(channel: K, req: Req<K>): Promise<IpcResult<K>> {
   return ipcRenderer.invoke(channel, req)
@@ -57,7 +58,14 @@ const api: DbClientApi = {
     entries: (req) => invoke('telescope.entries', req),
     entry: (connectionId, uuid) => invoke('telescope.entry', { connectionId, uuid }),
     related: (connectionId, batchId, excludeUuid) => invoke('telescope.related', { connectionId, batchId, excludeUuid }),
-    tags: (connectionId) => invoke('telescope.tags', connectionId)
+    tags: (connectionId) => invoke('telescope.tags', connectionId),
+    startTail: (connectionId) => invoke('telescope.startTail', connectionId),
+    stopTail: (connectionId) => invoke('telescope.stopTail', connectionId),
+    onNewEntries: (cb) => {
+      const l = (_e: unknown, payload: TelescopeNewEntriesEvent): void => cb(payload)
+      ipcRenderer.on('telescope:new-entries', l)
+      return () => ipcRenderer.removeListener('telescope:new-entries', l)
+    }
   },
   edits: {
     apply: (req) => invoke('edits.apply', req)

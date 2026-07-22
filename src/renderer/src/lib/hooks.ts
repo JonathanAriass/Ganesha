@@ -1,6 +1,7 @@
+import { useState, useEffect, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query'
 import type { ConnectionInput, SavedQueryInput, SavedQueryPatch, SsmTunnelInput } from '@shared/domain'
-import type { TelescopeFilter } from '@shared/telescope'
+import type { TelescopeFilter, TelescopeEntry } from '@shared/telescope'
 import type { ObjectRef } from '@shared/schema'
 import { unwrap } from './result'
 import type { QueryResult } from '@shared/query'
@@ -363,4 +364,30 @@ export function useTelescopeTags(connectionId: string | null) {
     enabled: connectionId != null,
     retry: false,
   })
+}
+
+/** Subscribe to live new-entry pushes for a connection. Starts/stops the main-side tail poller with
+ *  the component lifecycle and buffers new entries (deduped, newest-first, capped at 500) so a
+ *  "N new entries" banner can surface them without disrupting the scroll position. */
+export function useTelescopeTail(connectionId: string | null): { newEntries: TelescopeEntry[]; clear: () => void } {
+  const [newEntries, setNewEntries] = useState<TelescopeEntry[]>([])
+  useEffect(() => {
+    if (!connectionId) return
+    void window.api.telescope.startTail(connectionId)
+    const off = window.api.telescope.onNewEntries((ev) => {
+      if (ev.connectionId !== connectionId) return
+      setNewEntries((prev) => {
+        const seen = new Set(prev.map((e) => e.uuid))
+        const fresh = ev.entries.filter((e) => !seen.has(e.uuid))
+        return fresh.length ? [...fresh, ...prev].slice(0, 500) : prev
+      })
+    })
+    return () => {
+      off()
+      void window.api.telescope.stopTail(connectionId)
+      setNewEntries([])
+    }
+  }, [connectionId])
+  const clear = useCallback(() => setNewEntries([]), [])
+  return { newEntries, clear }
 }

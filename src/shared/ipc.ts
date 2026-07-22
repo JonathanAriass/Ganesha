@@ -54,6 +54,8 @@ export interface IpcChannels {
   'telescope.entry': { req: { connectionId: string; uuid: string }; res: TelescopeEntryDetail | null }
   'telescope.related': { req: { connectionId: string; batchId: string; excludeUuid?: string }; res: TelescopeEntry[] }
   'telescope.tags': { req: string; res: string[] }
+  'telescope.startTail': { req: string; res: null }
+  'telescope.stopTail': { req: string; res: null }
   'edits.apply': {
     req: { connectionId: string; table: { schema: string | null; name: string }; rows: RowEdit[] }
     res: { updated: number }
