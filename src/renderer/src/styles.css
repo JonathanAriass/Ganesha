@@ -2631,3 +2631,248 @@ mark.hl {
 .ti-arrow {
   color: var(--text-2);
 }
+
+/* ── Telescope inspector ─────────────────────────────────────────────────── */
+.telescope {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+}
+.telescope-empty {
+  margin: auto;
+  color: var(--text-2);
+}
+
+/* Type sidebar */
+.tele-sidebar {
+  flex: 0 0 168px;
+  overflow-y: auto;
+  border-right: 1px solid var(--border);
+  background: var(--bg-2);
+  padding: 6px;
+}
+.tele-type {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  border-radius: var(--radius);
+  cursor: pointer;
+  text-align: left;
+  font-size: 13px;
+}
+.tele-type:hover { background: var(--hover-overlay); color: var(--text); }
+.tele-type.active { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--text); }
+.tele-type-icon { width: 18px; text-align: center; flex: 0 0 auto; }
+.tele-type-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Main column */
+.tele-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.tele-filterbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-2);
+}
+.tele-search {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+}
+.tele-search:focus { outline: none; border-color: var(--accent); }
+.tele-search-clear,
+.tele-detail-close {
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: var(--radius);
+}
+.tele-search-clear:hover,
+.tele-detail-close:hover { background: var(--hover-overlay); color: var(--text); }
+.tele-tag-select {
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  padding: 0 6px;
+}
+
+/* List / detail split */
+.tele-content { flex: 1; min-height: 0; display: flex; }
+.tele-listpane { flex: 1; min-width: 0; display: flex; }
+.tele-content.with-detail .tele-listpane { flex: 0 0 44%; border-right: 1px solid var(--border); }
+.tele-detailpane { flex: 1; min-width: 0; display: flex; }
+
+/* Entry list */
+.tele-list { flex: 1; overflow-y: auto; min-height: 0; }
+.tele-list-state { padding: 24px; color: var(--text-2); text-align: center; }
+.tele-list-state.error { color: var(--danger-text, var(--danger)); }
+.tele-row {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  padding: 0 12px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-left: 2px solid transparent;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  overflow: hidden;
+}
+.tele-row:hover { background: var(--hover-overlay); }
+.tele-row.selected { background: var(--hover-overlay); border-left-color: var(--accent); }
+.tele-row.loader { justify-content: center; color: var(--text-2); font-size: 12px; }
+.tele-row-line1 { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.tele-row-icon { flex: 0 0 auto; }
+.tele-row-method {
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-2);
+  text-transform: uppercase;
+  flex: 0 0 auto;
+}
+.tele-row-primary { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tele-row-line2 {
+  font-size: 11px;
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-left: 26px;
+}
+
+/* Badges */
+.tele-badge {
+  flex: 0 0 auto;
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--mono, ui-monospace, monospace);
+  line-height: 1.5;
+}
+.tele-badge.tone-ok { background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); }
+.tele-badge.tone-warn { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+.tele-badge.tone-danger { background: color-mix(in srgb, var(--danger) 16%, transparent); color: var(--danger); }
+.tele-badge.tone-info { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+.tele-badge.tone-muted { background: var(--hover-overlay); color: var(--text-2); }
+
+/* Detail pane */
+.tele-detail { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--bg); }
+.tele-detail-head { padding: 12px; border-bottom: 1px solid var(--border); background: var(--bg-2); }
+.tele-detail-titlerow { display: flex; align-items: center; gap: 8px; }
+.tele-detail-icon { flex: 0 0 auto; }
+.tele-detail-title {
+  font-size: 15px;
+  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tele-detail-meta { margin-top: 4px; font-size: 12px; color: var(--text-2); }
+.tele-detail-abs { margin-left: 4px; }
+.tele-detail-uuid {
+  margin-top: 4px;
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 11px;
+  color: var(--text-2);
+  user-select: text;
+}
+
+/* Detail tabs */
+.tele-tabs { display: flex; gap: 2px; padding: 0 8px; border-bottom: 1px solid var(--border); background: var(--bg-2); }
+.tele-tab {
+  position: relative;
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  padding: 8px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.tele-tab:hover { color: var(--text); }
+.tele-tab.active { color: var(--text); font-weight: 600; }
+.tele-tab.active::after {
+  content: '';
+  position: absolute;
+  left: 6px; right: 6px; bottom: 0;
+  height: 2px;
+  background: var(--accent);
+}
+.tele-detail-body { flex: 1; overflow: auto; padding: 12px; min-height: 0; }
+
+/* Detail primitives */
+.tele-empty-hint { color: var(--text-2); font-size: 12px; padding: 8px 0; }
+.tele-stack { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.tele-stack > * { width: 100%; }
+.tele-kv { display: flex; flex-direction: column; }
+.tele-kv-row { display: flex; gap: 12px; padding: 3px 0; border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent); }
+.tele-kv-label { flex: 0 0 128px; color: var(--text-2); font-size: 12px; font-weight: 600; }
+.tele-kv-value { flex: 1; min-width: 0; font-family: var(--mono, ui-monospace, monospace); font-size: 12px; word-break: break-word; }
+.tele-code {
+  margin: 0;
+  padding: 10px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 12px;
+  max-height: 420px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.tele-json { max-height: 460px; overflow: auto; background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px; }
+
+/* Exception stack */
+.tele-exc-message { color: var(--danger); font-weight: 600; }
+.tele-exc-origin { font-family: var(--mono, ui-monospace, monospace); font-size: 12px; color: var(--accent); }
+.tele-frames { display: flex; flex-direction: column; gap: 2px; width: 100%; }
+.tele-frame { display: flex; flex-direction: column; padding: 4px 0; border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent); }
+.tele-frame.vendor { opacity: 0.55; }
+.tele-frame-loc { font-family: var(--mono, ui-monospace, monospace); font-size: 12px; color: var(--accent); word-break: break-all; }
+.tele-frame-fn { font-size: 11px; color: var(--text-2); }
+
+/* Related entries */
+.tele-related { display: flex; flex-direction: column; gap: 2px; }
+.tele-related-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+.tele-related-row:hover { background: var(--hover-overlay); }
+.tele-related-icon { flex: 0 0 auto; }
+.tele-related-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }

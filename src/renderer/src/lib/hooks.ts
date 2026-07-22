@@ -1,5 +1,6 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query'
 import type { ConnectionInput, SavedQueryInput, SavedQueryPatch, SsmTunnelInput } from '@shared/domain'
+import type { TelescopeFilter } from '@shared/telescope'
 import type { ObjectRef } from '@shared/schema'
 import { unwrap } from './result'
 import type { QueryResult } from '@shared/query'
@@ -309,6 +310,57 @@ export function useLlmMessages(conversationId: string | null) {
     queryKey: ['llm', 'messages', conversationId],
     queryFn: () => window.api.llm.listMessages(conversationId!).then(unwrap),
     enabled: conversationId != null,
+    retry: false,
+  })
+}
+
+// ── Telescope inspector ────────────────────────────────────────────────────────
+
+/** The list filters that identify a distinct entry query (drive the query key + cursor paging). */
+export type TelescopeListFilter = Pick<TelescopeFilter, 'type' | 'tag' | 'search'>
+
+/** Cursor-paginated entries for the current type/tag/search filter (keyset on `sequence`). */
+export function useTelescopeEntries(connectionId: string | null, filter: TelescopeListFilter) {
+  return useInfiniteQuery({
+    queryKey: ['telescope', 'entries', connectionId, filter.type, filter.tag ?? null, filter.search ?? null],
+    queryFn: ({ pageParam }) =>
+      window.api.telescope
+        .entries({ connectionId: connectionId!, type: filter.type, tag: filter.tag, search: filter.search, beforeSequence: pageParam })
+        .then(unwrap),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => (last.hasMore ? last.nextCursor : undefined),
+    enabled: connectionId != null,
+    retry: false,
+  })
+}
+
+/** One entry's full detail (lazy, cached 5 min). */
+export function useTelescopeEntry(connectionId: string | null, uuid: string | null) {
+  return useQuery({
+    queryKey: ['telescope', 'entry', connectionId, uuid],
+    queryFn: () => window.api.telescope.entry(connectionId!, uuid!).then(unwrap),
+    enabled: connectionId != null && uuid != null,
+    staleTime: 5 * 60_000,
+    retry: false,
+  })
+}
+
+/** Sibling entries in an entry's batch (the "Related" tab). */
+export function useTelescopeRelated(connectionId: string | null, batchId: string | null, excludeUuid?: string) {
+  return useQuery({
+    queryKey: ['telescope', 'related', connectionId, batchId, excludeUuid ?? null],
+    queryFn: () => window.api.telescope.related(connectionId!, batchId!, excludeUuid).then(unwrap),
+    enabled: connectionId != null && !!batchId,
+    retry: false,
+  })
+}
+
+/** Distinct tags for the tag filter. */
+export function useTelescopeTags(connectionId: string | null) {
+  return useQuery({
+    queryKey: ['telescope', 'tags', connectionId],
+    queryFn: () => window.api.telescope.tags(connectionId!).then(unwrap),
+    enabled: connectionId != null,
     retry: false,
   })
 }
