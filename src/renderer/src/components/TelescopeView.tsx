@@ -109,7 +109,10 @@ export default function TelescopeView({ connectionId }: { connectionId: string }
           </div>
           {selected && (
             <div className="tele-detailpane">
-              <TelescopeDetail connectionId={connectionId} entry={selected} onSelectEntry={setSelected} onClose={() => setSelected(null)} />
+              {/* key on the uuid: selecting a different entry (e.g. clicking a row in the Related tab)
+                  remounts the detail so its active-tab state resets to that entry's first tab
+                  instead of sticking on 'Related'. */}
+              <TelescopeDetail key={selected.uuid} connectionId={connectionId} entry={selected} onSelectEntry={setSelected} onClose={() => setSelected(null)} />
             </div>
           )}
         </div>
