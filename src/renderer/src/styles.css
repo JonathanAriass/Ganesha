@@ -2708,6 +2708,11 @@ mark.hl {
 .tele-search-clear:hover,
 .tele-detail-close:hover { background: var(--hover-overlay); color: var(--text); }
 .tele-tag-select {
+  /* Override the global `select { width: 100% }` so the dropdown sizes to its content and the
+     search input (flex: 1) fills the rest of the bar instead of being squeezed narrow. */
+  flex: 0 0 auto;
+  width: auto;
+  max-width: 220px;
   height: 30px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -2888,3 +2893,4 @@ mark.hl {
 .tele-related-row:hover { background: var(--hover-overlay); }
 .tele-related-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
 .tele-related-time { flex: 0 0 auto; font-family: var(--mono, ui-monospace, monospace); font-size: 11px; color: var(--text-2); }
+.tele-related-dot { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; }

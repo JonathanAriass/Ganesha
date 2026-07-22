@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { TelescopeEntry, EntryDetailContent } from '@shared/telescope'
 import { useTelescopeEntry, useTelescopeRelated } from '../lib/hooks'
-import { detailTabs } from '../lib/telescope-types'
+import { detailTabs, typeConfig } from '../lib/telescope-types'
 import { entryTitle, entryIcon, entryBadge, entrySecondary, entryPrimary } from '../lib/telescope-present'
 import { formatAbsoluteTime, formatDuration } from '../lib/telescope-format'
 import { Badge, KeyVals, JsonBlock, Code, MaybeJson, EmptyHint } from './telescope-ui'
@@ -203,6 +203,7 @@ function RelatedEntries({ connectionId, entry, onSelectEntry }: { connectionId: 
               : null
         return (
           <button key={r.uuid} className="tele-related-row" onClick={() => onSelectEntry(r)}>
+            <span className="tele-related-dot" style={{ background: typeConfig(r.type).color }} title={r.type} aria-hidden="true" />
             <span className="tele-related-text">{entryPrimary(r)}</span>
             {time && <span className="tele-related-time">{time}</span>}
             {badge && <Badge tone={badge.tone}>{badge.text}</Badge>}
