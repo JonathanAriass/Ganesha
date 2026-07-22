@@ -192,8 +192,18 @@ function RelatedEntries({ connectionId, entry, onSelectEntry }: { connectionId: 
   const { data: related = [], isLoading } = useTelescopeRelated(connectionId, entry.batchId, entry.uuid)
   if (isLoading) return <EmptyHint>Loading related…</EmptyHint>
   if (related.length === 0) return <EmptyHint>No related entries in this batch.</EmptyHint>
+  // Legend of just the entry types present in this batch (color → label), so the dots/tints read.
+  const legend = [...new Set(related.map((r) => r.type))].map((t) => typeConfig(t))
   return (
     <div className="tele-related">
+      <div className="tele-related-legend">
+        {legend.map((c) => (
+          <span className="tele-legend-item" key={c.type}>
+            <span className="tele-related-dot" style={{ background: c.color }} aria-hidden="true" />
+            {c.label}
+          </span>
+        ))}
+      </div>
       {related.map((r) => {
         const badge = entryBadge(r)
         const color = typeConfig(r.type).color

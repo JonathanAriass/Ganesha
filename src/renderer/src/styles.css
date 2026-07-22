@@ -2895,3 +2895,14 @@ mark.hl {
 .tele-related-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
 .tele-related-time { flex: 0 0 auto; font-family: var(--mono, ui-monospace, monospace); font-size: 11px; color: var(--text-2); }
 .tele-related-dot { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; }
+.tele-related-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 2px 4px 8px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-2);
+}
+.tele-legend-item { display: inline-flex; align-items: center; gap: 5px; }
