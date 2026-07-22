@@ -109,8 +109,9 @@ export interface QueryTabData {
   connectionId: string
   title: string
   /** Tab kind. Absent/`'query'` = the normal editor+results tab; `'diagram'` = the read-only schema
-   *  diagram; `'table-info'` = the read-only table-structure view for `objectRef`. */
-  kind?: 'query' | 'diagram' | 'table-info'
+   *  diagram; `'table-info'` = the read-only table-structure view for `objectRef`; `'telescope'` =
+   *  the read-only Laravel Telescope inspector. */
+  kind?: 'query' | 'diagram' | 'table-info' | 'telescope'
   /** The table this tab targets (only set for `kind: 'table-info'`). */
   objectRef?: { schema: string | null; name: string }
   /** Which side of a split this tab lives in. Defaults to `'left'`; only ever `'right'`
@@ -202,6 +203,8 @@ interface AppState {
   openQueryTab: (args: { connectionId: string; title?: string; text?: string; runOnOpen?: boolean }) => void
   /** Open (or focus the existing) read-only schema-diagram tab for a connection. */
   openDiagramTab: (connectionId: string) => void
+  /** Open (or focus the existing) read-only Telescope inspector tab for a connection. */
+  openTelescopeTab: (connectionId: string) => void
   /** Open (or focus the existing) read-only table-info tab for one table. */
   openTableInfoTab: (connectionId: string, ref: { schema: string | null; name: string }) => void
   /** One-shot boot restore of a persisted session. No-ops once any tab exists —
@@ -302,7 +305,7 @@ function blankTab(fields: {
   title: string
   pane: PaneId
   text?: string
-  kind?: 'query' | 'diagram' | 'table-info'
+  kind?: 'query' | 'diagram' | 'table-info' | 'telescope'
   objectRef?: { schema: string | null; name: string }
   runOnOpen?: boolean
 }): QueryTabData {
@@ -453,6 +456,28 @@ export const useAppStore = create<AppState>((set, get) => ({
       })
     }),
 
+  openTelescopeTab: (connectionId) =>
+    set((s) => {
+      const existing = s.tabs.find((t) => t.connectionId === connectionId && t.kind === 'telescope')
+      if (existing) {
+        return withMirror({
+          focusedPane: existing.pane,
+          activeTabByPane: { ...s.activeTabByPane, [existing.pane]: existing.id },
+          activeConnByPane: { ...s.activeConnByPane, [existing.pane]: connectionId },
+          lastActiveByConnection: { ...s.lastActiveByConnection, [connectionId]: existing.id },
+        })
+      }
+      const p = s.focusedPane
+      const tab = blankTab({ connectionId, title: '🔭 Telescope', kind: 'telescope', pane: p })
+      return withMirror({
+        tabs: [...s.tabs, tab],
+        focusedPane: p,
+        activeTabByPane: { ...s.activeTabByPane, [p]: tab.id },
+        activeConnByPane: { ...s.activeConnByPane, [p]: connectionId },
+        lastActiveByConnection: { ...s.lastActiveByConnection, [connectionId]: tab.id },
+      })
+    }),
+
   openTableInfoTab: (connectionId, ref) =>
     set((s) => {
       // One info tab per table — focus an existing one (in whichever pane) instead of stacking.
@@ -590,8 +615,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   openOrLoadQuery: ({ connectionId, title, text }) => {
     const s = get()
     const activeTab = s.tabs.find((t) => t.id === s.activeTabId)
-    // Reuse the active tab only if it's a query tab for this connection (never a diagram tab).
-    if (activeTab && activeTab.connectionId === connectionId && activeTab.kind !== 'diagram') s.loadQueryText(activeTab.id, text)
+    // Reuse the active tab only if it's a query tab for this connection (never a diagram/table-info/
+    // telescope tab, which have no editor to load text into).
+    if (activeTab && activeTab.connectionId === connectionId && (activeTab.kind == null || activeTab.kind === 'query')) s.loadQueryText(activeTab.id, text)
     else s.openQueryTab({ connectionId, title, text })
   },
 
@@ -600,7 +626,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     // Avoid a DUPLICATE tab for the same table: if one is already open (matched by connection + the
     // table's name as title), just focus it. A different table keeps its own tab open — opening one
     // table never replaces another.
-    const existing = s.tabs.find((t) => t.connectionId === connectionId && t.kind !== 'diagram' && t.title === title)
+    const existing = s.tabs.find((t) => t.connectionId === connectionId && (t.kind == null || t.kind === 'query') && t.title === title)
     if (existing) {
       s.setActiveTab(existing.id)
       return

@@ -1,6 +1,6 @@
 import type { ChangeEvent } from 'react'
 import { useAppStore } from '../state/store'
-import { useConnections, useSsmTunnels } from '../lib/hooks'
+import { useConnections, useSsmTunnels, useObjects } from '../lib/hooks'
 import { mod } from '../lib/platform'
 import { Icon } from './icons'
 import logo from '../assets/logo.png'
@@ -16,11 +16,15 @@ export default function TopBar(): JSX.Element {
   const ssmOpen = useAppStore((s) => s.ssmOpen)
   const runningSsm = useAppStore((s) => s.runningSsm)
   const openDiagramTab = useAppStore((s) => s.openDiagramTab)
+  const openTelescopeTab = useAppStore((s) => s.openTelescopeTab)
 
   const { data: connections = [] } = useConnections()
   const { data: tunnels = [] } = useSsmTunnels()
+  const { data: objects = [] } = useObjects(activeConnectionId)
 
   const activeConn = connections.find((c) => c.id === activeConnectionId) ?? null
+  // Show the Telescope button only when the active connection has Laravel Telescope tables.
+  const hasTelescope = objects.some((o) => o.name === 'telescope_entries')
   // Tunnels linked to the active connection that aren't currently running → offer to start.
   const downLinked = activeConnectionId
     ? tunnels.filter((t) => t.connectionId === activeConnectionId && !runningSsm.includes(t.id))
@@ -77,6 +81,17 @@ export default function TopBar(): JSX.Element {
           data-tooltip="Schema diagram"
         >
           <Icon name="diagram" />
+        </button>
+      )}
+
+      {activeConn && hasTelescope && (
+        <button
+          className="icon-btn"
+          onClick={() => openTelescopeTab(activeConn.id)}
+          aria-label="Telescope inspector"
+          data-tooltip="Telescope inspector"
+        >
+          <Icon name="telescope" />
         </button>
       )}
 

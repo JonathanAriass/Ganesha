@@ -6,6 +6,7 @@ import TabBar from './TabBar'
 import QueryTab from './QueryTab'
 import DiagramView from './DiagramView'
 import TableInfoView from './TableInfoView'
+import TelescopeView from './TelescopeView'
 import Welcome from './Welcome'
 
 type DropSide = 'left' | 'right' | 'whole'
@@ -70,6 +71,8 @@ export default function EditorPane({ paneId }: { paneId: PaneId }): JSX.Element 
             <DiagramView key={tab.id} connectionId={tab.connectionId} />
           ) : tab.kind === 'table-info' && tab.objectRef ? (
             <TableInfoView key={tab.id} connectionId={tab.connectionId} objectRef={tab.objectRef} />
+          ) : tab.kind === 'telescope' ? (
+            <TelescopeView key={tab.id} connectionId={tab.connectionId} />
           ) : (
             <QueryTab key={tab.id} tab={tab} />
           )

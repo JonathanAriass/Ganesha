@@ -848,3 +848,49 @@ describe('results filter view (main-side search)', () => {
     expect(tab().filterView?.rows).toEqual([[1], [2]])
   })
 })
+
+describe('openTelescopeTab', () => {
+  beforeEach(() => {
+    useAppStore.setState({
+      tabs: [], activeTabId: null, _queryCounter: 0,
+      focusedPane: 'left', activeTabByPane: { left: null, right: null }, activeConnByPane: { left: null, right: null },
+      lastActiveByConnection: {},
+    })
+  })
+
+  it('opens a telescope-kind tab and makes it active', () => {
+    useAppStore.getState().openTelescopeTab('c1')
+    const s = useAppStore.getState()
+    expect(s.tabs).toHaveLength(1)
+    expect(s.tabs[0].kind).toBe('telescope')
+    expect(s.tabs[0].title).toBe('🔭 Telescope')
+    expect(s.activeTabId).toBe(s.tabs[0].id)
+    expect(s.activeConnectionId).toBe('c1')
+  })
+
+  it('focuses the existing telescope tab instead of duplicating (one per connection)', () => {
+    useAppStore.getState().openTelescopeTab('c1')
+    const firstId = useAppStore.getState().tabs[0].id
+    useAppStore.getState().openQueryTab({ connectionId: 'c1' }) // switch active away
+    useAppStore.getState().openTelescopeTab('c1')
+    const s = useAppStore.getState()
+    expect(s.tabs.filter((t) => t.kind === 'telescope')).toHaveLength(1)
+    expect(s.activeTabId).toBe(firstId)
+  })
+
+  it('gives separate connections their own telescope tabs', () => {
+    useAppStore.getState().openTelescopeTab('c1')
+    useAppStore.getState().openTelescopeTab('c2')
+    expect(useAppStore.getState().tabs.filter((t) => t.kind === 'telescope')).toHaveLength(2)
+  })
+
+  it('openOrLoadQuery does not hijack a telescope tab — opens a new query tab', () => {
+    useAppStore.getState().openTelescopeTab('c1')
+    useAppStore.getState().openOrLoadQuery({ connectionId: 'c1', title: 'Saved', text: 'SELECT 1' })
+    const s = useAppStore.getState()
+    expect(s.tabs).toHaveLength(2)
+    const active = s.tabs.find((t) => t.id === s.activeTabId)!
+    expect(active.kind == null || active.kind === 'query').toBe(true)
+    expect(active.text).toBe('SELECT 1')
+  })
+})

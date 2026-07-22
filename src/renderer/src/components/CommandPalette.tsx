@@ -60,6 +60,17 @@ export default function CommandPalette(): JSX.Element {
                   Open schema diagram
                 </Command.Item>
               )}
+              {activeConnectionId && objects.some((o) => o.name === 'telescope_entries') && (
+                <Command.Item
+                  value="action telescope inspector"
+                  onSelect={() => {
+                    useAppStore.getState().openTelescopeTab(activeConnectionId)
+                    close()
+                  }}
+                >
+                  Open Telescope inspector
+                </Command.Item>
+              )}
               <Command.Item
                 value="action toggle theme"
                 onSelect={() => {
