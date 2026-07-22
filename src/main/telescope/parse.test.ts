@@ -18,6 +18,10 @@ describe('helpers', () => {
     expect(shortClass('App\\Notifications\\OrderShipped')).toBe('OrderShipped')
     expect(shortClass('NoNamespace')).toBe('NoNamespace')
   })
+  it('trunc counts code points and never splits a surrogate pair', () => {
+    expect(trunc('😀😀😀', 2)).toBe('😀😀...') // whole emoji kept, no lone surrogate
+    expect(trunc('😀😀', 5)).toBe('😀😀')
+  })
   it('stripHtml removes tags', () => {
     expect(stripHtml('<span class="x">hi</span> there')).toBe('hi there')
   })
@@ -43,6 +47,8 @@ describe('parseEntrySummary', () => {
     expect(parseEntrySummary('mail', { subject: 'Hi', to: [{ address: 'a@b.com' }] }))
       .toEqual({ type: 'mail', subject: 'Hi', to: 'a@b.com' })
     expect(parseEntrySummary('mail', { subject: 'Hi' })).toEqual({ type: 'mail', subject: 'Hi', to: 'unknown' })
+    // present-but-empty address stays '' (only an absent/non-string address defaults to 'unknown')
+    expect(parseEntrySummary('mail', { subject: 'Hi', to: [{ address: '' }] })).toEqual({ type: 'mail', subject: 'Hi', to: '' })
   })
   it('cache maps JSON `type` to cacheType', () => {
     expect(parseEntrySummary('cache', { key: 'k', type: 'hit' })).toEqual({ type: 'cache', key: 'k', cacheType: 'hit' })
@@ -93,8 +99,10 @@ describe('parseEntryDetail', () => {
   it('unknown type → raw with the original object', () => {
     expect(parseEntryDetail('mystery', { a: 1 })).toEqual({ type: 'raw', data: { a: 1 } })
   })
-  it('non-object content is tolerated (treated as empty)', () => {
-    expect(parseEntryDetail('request', null)).toMatchObject({ type: 'request', uri: null })
-    expect(parseEntryDetail('mystery', 'a string')).toEqual({ type: 'raw', data: {} })
+  it('non-object content degrades to a raw view of the original source (known + unknown types)', () => {
+    expect(parseEntryDetail('request', null)).toEqual({ type: 'raw', data: null })
+    expect(parseEntryDetail('query', 'boom')).toEqual({ type: 'raw', data: 'boom' })
+    expect(parseEntryDetail('mystery', 'a string')).toEqual({ type: 'raw', data: 'a string' })
+    expect(parseEntryDetail('mystery', [1, 2])).toEqual({ type: 'raw', data: [1, 2] })
   })
 })

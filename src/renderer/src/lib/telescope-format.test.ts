@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  formatDuration, truncateText, formatRelativeTime,
+  formatDuration, formatRelativeTime,
   statusTone, logLevelTone, jobStatusTone, cacheTypeTone, gateResultTone, exitCodeTone
 } from './telescope-format'
 import { typeConfig, detailTabs } from './telescope-types'
@@ -11,13 +11,6 @@ describe('formatDuration', () => {
     expect(formatDuration(0.5)).toBe('500μs')
     expect(formatDuration(12.34)).toBe('12.3ms')
     expect(formatDuration(2500)).toBe('2.50s')
-  })
-})
-
-describe('truncateText', () => {
-  it('ellipsizes past max', () => {
-    expect(truncateText('abc', 5)).toBe('abc')
-    expect(truncateText('abcdef', 3)).toBe('abc...')
   })
 })
 

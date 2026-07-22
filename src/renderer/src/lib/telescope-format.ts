@@ -10,11 +10,6 @@ export function formatDuration(ms: number | null | undefined): string {
   return `${(ms / 1000).toFixed(2)}s`
 }
 
-/** Truncate with an ellipsis. */
-export function truncateText(text: string, max: number): string {
-  return text.length <= max ? text : text.slice(0, max) + '...'
-}
-
 /** A Telescope 'YYYY-MM-DD HH:MM:SS' timestamp → a coarse "5m ago" relative string.
  *  Laravel stores created_at in the app timezone (UTC by default), so the value is parsed as UTC. */
 export function formatRelativeTime(dateStr: string | null | undefined): string {

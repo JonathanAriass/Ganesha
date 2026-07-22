@@ -13,12 +13,6 @@ export type TelescopeType =
   | 'notification' | 'cache' | 'dump' | 'schedule' | 'command'
   | 'gate' | 'model' | 'event' | 'view' | 'redis' | 'batch'
 
-export const TELESCOPE_TYPES: TelescopeType[] = [
-  'request', 'exception', 'query', 'log', 'job', 'mail',
-  'notification', 'cache', 'dump', 'schedule', 'command',
-  'gate', 'model', 'event', 'view', 'redis', 'batch'
-]
-
 // ── Lightweight per-type summaries (list rows) ─────────────────────────────────────────────
 export type EntrySummary =
   | { type: 'request'; method: string; uri: string; status: number; duration: number }
@@ -206,7 +200,7 @@ export type EntryDetailContent =
   | ({ type: 'view' } & ViewContent)
   | ({ type: 'redis' } & RedisContent)
   | ({ type: 'batch' } & BatchContent)
-  | { type: 'raw'; data: Record<string, unknown> }
+  | { type: 'raw'; data: unknown } // original content when it isn't a typed object (mirrors serde Raw)
 
 /** A list-view entry (metadata + lightweight summary). `sequence` is a string (BIGINT-safe). */
 export interface TelescopeEntry {

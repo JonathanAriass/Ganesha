@@ -61,7 +61,7 @@ export function entrySecondary(e: TelescopeEntry): string[] {
       case 'model': return [s.action]
       case 'event': return [`${s.listenerCount} listener${s.listenerCount === 1 ? '' : 's'}`]
       case 'view': return [s.path]
-      case 'redis': return [`${s.duration}ms`]
+      case 'redis': return [s.duration ? `${s.duration}ms` : null]
       case 'batch': return [`${s.progress}% of ${s.totalJobs}`]
       case 'schedule': return [s.expression]
       default: return []

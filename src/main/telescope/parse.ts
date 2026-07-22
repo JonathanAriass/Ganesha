@@ -30,9 +30,11 @@ export function parseTime(v: unknown): number {
   return 0
 }
 
-/** Truncate to `max` chars with an ellipsis. */
+/** Truncate to `max` code points with an ellipsis. Counts/splits on code points (not UTF-16 units)
+ *  so a multi-byte char (emoji) is never cut into a lone surrogate. */
 export function trunc(s: string, max: number): string {
-  return s.length <= max ? s : s.slice(0, max) + '...'
+  const cp = [...s]
+  return cp.length <= max ? s : cp.slice(0, max).join('') + '...'
 }
 
 /** Last segment of a PHP FQCN: 'App\\Notifications\\OrderShipped' → 'OrderShipped'. */
@@ -72,8 +74,11 @@ export function parseEntrySummary(type: string, content: unknown): EntrySummary 
     case 'job':
       return { type: 'job', name: str(c.name), status: str(c.status) }
     case 'mail': {
-      const to = arrOrNull<Json>(c.to)
-      return { type: 'mail', subject: str(c.subject), to: (to && str(to[0]?.address)) || 'unknown' }
+      // Keep a present-but-empty address as '' (like the reference's unwrap_or, which only defaults
+      // when the address is absent/non-string) rather than coercing it to 'unknown'.
+      const first = arrOrNull<Json>(c.to)?.[0]
+      const address = first && typeof first.address === 'string' ? first.address : null
+      return { type: 'mail', subject: str(c.subject), to: address ?? 'unknown' }
     }
     case 'notification':
       return { type: 'notification', notification: shortClass(str(c.notification)), channel: str(c.channel) }
@@ -104,7 +109,13 @@ export function parseEntrySummary(type: string, content: unknown): EntrySummary 
 
 // ── detail (detail pane) — map snake_case JSON → camelCase Content, else raw ────────────────────
 export function parseEntryDetail(type: string, content: unknown): EntryDetailContent {
-  const c = asObject(content)
+  // A typed detail shape needs a JSON object; anything else (string/number/array/null) — like an
+  // unknown type — degrades to a raw view of the ORIGINAL source (mirrors the reference's serde
+  // "deserialize to the typed struct, else Raw{data: original}").
+  if (!content || typeof content !== 'object' || Array.isArray(content)) {
+    return { type: 'raw', data: content }
+  }
+  const c = content as Json
   switch (type) {
     case 'request': {
       const v: RequestContent = {

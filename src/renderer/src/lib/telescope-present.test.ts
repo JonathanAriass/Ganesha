@@ -36,6 +36,7 @@ describe('entry presenters', () => {
   })
   it('redis renders duration string, generic falls back to preview + icon', () => {
     expect(entrySecondary(entry({ type: 'redis', command: 'GET x', duration: '1.2' }))).toEqual(['1.2ms'])
+    expect(entrySecondary(entry({ type: 'redis', command: 'GET x', duration: '' }))).toEqual([]) // empty → no bare 'ms'
     expect(entryPrimary(entry({ type: 'generic', preview: 'blob' }))).toBe('blob')
     expect(entryIcon(entry({ type: 'request', method: 'GET', uri: '/', status: 200, duration: 1 }))).toBe('🌐')
   })
