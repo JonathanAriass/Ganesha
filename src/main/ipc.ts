@@ -23,7 +23,7 @@ import { connectVia, disconnectVia, openTunnel } from './connection-runtime'
 import { buildConnectParams } from './drivers/params'
 import { readFileSync } from 'fs'
 import { randomUUID } from 'crypto'
-import { LlmEngine } from './llm/engine'
+import { EngineHost } from './llm/engine-host'
 import { MODEL_CATALOG } from './llm/catalog'
 import { listLocalModels, deleteLocalModel, downloadModel } from './llm/models'
 import { buildSchemaContext } from './llm/schema-context'
@@ -47,7 +47,7 @@ drivers.register(new MongoDriver())
 // When a tunnel drops, evict the connection's now-stale driver pool (still bound to
 // the closed local forwarder port) so the next query re-dials the tunnel and re-pools.
 const tunnels = new SshTunnelManager({ onDrop: (connId) => void drivers.disconnectAll(connId) })
-const engine = new LlmEngine()
+const engine = new EngineHost()
 const activeGenerations = new Map<string, AbortController>()
 // Retains full result sets (LRU-bounded) so the grid can page more rows on scroll without re-querying.
 const resultCache = new ResultCache()
@@ -89,9 +89,10 @@ export function stopTelescopeTails(): void {
   telescopeTail.stopAll()
 }
 
-/** Free the loaded LLM model (native memory) — called on app quit. */
+/** Stop the LLM engine subprocess (frees native memory) — called on app quit. */
 export function unloadLlm(): Promise<void> {
-  return engine.unload()
+  engine.kill()
+  return Promise.resolve()
 }
 
 /** Kill every running SSM tunnel process — called on app quit. */
