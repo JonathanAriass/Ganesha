@@ -14,7 +14,7 @@
   },
   "main": "./out/main/index.js",
   "scripts": {
-    "postinstall": "electron-builder install-app-deps",
+    "postinstall": "patch-package && electron-builder install-app-deps",
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
@@ -50,6 +50,7 @@
     "eslint": "^8.57.1",
     "eslint-config-prettier": "^9.1.2",
     "eslint-plugin-react-hooks": "^4.6.2",
+    "patch-package": "^8.0.1",
     "prettier": "^3.8.3",
     "testcontainers": "^10.28.0",
     "typescript": "^5.5.4",

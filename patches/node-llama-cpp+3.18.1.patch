@@ -1,0 +1,13 @@
+diff --git a/node_modules/node-llama-cpp/dist/config.js b/node_modules/node-llama-cpp/dist/config.js
+index 1ab0073..5ee1c2c 100644
+--- a/node_modules/node-llama-cpp/dist/config.js
++++ b/node_modules/node-llama-cpp/dist/config.js
+@@ -10,7 +10,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
+ const env = envVar.from(process.env);
+ export const llamaDirectory = path.join(__dirname, "..", "llama");
+ export const llamaToolchainsDirectory = path.join(llamaDirectory, "toolchains");
+-export const llamaPrebuiltBinsDirectory = path.join(__dirname, "..", "bins");
++export const llamaPrebuiltBinsDirectory = process.env.GANESHA_LLAMA_BINS_DIR ?? path.join(__dirname, "..", "bins");
+ export const llamaLocalBuildBinsDirectory = path.join(llamaDirectory, "localBuilds");
+ export const llamaBinsGrammarsDirectory = path.join(__dirname, "..", "llama", "grammars");
+ export const projectTemplatesDirectory = path.join(__dirname, "..", "templates");
