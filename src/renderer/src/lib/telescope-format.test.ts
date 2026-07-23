@@ -60,7 +60,7 @@ describe('badge tones', () => {
 describe('type registry', () => {
   it('known type config + unknown fallback', () => {
     expect(typeConfig('request').label).toBe('Requests')
-    expect(typeConfig('mystery')).toEqual({ type: 'mystery', label: 'mystery', icon: '•' })
+    expect(typeConfig('mystery')).toEqual({ type: 'mystery', label: 'mystery', icon: '•', color: 'var(--text-2)' })
   })
   it('detail tabs incl. fallback', () => {
     expect(detailTabs('request')).toEqual(['Headers', 'Payload', 'Response'])
