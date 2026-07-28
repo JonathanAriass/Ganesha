@@ -315,6 +315,16 @@ export function useLlmMessages(conversationId: string | null) {
   })
 }
 
+/** Whether the native LLM engine binaries are installed (downloaded into userData; always true in
+ *  dev, where they resolve from node_modules). */
+export function useEngineStatus() {
+  return useQuery({
+    queryKey: ['llm', 'engine'],
+    queryFn: () => window.api.llm.engineStatus().then(unwrap),
+    retry: false,
+  })
+}
+
 // ── Telescope inspector ────────────────────────────────────────────────────────
 
 /** The list filters that identify a distinct entry query (drive the query key + cursor paging). */

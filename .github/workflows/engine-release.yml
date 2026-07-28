@@ -1,0 +1,47 @@
+name: Publish AI engine
+
+# Builds the on-demand native LLM engine tarball (the @node-llama-cpp prebuilt binaries that are no
+# longer bundled in the app) and publishes it to an `ai-engine-v<nlcVersion>` release, which the app
+# downloads into userData on first assistant use. Run this once per node-llama-cpp version bump —
+# and update ENGINE_NLC_VERSION in src/main/llm/engine-install.ts to match.
+on:
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: macos-14 # Apple Silicon — yields the arm64 @node-llama-cpp/mac-arm64-metal prebuilt
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install deps (pulls the platform @node-llama-cpp prebuilt)
+        run: npm ci --ignore-scripts
+
+      - name: Build the engine tarball
+        id: v
+        run: |
+          set -euo pipefail
+          nlc="$(node -p "require('node-llama-cpp/package.json').version")"
+          echo "nlc=$nlc" >> "$GITHUB_OUTPUT"
+          bins="node_modules/@node-llama-cpp/mac-arm64-metal/bins/mac-arm64-metal"
+          test -f "$bins/llama-addon.node" && test -f "$bins/_nlcBuildMetadata.json"
+          tar -czf ai-engine-mac-arm64-metal.tar.gz -C "$bins" .
+          echo "Built ai-engine-mac-arm64-metal.tar.gz for node-llama-cpp $nlc:"; tar -tzf ai-engine-mac-arm64-metal.tar.gz
+
+      - name: Publish / update the ai-engine release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="ai-engine-v${{ steps.v.outputs.nlc }}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" ai-engine-mac-arm64-metal.tar.gz --clobber
+          else
+            gh release create "$tag" ai-engine-mac-arm64-metal.tar.gz \
+              --title "AI engine — node-llama-cpp ${{ steps.v.outputs.nlc }} (mac-arm64-metal)" \
+              --notes "On-demand native LLM engine binaries for Ganesha (downloaded into userData; not bundled in the app). Matches node-llama-cpp ${{ steps.v.outputs.nlc }}."
+          fi

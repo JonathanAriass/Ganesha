@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAppStore } from '../state/store'
-import { useLlmModels, useLlmConversations, useLlmMessages } from '../lib/hooks'
+import { useLlmModels, useLlmConversations, useLlmMessages, useEngineStatus } from '../lib/hooks'
 import { extractCodeBlocks } from '../lib/llm-blocks'
 import { clampWidth, dragWidth, loadWidth, saveWidth, DEFAULT_WIDTH, MIN_WIDTH, MAX_WIDTH } from '../lib/assistant-width'
 import type { LlmMessage } from '@shared/domain'
@@ -29,6 +29,7 @@ export default function AssistantPanel(): JSX.Element | null {
 
   const qc = useQueryClient()
   const { data: models } = useLlmModels()
+  const { data: engine } = useEngineStatus()
   const { data: conversations } = useLlmConversations(connectionId)
   const { data: persisted } = useLlmMessages(convId)
 
@@ -137,6 +138,9 @@ export default function AssistantPanel(): JSX.Element | null {
   if (!open) return null
 
   const hasModel = (models?.downloaded.length ?? 0) > 0
+  // Default true while the status query loads (main enforces the real gate) to avoid input flicker.
+  const engineReady = engine?.installed ?? true
+  const ready = hasModel && engineReady
 
   return (
     <aside className="assistant-panel" ref={panelRef} style={{ width }}>
@@ -176,7 +180,12 @@ export default function AssistantPanel(): JSX.Element | null {
       </div>
 
       {!connectionId && <div className="assistant-empty">Select a connection to get schema-aware suggestions.</div>}
-      {connectionId && !hasModel && (
+      {connectionId && !engineReady && (
+        <div className="assistant-empty">
+          AI engine not installed — <button className="link-btn" onClick={openModelManager}>open the Model Manager</button> to download it (~2&nbsp;MB, once).
+        </div>
+      )}
+      {connectionId && engineReady && !hasModel && (
         <div className="assistant-empty">
           No model yet — <button className="link-btn" onClick={openModelManager}>open the Model Manager</button> to download one.
         </div>
@@ -232,13 +241,13 @@ export default function AssistantPanel(): JSX.Element | null {
         <textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder={hasModel ? 'Ask for a query…  (⌘↵ to send)' : 'Download a model to start'}
+          placeholder={ready ? 'Ask for a query…  (⌘↵ to send)' : engineReady ? 'Download a model to start' : 'Install the AI engine to start'}
           onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void send() } }}
-          disabled={!connectionId || !hasModel || streaming}
+          disabled={!connectionId || !ready || streaming}
         />
         {streaming
           ? <button className="btn" onClick={stop}>Stop</button>
-          : <button className="btn primary" onClick={() => void send()} disabled={!connectionId || !hasModel || !draft.trim()}>Send</button>}
+          : <button className="btn primary" onClick={() => void send()} disabled={!connectionId || !ready || !draft.trim()}>Send</button>}
       </div>
     </aside>
   )

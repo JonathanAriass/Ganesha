@@ -1,16 +1,19 @@
 import { useState, useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAppStore } from '../state/store'
-import { useLlmModels } from '../lib/hooks'
+import { useLlmModels, useEngineStatus } from '../lib/hooks'
 
 export default function ModelManagerModal(): JSX.Element | null {
   const open = useAppStore((s) => s.modelManagerOpen)
   const close = useAppStore((s) => s.closeModelManager)
   const { data } = useLlmModels()
+  const { data: engine } = useEngineStatus()
   const qc = useQueryClient()
   const [customUri, setCustomUri] = useState('')
   const [progress, setProgress] = useState<{ uri: string; pct: number; received: number; total: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [enginePct, setEnginePct] = useState<number | null>(null)
+  const [engineError, setEngineError] = useState<string | null>(null)
 
   useEffect(() => {
     return window.api.llm.onDownloadProgress((e) => {
@@ -19,6 +22,15 @@ export default function ModelManagerModal(): JSX.Element | null {
       const received = e.receivedBytes ?? 0
       const total = e.totalBytes ?? 0
       setProgress({ uri: e.uri, pct: total ? Math.min(100, Math.round((received / total) * 100)) : 0, received, total })
+    })
+  }, [qc])
+
+  useEffect(() => {
+    return window.api.llm.onEngineDownload((e) => {
+      if (e.error) { setEngineError(e.error); setEnginePct(null); return }
+      if (e.done) { setEnginePct(null); void qc.invalidateQueries({ queryKey: ['llm', 'engine'] }); return }
+      const r = e.receivedBytes ?? 0, t = e.totalBytes ?? 0
+      setEnginePct(t ? Math.min(100, Math.round((r / t) * 100)) : 0)
     })
   }, [qc])
 
@@ -38,6 +50,11 @@ export default function ModelManagerModal(): JSX.Element | null {
     await window.api.llm.setActiveModel(id)
     void qc.invalidateQueries({ queryKey: ['llm', 'models'] })
   }
+  async function downloadEngine(): Promise<void> {
+    setEngineError(null); setEnginePct(0)
+    const res = await window.api.llm.downloadEngine()
+    if (!res.ok) { setEngineError(res.error); setEnginePct(null) }
+  }
 
   return (
     <div
@@ -50,6 +67,27 @@ export default function ModelManagerModal(): JSX.Element | null {
       <div className="modal">
         <div className="modal-header"><h2>Model Manager</h2></div>
         <div className="modal-body model-manager">
+          <h3>AI engine</h3>
+          {engine?.installed ? (
+            <p className="tree-muted">Installed <span className="status ok">v{engine.version}</span></p>
+          ) : (
+            <div className="model-row">
+              <span className="model-name">
+                <span>Local inference engine</span>
+                <span className="tree-muted">required once to run the assistant (~2&nbsp;MB)</span>
+              </span>
+              <span className="spacer" />
+              <button className="btn xs" disabled={enginePct !== null} onClick={() => void downloadEngine()}>Download</button>
+            </div>
+          )}
+          {enginePct !== null && (
+            <div className="progress-wrap">
+              <div className="progress-track"><div className="progress-fill" style={{ width: `${enginePct}%` }} /></div>
+              <div className="progress-label">Downloading engine… {enginePct}%</div>
+            </div>
+          )}
+          {engineError && <div className="status err" role="alert">{engineError}</div>}
+
           <h3>Downloaded</h3>
           {(data?.downloaded.length ?? 0) === 0 && <p className="tree-muted">None yet — pick one from the catalog below.</p>}
           {data?.downloaded.map((m) => (
