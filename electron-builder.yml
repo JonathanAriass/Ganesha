@@ -15,6 +15,10 @@ files:
 # runtime. Its native binaries are NOT bundled (see the files exclusion above).
 asarUnpack:
   - "**/node_modules/node-llama-cpp/**"
+  # The LLM engine runs via utilityProcess.fork — its entry must be a real file on disk (an
+  # asar-packed script can't be reliably forked). Electron redirects the app.asar path to this
+  # unpacked copy transparently.
+  - "out/main/engine-worker.js"
 # Ship the `ganesha` CLI launcher inside the bundle (→ Ganesha.app/Contents/Resources/ganesha).
 # The Homebrew cask symlinks it onto the user's PATH with a `binary` stanza so `ganesha` opens
 # the app from a terminal.
