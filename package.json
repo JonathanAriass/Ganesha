@@ -16,6 +16,7 @@
   "scripts": {
     "postinstall": "patch-package && electron-builder install-app-deps",
     "dev": "electron-vite dev",
+    "fix:electron": "codesign --force --deep --sign - node_modules/electron/dist/Electron.app && xattr -cr node_modules/electron/dist/Electron.app",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
