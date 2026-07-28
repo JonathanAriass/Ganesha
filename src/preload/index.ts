@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { ChannelName, Req, IpcResult, LlmTokenEvent, LlmDownloadEvent, LlmContextEvent, SsmOutputEvent, SsmStatusEvent } from '../shared/ipc'
+import type { ChannelName, Req, IpcResult, LlmTokenEvent, LlmDownloadEvent, LlmContextEvent, EngineDownloadEvent, SsmOutputEvent, SsmStatusEvent } from '../shared/ipc'
 import type { DbClientApi } from '../shared/api'
 import type { TelescopeNewEntriesEvent } from '../shared/telescope'
 
@@ -109,6 +109,13 @@ const api: DbClientApi = {
       const l = (_e: unknown, payload: LlmDownloadEvent): void => cb(payload)
       ipcRenderer.on('llm:download', l)
       return () => ipcRenderer.removeListener('llm:download', l)
+    },
+    engineStatus: () => invoke('llm.engine.status', undefined),
+    downloadEngine: () => invoke('llm.engine.download', undefined),
+    onEngineDownload: (cb) => {
+      const l = (_e: unknown, payload: EngineDownloadEvent): void => cb(payload)
+      ipcRenderer.on('llm:engine-download', l)
+      return () => ipcRenderer.removeListener('llm:engine-download', l)
     }
   },
   ssm: {

@@ -34,8 +34,9 @@ import * as llm from './persistence/llm'
 import * as ssm from './persistence/ssm-tunnels'
 import { SsmRunner } from './ssm/runner'
 import { runAws, listAwsProfiles, parseArn, parseInstances } from './ssm/aws'
-import { getModelsDir } from './persistence/paths'
-import type { LlmTokenEvent, LlmDownloadEvent, LlmContextEvent } from '../shared/ipc'
+import { getModelsDir, getDataDir } from './persistence/paths'
+import { engineRootFor, engineBinsDir, isEngineInstalledAt, downloadAndExtractEngine, engineTarballUrl, ENGINE_NLC_VERSION, type FetchLike } from './llm/engine-install'
+import type { LlmTokenEvent, LlmDownloadEvent, LlmContextEvent, EngineDownloadEvent } from '../shared/ipc'
 import type { TelescopeNewEntriesEvent } from '../shared/telescope'
 
 const drivers = new DriverManager()
@@ -147,8 +148,19 @@ function store(): { db: ReturnType<typeof openDb>; secrets: ReturnType<typeof ma
   return { db, secrets: makeSecretStore(db, safeStorageEncryptor()) }
 }
 
+/** Is the native LLM engine usable? In dev the binaries live in node_modules; a packaged app must
+ *  have downloaded them into userData first (they're no longer bundled). */
+function isEngineInstalled(): boolean {
+  if (!app.isPackaged) return true
+  return isEngineInstalledAt(engineBinsDir(getDataDir()))
+}
+
 /** Register every main-process IPC handler. Called once on app ready. */
 export function registerIpcHandlers(): void {
+  // Point the engine subprocess at the (downloaded) native binaries under userData. Harmless in dev
+  // (that dir is empty, so node-llama-cpp falls back to the node_modules binaries).
+  engine.setBinsDir(engineRootFor(getDataDir()))
+
   handle('ping', (message) => ok({ pong: message }))
 
   handle('connections.list', () => ok(conns.listConnections(store().db)))
@@ -441,6 +453,7 @@ export function registerIpcHandlers(): void {
   handle('llm.conversations.delete', ({ id }) => { llm.deleteConversation(store().db, id); return ok(null) })
   handle('llm.messages.list', ({ conversationId }) => ok(llm.listMessages(store().db, conversationId)))
   handle('llm.chat.cancel', ({ requestId }) => { activeGenerations.get(requestId)?.abort(); return ok(null) })
+  handle('llm.engine.status', () => ok({ installed: isEngineInstalled(), version: ENGINE_NLC_VERSION }))
 
   // ── SSM tunnels ──
   handle('ssm.list', () => ok(ssm.listSsmTunnels(store().db)))
@@ -478,6 +491,23 @@ export function registerIpcHandlers(): void {
     }
   })
 
+  // Download the ~5 MB native engine binaries on demand (no longer bundled). Streams progress.
+  ipcMain.handle('llm.engine.download', async (event) => {
+    const push = (ev: EngineDownloadEvent): void => { if (!event.sender.isDestroyed()) event.sender.send('llm:engine-download', ev) }
+    try {
+      await downloadAndExtractEngine(engineBinsDir(getDataDir()), {
+        url: engineTarballUrl(),
+        fetchFn: (url) => net.fetch(url, { headers: { 'User-Agent': 'Ganesha' } }) as unknown as Promise<FetchLike>,
+        onProgress: push
+      })
+      return ok(null)
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e)
+      push({ error: message })
+      return err(message)
+    }
+  })
+
   // Chat: stream tokens, persisting the turn only once generation has actually
   // started — so a failure during setup (no model / bad connection / model load)
   // never leaves an orphaned user message that would double-feed the model next time.
@@ -492,6 +522,7 @@ export function registerIpcHandlers(): void {
       const models = listLocalModels(getModelsDir())
       const model = models.find((m) => m.id === activeModelId) ?? models[0]
       if (!model) throw new Error('No model downloaded — open the model manager to download one.')
+      if (!isEngineInstalled()) throw new Error('The AI engine is not installed yet — download it once from the model manager, then try again.')
 
       const config = conns.getConnection(db, connectionId)
       if (!config) throw new Error(`Connection not found: ${connectionId}`)

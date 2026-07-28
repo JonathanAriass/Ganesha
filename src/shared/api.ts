@@ -1,4 +1,4 @@
-import type { IpcResult, LlmTokenEvent, LlmDownloadEvent, LlmContextEvent, SsmOutputEvent, SsmStatusEvent } from './ipc'
+import type { IpcResult, LlmTokenEvent, LlmDownloadEvent, LlmContextEvent, EngineDownloadEvent, SsmOutputEvent, SsmStatusEvent } from './ipc'
 import type { ConnectionInput, HistoryEntryInput, SavedQueryInput, SavedQueryPatch, SessionTab, SsmTunnelInput } from './domain'
 import type { ObjectRef } from './schema'
 import type { FilterQuery } from './query'
@@ -91,9 +91,12 @@ export interface DbClientApi {
     listMessages(conversationId: string): Promise<IpcResult<'llm.messages.list'>>
     send(conversationId: string, connectionId: string, prompt: string, queryText?: string): Promise<IpcResult<'llm.chat.send'>>
     cancel(requestId: string): Promise<IpcResult<'llm.chat.cancel'>>
+    engineStatus(): Promise<IpcResult<'llm.engine.status'>>
+    downloadEngine(): Promise<IpcResult<'llm.engine.download'>>
     onToken(cb: (e: LlmTokenEvent) => void): () => void
     onContext(cb: (e: LlmContextEvent) => void): () => void
     onDownloadProgress(cb: (e: LlmDownloadEvent) => void): () => void
+    onEngineDownload(cb: (e: EngineDownloadEvent) => void): () => void
   }
   ssm: {
     list(): Promise<IpcResult<'ssm.list'>>

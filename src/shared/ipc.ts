@@ -75,6 +75,8 @@ export interface IpcChannels {
   'llm.messages.list': { req: { conversationId: string }; res: LlmMessage[] }
   'llm.chat.send': { req: { conversationId: string; connectionId: string; prompt: string; queryText?: string }; res: { requestId: string } }
   'llm.chat.cancel': { req: { requestId: string }; res: null }
+  'llm.engine.status': { req: void; res: { installed: boolean; version: string } }
+  'llm.engine.download': { req: void; res: null }
   'ssm.list': { req: void; res: SsmTunnel[] }
   'ssm.create': { req: SsmTunnelInput; res: SsmTunnel }
   'ssm.update': { req: { id: string; patch: Partial<SsmTunnelInput> }; res: SsmTunnel }
@@ -92,6 +94,8 @@ export interface IpcChannels {
 export interface LlmTokenEvent { requestId: string; chunk?: string; done?: boolean; error?: string }
 /** main→renderer push payload for model download progress. */
 export interface LlmDownloadEvent { uri: string; receivedBytes?: number; totalBytes?: number; done?: boolean; error?: string }
+/** main→renderer push payload for the on-demand engine-binary download. */
+export interface EngineDownloadEvent { receivedBytes?: number; totalBytes?: number; done?: boolean; error?: string }
 /** One linked-repo file that grounded a chat turn: its path, the table that pulled it in, and the
  *  exact snippet injected into the prompt (so the UI can show what the model actually saw). */
 export interface LlmContextFile { path: string; table: string; snippet: string }
