@@ -39,13 +39,13 @@ jobs:
           # the separate `release` job instead, so GH_TOKEN stays unset and we build
           # with `--publish never`.
           #
-          # ── Sign + notarize later (when an Apple Developer account is available) ──
-          # Add these as repository Actions secrets, then uncomment:
-          # CSC_LINK: ${{ secrets.CSC_LINK }}                              # base64 of the Developer ID .p12
-          # CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          # APPLE_ID: ${{ secrets.APPLE_ID }}
-          # APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # ── Sign + notarize (Developer ID) ── set these as repository Actions secrets.
+          # If they're unset (e.g. a fork), electron-builder skips signing and builds unsigned.
+          CSC_LINK: ${{ secrets.CSC_LINK }}                              # base64 of the Developer ID .p12
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           npm run build
           npx electron-builder --mac --${{ matrix.arch }} --publish never
