@@ -36,12 +36,17 @@ mac:
   artifactName: ${productName}-${version}-${arch}.zip
   # ── Sign + notarize (Developer ID) ──
   # Requires these repo Actions secrets (see release.yml env): CSC_LINK (base64 Developer ID .p12),
-  # CSC_KEY_PASSWORD, APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID. When the secrets are
-  # absent (e.g. a fork), electron-builder skips signing and produces an unsigned build.
+  # CSC_KEY_PASSWORD, APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD. When they're absent (e.g. a fork),
+  # electron-builder skips signing and produces an unsigned build.
   hardenedRuntime: true
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
-  notarize: true
+  # teamId MUST be set here: electron-builder 24.13.3's `notarize: true` shorthand passes
+  # teamId=undefined (it does NOT read APPLE_TEAM_ID from env), so @electron/notarize rejects the
+  # submission with "teamId property is required". The team ID is public (it's embedded in every
+  # signed binary — `codesign -dv` shows TeamIdentifier=…), so hardcoding it in a public repo is fine.
+  notarize:
+    teamId: YP9D4AGW3G
 publish:
   provider: github
   owner: JonathanAriass
