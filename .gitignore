@@ -25,6 +25,14 @@ yarn-error.log*
 .env.local
 .env.*.local
 
+# Code-signing material — NEVER commit (public repo). The Developer ID cert +
+# private key are exported here for the base64 CSC_LINK secret, then live only
+# in GitHub Actions secrets.
+*.p12
+*.cer
+*.certSigningRequest
+*.mobileprovision
+
 # OS cruft
 .DS_Store
 Thumbs.db
