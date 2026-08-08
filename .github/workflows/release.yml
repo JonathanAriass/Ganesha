@@ -21,6 +21,10 @@ jobs:
           - runner: macos-14 # Apple Silicon
             arch: arm64
     runs-on: ${{ matrix.runner }}
+    # notarytool's `--wait` has NO default timeout: if Apple never returns a verdict or the
+    # upload stalls, it hangs until GitHub's 6h job limit. Cap it so a stuck submission fails
+    # fast (~5min build + generous notary wait) instead of burning a 6h runner.
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -35,6 +39,9 @@ jobs:
       - name: Build + package the ${{ matrix.arch }} app
         env:
           NODE_OPTIONS: --max-old-space-size=4096
+          # Surface @electron/notarize's internal logging (the notarytool command + streaming
+          # status) so a stuck/slow notarization is diagnosable live instead of buffered silence.
+          DEBUG: '@electron/notarize*'
           # electron-builder auto-publishes in CI when GH_TOKEN is set — we publish in
           # the separate `release` job instead, so GH_TOKEN stays unset and we build
           # with `--publish never`.
