@@ -86,6 +86,11 @@ const MonacoEditor = forwardRef<MonacoEditorHandle, Props>(function MonacoEditor
       scrollBeyondLastLine: false,
       padding: { top: 8 },
       tabSize: 2,
+      // Auto-show suggestions while typing. Monaco's default already enables this, but we set
+      // it explicitly so our custom async (schema/column IPC) completion providers reliably
+      // trigger on keystrokes — not only on ⌃Space.
+      quickSuggestions: { other: true, comments: false, strings: false },
+      suggestOnTriggerCharacters: true,
       // Render suggest/hover widgets in a body-level container (see above) instead
       // of inside the editor: in our flex layout the editor's own layers AND the
       // results/sidebar panels stacked OVER the widget, occluding the labels.
