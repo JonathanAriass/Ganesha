@@ -18,4 +18,12 @@ describe('settings service', () => {
     setSetting(db, 'bogus', 'x')
     expect(getSettings(db)).toEqual({ theme: 'midnight' })
   })
+  it('preserves any known theme id (not just light)', () => {
+    setSetting(db, 'theme', 'dracula')
+    expect(getSettings(db).theme).toBe('dracula')
+  })
+  it('falls back to the default for an unknown theme value', () => {
+    setSetting(db, 'theme', 'not-a-theme')
+    expect(getSettings(db).theme).toBe('midnight')
+  })
 })

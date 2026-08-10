@@ -1,7 +1,7 @@
 import { copyFileSync, existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import type { DB } from './db'
-import { type AppSettings, DEFAULT_SETTINGS } from '../../shared/domain'
+import { type AppSettings, DEFAULT_SETTINGS, THEMES } from '../../shared/domain'
 import { getDataDir, setDataDir, DB_FILENAME } from './paths'
 import { closeDb } from './db'
 
@@ -21,7 +21,10 @@ export function getSetting(db: DB, key: string): string | null {
 /** Build the typed AppSettings from the key/value rows, falling back to defaults. */
 export function getSettings(db: DB): AppSettings {
   const theme = getSetting(db, 'theme')
-  return { theme: theme === 'light' ? 'light' : DEFAULT_SETTINGS.theme }
+  // Accept any known theme id; unknown/legacy/null values fall back to the default.
+  return {
+    theme: THEMES.some((t) => t.id === theme) ? (theme as AppSettings['theme']) : DEFAULT_SETTINGS.theme
+  }
 }
 
 export function getCurrentDataDir(): string {
