@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { THEMES, type ThemeMeta } from '@shared/domain'
 import { useAppStore } from '../state/store'
 import { useSettings, useSetSetting, useDataDir, useSetDataDir } from '../lib/hooks'
 import { unwrap } from '../lib/result'
@@ -16,6 +17,21 @@ export default function SettingsModal(): JSX.Element {
   useRestoreFocus()
 
   const theme = settings?.theme ?? 'midnight'
+
+  const renderTheme = (t: ThemeMeta): JSX.Element => (
+    <button
+      key={t.id}
+      role="radio"
+      aria-checked={theme === t.id}
+      className={`theme-opt${theme === t.id ? ' active' : ''}`}
+      onClick={() => setSetting.mutate({ key: 'theme', value: t.id })}
+    >
+      <span className="tchip" style={{ background: t.bg }}>
+        <i style={{ background: t.accent }} />
+      </span>
+      {t.label}
+    </button>
+  )
 
   async function changeDataDir(): Promise<void> {
     setPickError(null)
@@ -46,23 +62,15 @@ export default function SettingsModal(): JSX.Element {
           <div className="form-grid">
             <div className="form-row">
               <label>Theme</label>
-              <div className="seg" role="radiogroup" aria-label="Theme">
-                <button
-                  role="radio"
-                  aria-checked={theme === 'midnight'}
-                  className={`seg-btn${theme === 'midnight' ? ' active' : ''}`}
-                  onClick={() => setSetting.mutate({ key: 'theme', value: 'midnight' })}
-                >
-                  Midnight
-                </button>
-                <button
-                  role="radio"
-                  aria-checked={theme === 'light'}
-                  className={`seg-btn${theme === 'light' ? ' active' : ''}`}
-                  onClick={() => setSetting.mutate({ key: 'theme', value: 'light' })}
-                >
-                  Light
-                </button>
+              <div role="radiogroup" aria-label="Theme">
+                <div className="theme-group-label">Dark</div>
+                <div className="theme-list">
+                  {THEMES.filter((t) => t.mode === 'dark').map(renderTheme)}
+                </div>
+                <div className="theme-group-label">Light</div>
+                <div className="theme-list">
+                  {THEMES.filter((t) => t.mode === 'light').map(renderTheme)}
+                </div>
               </div>
             </div>
 

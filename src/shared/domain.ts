@@ -121,8 +121,48 @@ export interface SessionTab {
   active: boolean
 }
 
+/** Every built-in theme id. 'light' is kept (not 'daylight') for backward-compat with
+ *  settings saved before the multi-theme picker existed. */
+export type ThemeId =
+  | 'midnight'
+  | 'light'
+  | 'dracula'
+  | 'nord'
+  | 'tokyo-night'
+  | 'catppuccin-mocha'
+  | 'gruvbox'
+  | 'rose-pine'
+  | 'catppuccin-latte'
+  | 'solarized-light'
+
+export interface ThemeMeta {
+  id: ThemeId
+  label: string
+  mode: 'dark' | 'light'
+  /** App background — the main process paints this as the window's launch color (no flash). */
+  bg: string
+  /** Accent — used for the small swatch in the picker. */
+  accent: string
+}
+
+/** The theme registry: single source of truth for the picker, the ⌘K palette, and the
+ *  launch-background color in main. The actual CSS variables live in styles.css
+ *  (one `:root[data-theme='<id>']` block each) and the editor colors in lib/monaco.ts. */
+export const THEMES: ThemeMeta[] = [
+  { id: 'midnight', label: 'Midnight', mode: 'dark', bg: '#0f1117', accent: '#6366f1' },
+  { id: 'light', label: 'Daylight', mode: 'light', bg: '#f7f8fa', accent: '#4f46e5' },
+  { id: 'dracula', label: 'Dracula', mode: 'dark', bg: '#282a36', accent: '#bd93f9' },
+  { id: 'nord', label: 'Nord', mode: 'dark', bg: '#2e3440', accent: '#88c0d0' },
+  { id: 'tokyo-night', label: 'Tokyo Night', mode: 'dark', bg: '#1a1b26', accent: '#7aa2f7' },
+  { id: 'catppuccin-mocha', label: 'Catppuccin Mocha', mode: 'dark', bg: '#1e1e2e', accent: '#cba6f7' },
+  { id: 'gruvbox', label: 'Gruvbox Dark', mode: 'dark', bg: '#282828', accent: '#fe8019' },
+  { id: 'rose-pine', label: 'Rosé Pine', mode: 'dark', bg: '#191724', accent: '#c4a7e7' },
+  { id: 'catppuccin-latte', label: 'Catppuccin Latte', mode: 'light', bg: '#eff1f5', accent: '#8839ef' },
+  { id: 'solarized-light', label: 'Solarized Light', mode: 'light', bg: '#fdf6e3', accent: '#268bd2' }
+]
+
 export interface AppSettings {
-  theme: 'midnight' | 'light'
+  theme: ThemeId
 }
 
 export const DEFAULT_SETTINGS: AppSettings = { theme: 'midnight' }

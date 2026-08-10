@@ -4,6 +4,7 @@ import { registerIpcHandlers, closeAllTunnels, unloadLlm, stopAllSsmTunnels, sto
 import { installAppMenu } from './menu'
 import { openDb } from './persistence/db'
 import { getSettings } from './persistence/settings'
+import { THEMES } from '../shared/domain'
 
 // ── App identity ──
 // The "Ganesha" display name comes ONLY from electron-builder `productName` (the packaged .app/dmg)
@@ -23,7 +24,8 @@ app.setPath('userData', join(app.getPath('appData'), 'db-client'))
  */
 function windowBackground(): string {
   try {
-    return getSettings(openDb()).theme === 'light' ? '#f7f8fa' : '#0f1117'
+    const theme = getSettings(openDb()).theme
+    return THEMES.find((t) => t.id === theme)?.bg ?? '#0f1117'
   } catch {
     return '#0f1117'
   }

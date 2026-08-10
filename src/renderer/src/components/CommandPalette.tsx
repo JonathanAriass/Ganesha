@@ -1,4 +1,5 @@
 import { Command } from 'cmdk'
+import { THEMES } from '@shared/domain'
 import { useAppStore } from '../state/store'
 import { useConnections, useObjects, useSavedQueries, useSettings, useSetSetting } from '../lib/hooks'
 import { defaultTableQuery } from '../lib/tabquery'
@@ -71,23 +72,26 @@ export default function CommandPalette(): JSX.Element {
                   Open Telescope inspector
                 </Command.Item>
               )}
-              <Command.Item
-                value="action toggle theme"
-                onSelect={() => {
-                  if (!settings) return // theme unknown while loading — don't guess
-                  setSetting.mutate({
-                    key: 'theme',
-                    value: settings.theme === 'light' ? 'midnight' : 'light',
-                  })
-                  close()
-                }}
-              >
-                Toggle theme
-              </Command.Item>
               <Command.Item value="action open settings" onSelect={openSettings}>
                 Open settings
                 <span className="kbd">{mod},</span>
               </Command.Item>
+            </Command.Group>
+
+            <Command.Group heading="Theme">
+              {THEMES.map((t) => (
+                <Command.Item
+                  key={t.id}
+                  value={`theme ${t.label}`}
+                  onSelect={() => {
+                    setSetting.mutate({ key: 'theme', value: t.id })
+                    close()
+                  }}
+                >
+                  Theme: {t.label}
+                  {settings?.theme === t.id && <span className="kbd">current</span>}
+                </Command.Item>
+              ))}
             </Command.Group>
 
             {activeConn && snippets.length > 0 && (

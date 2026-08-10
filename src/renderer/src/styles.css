@@ -74,6 +74,142 @@
   --chat-user-border: #c7d2fe;
 }
 
+/* ── Dracula ── */
+:root[data-theme='dracula'] {
+  color-scheme: dark;
+  --bg: #282a36; --bg-2: #21222c; --bg-3: #343746; --border: #191a21;
+  --text: #f8f8f2; --text-2: #9ca0b8;
+  --accent: #bd93f9; --accent-hover: #caa9fa;
+  --danger: #ff5555; --danger-hover: #ff6e6e; --danger-text: #ff9999;
+  --ok: #50fa7b; --warn: #ffb86c; --warn-border: #ffb86c44;
+  --scroll-thumb: #44475a; --scroll-thumb-hover: #565a73;
+  --btn-hover-bg: #343746; --btn-hover-border: #565a73;
+  --row-odd: #21222c66; --hover-overlay: rgba(255, 255, 255, 0.08);
+  --swatch-ring: #f8f8f2; --modal-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  --json-key: #8be9fd; --json-string: #f1fa8c; --json-number: #bd93f9; --json-bool: #ff79c6;
+  --obj-table: #bd93f9; --obj-view: #8be9fd; --obj-coll: #50fa7b;
+  --chat-user-bg: #44366b; --chat-user-text: #f8f8f2; --chat-user-border: #6a4a9e;
+}
+
+/* ── Nord ── */
+:root[data-theme='nord'] {
+  color-scheme: dark;
+  --bg: #2e3440; --bg-2: #292e39; --bg-3: #3b4252; --border: #3b4252;
+  --text: #eceff4; --text-2: #9aa4b8;
+  --accent: #88c0d0; --accent-hover: #8fbcbb;
+  --danger: #bf616a; --danger-hover: #cf6f78; --danger-text: #d99aa0;
+  --ok: #a3be8c; --warn: #ebcb8b; --warn-border: #ebcb8b44;
+  --scroll-thumb: #434c5e; --scroll-thumb-hover: #4c566a;
+  --btn-hover-bg: #3b4252; --btn-hover-border: #4c566a;
+  --row-odd: #292e3966; --hover-overlay: rgba(255, 255, 255, 0.06);
+  --swatch-ring: #eceff4; --modal-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+  --json-key: #81a1c1; --json-string: #a3be8c; --json-number: #b48ead; --json-bool: #d08770;
+  --obj-table: #81a1c1; --obj-view: #88c0d0; --obj-coll: #a3be8c;
+  --chat-user-bg: #3b4a5a; --chat-user-text: #eceff4; --chat-user-border: #4c6178;
+}
+
+/* ── Tokyo Night ── */
+:root[data-theme='tokyo-night'] {
+  color-scheme: dark;
+  --bg: #1a1b26; --bg-2: #16161e; --bg-3: #24283b; --border: #292e42;
+  --text: #c0caf5; --text-2: #7982a9;
+  --accent: #7aa2f7; --accent-hover: #8fb0f8;
+  --danger: #f7768e; --danger-hover: #f98a9f; --danger-text: #f9a3b4;
+  --ok: #9ece6a; --warn: #e0af68; --warn-border: #e0af6844;
+  --scroll-thumb: #2a2e42; --scroll-thumb-hover: #3b4261;
+  --btn-hover-bg: #24283b; --btn-hover-border: #3b4261;
+  --row-odd: #16161e66; --hover-overlay: rgba(255, 255, 255, 0.06);
+  --swatch-ring: #c0caf5; --modal-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  --json-key: #7dcfff; --json-string: #9ece6a; --json-number: #ff9e64; --json-bool: #bb9af7;
+  --obj-table: #7aa2f7; --obj-view: #7dcfff; --obj-coll: #9ece6a;
+  --chat-user-bg: #2a3158; --chat-user-text: #c0caf5; --chat-user-border: #3d4785;
+}
+
+/* ── Catppuccin Mocha ── */
+:root[data-theme='catppuccin-mocha'] {
+  color-scheme: dark;
+  --bg: #1e1e2e; --bg-2: #181825; --bg-3: #313244; --border: #313244;
+  --text: #cdd6f4; --text-2: #9399b2;
+  --accent: #cba6f7; --accent-hover: #d4b8f9;
+  --danger: #f38ba8; --danger-hover: #f59bb4; --danger-text: #f7b0c4;
+  --ok: #a6e3a1; --warn: #fab387; --warn-border: #fab38744;
+  --scroll-thumb: #45475a; --scroll-thumb-hover: #585b70;
+  --btn-hover-bg: #313244; --btn-hover-border: #585b70;
+  --row-odd: #18182566; --hover-overlay: rgba(255, 255, 255, 0.06);
+  --swatch-ring: #cdd6f4; --modal-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  --json-key: #89b4fa; --json-string: #a6e3a1; --json-number: #fab387; --json-bool: #cba6f7;
+  --obj-table: #89b4fa; --obj-view: #94e2d5; --obj-coll: #a6e3a1;
+  --chat-user-bg: #3a3450; --chat-user-text: #cdd6f4; --chat-user-border: #585175;
+}
+
+/* ── Gruvbox Dark ── */
+:root[data-theme='gruvbox'] {
+  color-scheme: dark;
+  --bg: #282828; --bg-2: #1d2021; --bg-3: #3c3836; --border: #3c3836;
+  --text: #ebdbb2; --text-2: #a89984;
+  --accent: #fe8019; --accent-hover: #ff9642;
+  --danger: #fb4934; --danger-hover: #fc6050; --danger-text: #fd8b80;
+  --ok: #b8bb26; --warn: #fabd2f; --warn-border: #fabd2f44;
+  --scroll-thumb: #504945; --scroll-thumb-hover: #665c54;
+  --btn-hover-bg: #3c3836; --btn-hover-border: #665c54;
+  --row-odd: #1d202166; --hover-overlay: rgba(255, 255, 255, 0.06);
+  --swatch-ring: #ebdbb2; --modal-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  --json-key: #83a598; --json-string: #b8bb26; --json-number: #fabd2f; --json-bool: #d3869b;
+  --obj-table: #fabd2f; --obj-view: #83a598; --obj-coll: #b8bb26;
+  --chat-user-bg: #45403d; --chat-user-text: #ebdbb2; --chat-user-border: #665c54;
+}
+
+/* ── Rosé Pine ── */
+:root[data-theme='rose-pine'] {
+  color-scheme: dark;
+  --bg: #191724; --bg-2: #1f1d2e; --bg-3: #26233a; --border: #26233a;
+  --text: #e0def4; --text-2: #908caa;
+  --accent: #c4a7e7; --accent-hover: #d0b8ec;
+  --danger: #eb6f92; --danger-hover: #ef85a2; --danger-text: #f2a0b6;
+  --ok: #9ccfd8; --warn: #f6c177; --warn-border: #f6c17744;
+  --scroll-thumb: #403d52; --scroll-thumb-hover: #524f67;
+  --btn-hover-bg: #26233a; --btn-hover-border: #524f67;
+  --row-odd: #1f1d2e66; --hover-overlay: rgba(255, 255, 255, 0.05);
+  --swatch-ring: #e0def4; --modal-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  --json-key: #9ccfd8; --json-string: #f6c177; --json-number: #ebbcba; --json-bool: #c4a7e7;
+  --obj-table: #c4a7e7; --obj-view: #9ccfd8; --obj-coll: #31748f;
+  --chat-user-bg: #393552; --chat-user-text: #e0def4; --chat-user-border: #524f67;
+}
+
+/* ── Catppuccin Latte (light) ── */
+:root[data-theme='catppuccin-latte'] {
+  color-scheme: light;
+  --bg: #eff1f5; --bg-2: #ffffff; --bg-3: #e6e9ef; --border: #ccd0da;
+  --text: #4c4f69; --text-2: #6c6f85;
+  --accent: #8839ef; --accent-hover: #7a2fde;
+  --danger: #d20f39; --danger-hover: #b80d32; --danger-text: #b80d32;
+  --ok: #40a02b; --warn: #df8e1d; --warn-border: #df8e1d44;
+  --scroll-thumb: #bcc0cc; --scroll-thumb-hover: #acb0be;
+  --btn-hover-bg: #e6e9ef; --btn-hover-border: #ccd0da;
+  --row-odd: #e6e9ef66; --hover-overlay: rgba(0, 0, 0, 0.05);
+  --swatch-ring: #4c4f69; --modal-shadow: 0 20px 60px rgba(76, 79, 105, 0.18);
+  --json-key: #1e66f5; --json-string: #40a02b; --json-number: #fe640b; --json-bool: #8839ef;
+  --obj-table: #1e66f5; --obj-view: #179299; --obj-coll: #40a02b;
+  --chat-user-bg: #e6dcff; --chat-user-text: #4c4f69; --chat-user-border: #cbb6f5;
+}
+
+/* ── Solarized Light ── */
+:root[data-theme='solarized-light'] {
+  color-scheme: light;
+  --bg: #fdf6e3; --bg-2: #fffef8; --bg-3: #eee8d5; --border: #e5ddc5;
+  --text: #586e75; --text-2: #839496;
+  --accent: #268bd2; --accent-hover: #1a7bc2;
+  --danger: #dc322f; --danger-hover: #c72d2a; --danger-text: #c72d2a;
+  --ok: #859900; --warn: #b58900; --warn-border: #b5890044;
+  --scroll-thumb: #d7cfb8; --scroll-thumb-hover: #c7bfa5;
+  --btn-hover-bg: #eee8d5; --btn-hover-border: #d7cfb8;
+  --row-odd: #eee8d566; --hover-overlay: rgba(0, 0, 0, 0.05);
+  --swatch-ring: #586e75; --modal-shadow: 0 20px 60px rgba(88, 110, 117, 0.18);
+  --json-key: #268bd2; --json-string: #2aa198; --json-number: #d33682; --json-bool: #6c71c4;
+  --obj-table: #268bd2; --obj-view: #2aa198; --obj-coll: #859900;
+  --chat-user-bg: #dcedf7; --chat-user-text: #586e75; --chat-user-border: #b6dcf0;
+}
+
 /* ── Base / reset ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -2909,3 +3045,45 @@ mark.hl {
   color: var(--text-2);
 }
 .tele-legend-item { display: inline-flex; align-items: center; gap: 5px; }
+
+/* ── Theme picker (Settings) ── */
+.theme-group-label {
+  color: var(--text-2);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 10px 0 4px;
+}
+.theme-group-label:first-child { margin-top: 0; }
+.theme-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.theme-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--border);
+  background: var(--bg-3);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: 5px 10px 5px 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.theme-opt:hover { background: var(--btn-hover-bg); border-color: var(--btn-hover-border); }
+.theme-opt.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.theme-opt .tchip {
+  width: 20px;
+  height: 15px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+.theme-opt .tchip i {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
