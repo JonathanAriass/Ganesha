@@ -9,7 +9,29 @@ import { Menu, type MenuItemConstructorOptions } from 'electron'
 export function installAppMenu(): void {
   const isMac = process.platform === 'darwin'
   const template: MenuItemConstructorOptions[] = [
-    ...(isMac ? ([{ role: 'appMenu' }] as MenuItemConstructorOptions[]) : []),
+    // Build the macOS app menu explicitly instead of role: 'appMenu' so the
+    // About/Hide/Quit items read "Ganesha", not app.getName() — which stays
+    // 'db-client' on purpose (renaming it repoints the safeStorage keychain; see
+    // the App identity note in src/main/index.ts). macOS ignores the top-level
+    // label (it shows the bundle name) but honors these explicit item labels.
+    ...(isMac
+      ? ([
+          {
+            label: 'Ganesha',
+            submenu: [
+              { role: 'about', label: 'About Ganesha' },
+              { type: 'separator' },
+              { role: 'services' },
+              { type: 'separator' },
+              { role: 'hide', label: 'Hide Ganesha' },
+              { role: 'hideOthers' },
+              { role: 'unhide' },
+              { type: 'separator' },
+              { role: 'quit', label: 'Quit Ganesha' }
+            ]
+          }
+        ] as MenuItemConstructorOptions[])
+      : []),
     {
       label: 'File',
       submenu: [

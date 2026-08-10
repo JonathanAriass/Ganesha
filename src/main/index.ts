@@ -78,6 +78,15 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  // The native "About" panel and the app-menu items otherwise default to app.getName()
+  // (= 'db-client', kept for safeStorage — see the App identity note above). Override the
+  // shown name here so users see "Ganesha"; this does NOT change app.getName().
+  app.setAboutPanelOptions({
+    applicationName: 'Ganesha',
+    applicationVersion: app.getVersion(),
+    copyright: 'MIT License · © JonathanAriass'
+  })
+
   // Dev: show the Ganesha icon in the dock (packaged builds get it from the .app bundle, which is
   // not present in dev). build/ is a build resource sitting two levels up from out/main.
   if (!app.isPackaged && process.platform === 'darwin') {
