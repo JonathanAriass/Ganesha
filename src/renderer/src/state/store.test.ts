@@ -217,7 +217,7 @@ describe('script run lifecycle', () => {
       text: 'select 1;', result, error: null, skipped: false
     })
     useAppStore.getState().finishScript(tab().id)
-    useAppStore.getState().startRun(tab().id, 'q-9')
+    useAppStore.getState().startRun(tab().id, 'q-9', 'select 1')
     expect(tab().scriptRun).toBeNull() // panel must show the spinner, not stale sections
     useAppStore.getState().finishRun(tab().id, { result })
     const t = tab()
@@ -290,7 +290,7 @@ describe('hydrateTabs', () => {
     expect(s.tabs[0]).toEqual({
       id: 'a', connectionId: 'c1', title: 'Query 1', text: 'SELECT 1', pane: 'left',
       epoch: 0, runOnOpen: false, running: false, queryId: null,
-      result: null, resultQueryId: null, hasMore: false, loadingMore: false,
+      result: null, resultQueryId: null, lastRunText: null, hasMore: false, loadingMore: false,
       filter: '', filterMode: { caseSensitive: false, wholeWord: false, regex: false }, columnFilters: {}, filterView: null,
       error: null, scriptRun: null, edits: {}, editError: null
     })
@@ -494,8 +494,13 @@ describe('staged cell edits', () => {
 
   it('a new run clears staged edits', () => {
     s().setCellEdit(tab().id, '0:1', 'X')
-    s().startRun(tab().id, 'q1')
+    s().startRun(tab().id, 'q1', 'select 1')
     expect(tab().edits).toEqual({})
+  })
+
+  it('startRun records the query text as lastRunText (drives the Refresh button)', () => {
+    s().startRun(tab().id, 'q1', 'select * from users')
+    expect(tab().lastRunText).toBe('select * from users')
   })
 
   it('openCommitModal / closeCommitModal toggle the review modal for a tab', () => {
@@ -716,7 +721,7 @@ describe('split views — close', () => {
 describe('split views — reorderTab (drag-and-drop)', () => {
   const mk = (id: string, connectionId: string, pane: 'left' | 'right') => ({
     id, connectionId, title: id, pane, text: '', epoch: 0, runOnOpen: false, running: false,
-    queryId: null, result: null, resultQueryId: null, hasMore: false, loadingMore: false,
+    queryId: null, result: null, resultQueryId: null, lastRunText: null, hasMore: false, loadingMore: false,
     filter: '', filterMode: { caseSensitive: false, wholeWord: false, regex: false }, columnFilters: {}, filterView: null,
     error: null, scriptRun: null, edits: {}, editError: null,
   })

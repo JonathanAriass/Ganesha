@@ -127,6 +127,9 @@ export interface QueryTabData {
   /** queryId behind the current `result`, kept so `query.fetchMore` can page it (finishRun
    *  nulls `queryId`). null when there's no pageable result. */
   resultQueryId: string | null
+  /** The exact query text behind the current result — re-run by the ↻ Refresh button.
+   *  Set on every single run; null until a query has run in this tab. */
+  lastRunText: string | null
   /** More rows are cached in main past the loaded ones — drives scroll load-more. */
   hasMore: boolean
   /** A load-more fetch is in flight; suppresses duplicate triggers. */
@@ -243,7 +246,7 @@ interface AppState {
   setTabDragging: (dragging: boolean) => void
   /** Focus a pane (no-op if it has no tabs). */
   focusPane: (pane: PaneId) => void
-  startRun: (id: string, queryId: string) => void
+  startRun: (id: string, queryId: string, text: string) => void
   finishRun: (id: string, payload: { result: QueryResult } | { error: string }) => void
   /** Append a scroll-loaded page onto the current result (rows + mongo documents) and update hasMore. */
   appendRows: (id: string, page: { rows: unknown[][]; documents: Record<string, unknown>[] | null; hasMore: boolean }) => void
@@ -323,6 +326,7 @@ function blankTab(fields: {
     queryId: null,
     result: null,
     resultQueryId: null,
+    lastRunText: null,
     hasMore: false,
     loadingMore: false,
     filter: '',
@@ -740,12 +744,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       })
     }),
 
-  startRun: (id, queryId) =>
+  startRun: (id, queryId, text) =>
     set((s) => ({
       tabs: s.tabs.map((t) =>
         // scriptRun cleared: a single run supersedes a previous script's results.
         // Staged edits belong to the old result, so they're dropped on a new run.
-        t.id === id ? { ...t, running: true, error: null, queryId, runOnOpen: false, scriptRun: null, edits: {}, editError: null, resultQueryId: null, hasMore: false, loadingMore: false, filter: '', columnFilters: {}, filterView: null } : t
+        t.id === id ? { ...t, running: true, error: null, queryId, lastRunText: text, runOnOpen: false, scriptRun: null, edits: {}, editError: null, resultQueryId: null, hasMore: false, loadingMore: false, filter: '', columnFilters: {}, filterView: null } : t
       ),
     })),
 

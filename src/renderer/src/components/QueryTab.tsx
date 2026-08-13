@@ -158,11 +158,18 @@ export default function QueryTab({ tab }: Props): JSX.Element {
     if (!text.trim() || tab.running) return
     cancelQuery.reset() // a stale "Cancel failed" must not haunt the next run
     const queryId = crypto.randomUUID()
-    startRun(tab.id, queryId)
+    startRun(tab.id, queryId, text)
     runQuery
       .mutateAsync({ connectionId: tab.connectionId, query: text, queryId })
       .then((result) => finishRun(tab.id, { result }))
       .catch((e) => finishRun(tab.id, { error: e instanceof Error ? e.message : String(e) }))
+  }
+
+  /** Re-run the exact query behind the current results — the ↻ Refresh button. Uses
+   *  lastRunText (not the live editor text), so it reloads the shown rows even if the
+   *  editor has since been edited or the cursor moved. */
+  function refresh(): void {
+    if (tab.lastRunText && !tab.running) run(tab.lastRunText)
   }
 
   /** Run every statement in the tab, top to bottom, stopping at the first error
@@ -300,6 +307,14 @@ export default function QueryTab({ tab }: Props): JSX.Element {
           title={`Run all statements, top to bottom (${mod}⇧↵) — stops at the first error`}
         >
           ▶▶ Run all
+        </button>
+        <button
+          className="btn ghost"
+          disabled={tab.running || !tab.lastRunText}
+          onClick={refresh}
+          title="Refresh — re-run the current query and reload its rows"
+        >
+          ↻ Refresh
         </button>
         <button
           className="btn ghost"
