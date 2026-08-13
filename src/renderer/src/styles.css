@@ -2386,6 +2386,13 @@ mark.hl {
 .monaco-editor .suggest-widget .monaco-list .monaco-list-row.focused .monaco-icon-label,
 .monaco-editor .suggest-widget .monaco-list .monaco-list-row.focused .monaco-highlighted-label .highlight,
 .monaco-editor .suggest-widget .monaco-list .monaco-list-row.focused .details-label { color: #ffffff !important; }
+/* In the body-level overflow container (fixedOverflowWidgets) the suggest widget's inner
+   `.monaco-list` scroll viewport comes out ~6px too short (measured: 14px viewport vs a 20px
+   row Monaco sets inline), clipping the row's bottom — most visible with a single suggestion.
+   Floor the viewport (and its scrollable child) to a full row height so it can never be
+   shorter than one row. 20px = the editor line-height / row height at font-size 13. */
+.monaco-editor .suggest-widget .monaco-list,
+.monaco-editor .suggest-widget .monaco-list .monaco-scrollable-element { min-height: 20px !important; }
 
 /* ── Schema diagram ── */
 .diagram { flex: 1; min-height: 0; display: flex; flex-direction: column; }
