@@ -63,3 +63,17 @@ describe('open/section persistence', () => {
     expect(loadSideSection(s)).toBe('history')
   })
 })
+
+describe('default storage guard (node env)', () => {
+  it('no-arg loads return defaults and no-arg saves do not throw without localStorage', () => {
+    expect(loadSideWidth()).toBe(SIDE_DEFAULT_WIDTH)
+    expect(loadSideOpen()).toBe(true)
+    expect(loadSideSection()).toBe('schema')
+    expect(() => saveSideOpen(true)).not.toThrow()
+  })
+  it('save clamps out-of-range widths', () => {
+    const s = memStorage()
+    saveSideWidth(99999, s)
+    expect(loadSideWidth(s)).toBe(SIDE_MAX_WIDTH)
+  })
+})

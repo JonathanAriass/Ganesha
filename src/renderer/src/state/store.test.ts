@@ -899,3 +899,29 @@ describe('openTelescopeTab', () => {
     expect(active.text).toBe('SELECT 1')
   })
 })
+
+describe('side panel state', () => {
+  it('defaults: open with the schema section', () => {
+    const s = useAppStore.getState()
+    expect(s.sideOpen).toBe(true)
+    expect(s.sideSection).toBe('schema')
+  })
+
+  it('toggleSide flips open', () => {
+    const before = useAppStore.getState().sideOpen
+    useAppStore.getState().toggleSide()
+    expect(useAppStore.getState().sideOpen).toBe(!before)
+    useAppStore.getState().toggleSide()
+    expect(useAppStore.getState().sideOpen).toBe(before)
+  })
+
+  it('selectSideSection: opens when closed, switches when different, collapses on re-click', () => {
+    useAppStore.setState({ sideOpen: false, sideSection: 'schema' })
+    useAppStore.getState().selectSideSection('saved') // closed → open + switch
+    expect(useAppStore.getState()).toMatchObject({ sideOpen: true, sideSection: 'saved' })
+    useAppStore.getState().selectSideSection('history') // open, different → switch
+    expect(useAppStore.getState()).toMatchObject({ sideOpen: true, sideSection: 'history' })
+    useAppStore.getState().selectSideSection('history') // open, same → collapse
+    expect(useAppStore.getState()).toMatchObject({ sideOpen: false, sideSection: 'history' })
+  })
+})

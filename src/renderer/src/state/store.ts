@@ -8,6 +8,7 @@ import { unwrap } from '../lib/result'
 import { type CloseMode } from '../lib/tab-close'
 import { type PaneId, otherPane, normalizePanes, nextActiveInPane, applyPaneClose } from '../lib/panes'
 import { applyTabReorder, applyTabToSide, type TabMove } from '../lib/tab-reorder'
+import { loadSideOpen, saveSideOpen, loadSideSection, saveSideSection, type SideSection } from '../lib/side-panel'
 
 type ConnectionModalState =
   | { mode: 'create' }
@@ -170,6 +171,11 @@ interface AppState {
   setSsmRunning: (ids: string[]) => void
   markSsm: (id: string, running: boolean) => void
 
+  // ── Focus Mode side panel ─────────────────────────────────────────────────
+  /** Focus Mode side panel (rail-opened schema/saved/history). Persisted to localStorage. */
+  sideOpen: boolean
+  sideSection: SideSection
+
   // ── LLM assistant ─────────────────────────────────────────────────────────
   assistantOpen: boolean
   activeConversationId: string | null
@@ -197,6 +203,10 @@ interface AppState {
   /** Open the commit-confirmation review for a tab's staged edits. */
   openCommitModal: (tabId: string) => void
   closeCommitModal: () => void
+
+  toggleSide: () => void
+  /** Rail click: closed → open on that section; open+different → switch; open+same → collapse. */
+  selectSideSection: (section: SideSection) => void
 
   toggleAssistant: () => void
   setActiveConversation: (id: string | null) => void
@@ -364,6 +374,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   commitModal: null,
   ssmOpen: false,
   runningSsm: [],
+  sideOpen: loadSideOpen(),
+  sideSection: loadSideSection(),
   assistantOpen: false,
   activeConversationId: null,
   modelManagerOpen: false,
@@ -417,6 +429,22 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => ({
       runningSsm: running ? [...new Set([...s.runningSsm, id])] : s.runningSsm.filter((x) => x !== id)
     })),
+
+  toggleSide: () =>
+    set((s) => {
+      saveSideOpen(!s.sideOpen)
+      return { sideOpen: !s.sideOpen }
+    }),
+  selectSideSection: (section) =>
+    set((s) => {
+      if (s.sideOpen && s.sideSection === section) {
+        saveSideOpen(false)
+        return { sideOpen: false }
+      }
+      saveSideOpen(true)
+      saveSideSection(section)
+      return { sideOpen: true, sideSection: section }
+    }),
 
   toggleAssistant: () => set((s) => ({ assistantOpen: !s.assistantOpen })),
   setActiveConversation: (id) => set({ activeConversationId: id }),
