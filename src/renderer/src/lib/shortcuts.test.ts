@@ -20,6 +20,11 @@ describe('resolveShortcut', () => {
     expect(resolveShortcut({ ...base, key: 's', ctrlKey: true })).toBe('commit-edits')
   })
 
+  it('⌘B / Ctrl+B toggles the side panel', () => {
+    expect(resolveShortcut({ ...base, key: 'b', metaKey: true })).toBe('toggle-side')
+    expect(resolveShortcut({ ...base, key: 'B', ctrlKey: true })).toBe('toggle-side')
+  })
+
   it('is case-insensitive on the key', () => {
     expect(resolveShortcut({ ...base, key: 'W', metaKey: true })).toBe('close-tab')
   })

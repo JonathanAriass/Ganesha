@@ -901,6 +901,13 @@ describe('openTelescopeTab', () => {
 })
 
 describe('side panel state', () => {
+  // Restore rather than seed: a beforeEach would blind the defaults test to
+  // import-time hydration, while afterEach still leaves no state behind for
+  // later blocks (the last test here ends at sideOpen:false/history).
+  afterEach(() => {
+    useAppStore.setState({ sideOpen: true, sideSection: 'schema' })
+  })
+
   it('defaults: open with the schema section', () => {
     const s = useAppStore.getState()
     expect(s.sideOpen).toBe(true)
