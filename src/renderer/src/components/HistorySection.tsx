@@ -1,7 +1,7 @@
 import { useAppStore } from '../state/store'
 import { useHistory } from '../lib/hooks'
 
-export default function HistorySection(): JSX.Element | null {
+export default function HistorySection({ hosted = false }: { hosted?: boolean } = {}): JSX.Element | null {
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
   const openOrLoadQuery = useAppStore((s) => s.openOrLoadQuery)
 
@@ -9,9 +9,8 @@ export default function HistorySection(): JSX.Element | null {
 
   if (!activeConnectionId) return null
 
-  return (
-    <details className="history">
-      <summary>History</summary>
+  const body = (
+    <>
       {!isLoading && entries && entries.length === 0 && (
         <div className="h-empty">No queries yet</div>
       )}
@@ -43,6 +42,14 @@ export default function HistorySection(): JSX.Element | null {
             </button>
           )
         })}
+    </>
+  )
+
+  if (hosted) return <div className="panel-section">{body}</div>
+  return (
+    <details className="history">
+      <summary>History</summary>
+      {body}
     </details>
   )
 }

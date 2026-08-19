@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useAppStore } from '../state/store'
 import { useSavedQueries, useDeleteSavedQuery } from '../lib/hooks'
 
-export default function SavedSection(): JSX.Element | null {
+export default function SavedSection({ hosted = false }: { hosted?: boolean } = {}): JSX.Element | null {
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
   const openQueryTab = useAppStore((s) => s.openQueryTab)
   const openSaveQueryModal = useAppStore((s) => s.openSaveQueryModal)
@@ -14,9 +14,8 @@ export default function SavedSection(): JSX.Element | null {
 
   if (!activeConnectionId) return null
 
-  return (
-    <details className="history">
-      <summary>Saved</summary>
+  const body = (
+    <>
       {isError && <div className="h-empty">Couldn’t load saved queries</div>}
       {del.isError && (
         <div className="h-empty" role="alert">
@@ -24,7 +23,7 @@ export default function SavedSection(): JSX.Element | null {
         </div>
       )}
       {!isLoading && snippets && snippets.length === 0 && (
-        <div className="h-empty">Nothing saved yet — ☆ Save in the editor toolbar</div>
+        <div className="h-empty">Nothing saved yet — ☆ Save in the command bar</div>
       )}
       {snippets &&
         snippets.map((q) => (
@@ -80,6 +79,14 @@ export default function SavedSection(): JSX.Element | null {
             )}
           </div>
         ))}
+    </>
+  )
+
+  if (hosted) return <div className="panel-section">{body}</div>
+  return (
+    <details className="history">
+      <summary>Saved</summary>
+      {body}
     </details>
   )
 }

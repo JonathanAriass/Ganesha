@@ -31,7 +31,9 @@
   --obj-view: #67e8f9;
   --obj-coll: #86efac;
   --radius: 6px;
-  --topbar-h: 38px;
+  --topbar-h: 46px;
+  --rail-w: 52px;
+  --statusbar-h: 26px;
   --chat-user-bg: #2b3160;
   --chat-user-text: #e3e7f0;
   --chat-user-border: #3a4080;
@@ -434,16 +436,52 @@ button, input, select, textarea {
   background: rgba(239,68,68,0.12);
 }
 
-/* ── Sidebar ── */
-.sidebar {
-  width: 260px;
+/* ── Focus Mode: icon rail + side panel ── */
+.rail {
+  width: var(--rail-w);
   flex-shrink: 0;
   background: var(--bg-2);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  align-items: center;
+  padding: 10px 0;
+  gap: 4px;
 }
+.rail-spacer { flex: 1; }
+.rail-btn {
+  width: 38px; height: 38px;
+  display: grid; place-items: center;
+  background: none; border: none; border-radius: var(--radius);
+  color: var(--text-2); cursor: pointer; position: relative;
+  transition: color 0.12s, background 0.12s;
+}
+.rail-btn:hover { color: var(--text); background: var(--btn-hover-bg); }
+.rail-btn:disabled { opacity: 0.4; cursor: default; }
+.rail-btn.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.rail-btn.active::before {
+  content: ""; position: absolute; left: -7px; top: 50%; transform: translateY(-50%);
+  width: 3px; height: 20px; border-radius: 0 3px 3px 0; background: var(--accent);
+}
+.side-panel {
+  position: relative; flex-shrink: 0;
+  background: var(--bg-2); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; min-height: 0; overflow: hidden;
+}
+.side-head {
+  padding: 8px 12px 6px; font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-2); flex-shrink: 0;
+}
+.side-body { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; }
+.side-resizer {
+  position: absolute; right: 0; top: 0; bottom: 0; width: 6px; z-index: 2;
+  cursor: col-resize; touch-action: none;
+  background: linear-gradient(var(--border), var(--border)) right / 1px 100% no-repeat;
+}
+.side-resizer:hover, .side-resizer:focus-visible {
+  background: linear-gradient(var(--accent), var(--accent)) right / 2px 100% no-repeat; outline: none;
+}
+.panel-section { display: flex; flex-direction: column; }
 
 /* ── Main area ── */
 /* Scoped to the app layout: `.main` is a generic class Monaco also uses for its
@@ -2525,6 +2563,8 @@ mark.hl {
 [data-tooltip]:hover::after { opacity: 1; }
 /* Right-anchor for buttons near the window's right edge so the tooltip can't clip. */
 [data-tooltip][data-tip="right"]::after { left: auto; right: 0; transform: none; }
+/* rail tooltips fly right, not below (the bar is vertical) */
+[data-tip='rail']::after { top: 50%; left: calc(100% + 8px); transform: translateY(-50%); }
 
 /* ── Table info tab ── */
 .ti-view {

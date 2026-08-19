@@ -4,7 +4,8 @@ import type { SsmTunnel } from '@shared/domain'
 import { useAppStore } from './state/store'
 import TopBar from './components/TopBar'
 import Welcome from './components/Welcome'
-import ObjectTree from './components/ObjectTree'
+import Rail from './components/Rail'
+import SidePanel from './components/SidePanel'
 import ConnectionModal from './components/ConnectionModal'
 import SettingsModal from './components/SettingsModal'
 import CommandPalette from './components/CommandPalette'
@@ -12,8 +13,6 @@ import EditorPane from './components/EditorPane'
 import PaneDivider from './components/PaneDivider'
 import { loadPaneFraction } from './lib/pane-split'
 import SsmPanel from './components/SsmPanel'
-import SavedSection from './components/SavedSection'
-import HistorySection from './components/HistorySection'
 import SaveQueryModal from './components/SaveQueryModal'
 import CommitChangesModal from './components/CommitChangesModal'
 import AssistantPanel from './components/AssistantPanel'
@@ -76,13 +75,8 @@ function AppShell(): JSX.Element {
       <TopBar />
       <UpdateBanner />
       <div className="app-body">
-        <aside className="sidebar">
-          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
-            <ObjectTree />
-          </div>
-          <SavedSection />
-          <HistorySection />
-        </aside>
+        <Rail />
+        <SidePanel />
         <main className="main">
           {tabs.length === 0 ? (
             <Welcome />
