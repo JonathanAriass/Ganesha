@@ -8,6 +8,7 @@ import { unwrap } from '../lib/result'
 import { type CloseMode } from '../lib/tab-close'
 import { type PaneId, otherPane, normalizePanes, nextActiveInPane, applyPaneClose } from '../lib/panes'
 import { applyTabReorder, applyTabToSide, type TabMove } from '../lib/tab-reorder'
+import { loadSideOpen, saveSideOpen, loadSideSection, saveSideSection, type SideSection } from '../lib/side-panel'
 
 type ConnectionModalState =
   | { mode: 'create' }
@@ -151,6 +152,8 @@ export interface QueryTabData {
   edits: Record<string, unknown>
   /** Last edit-commit error, shown in the grid's commit bar. */
   editError: string | null
+  /** Last failed Cancel for this tab's in-flight run — shown in the status bar. */
+  cancelError: string | null
 }
 
 interface AppState {
@@ -169,6 +172,11 @@ interface AppState {
   toggleSsm: () => void
   setSsmRunning: (ids: string[]) => void
   markSsm: (id: string, running: boolean) => void
+
+  // ── Focus Mode side panel ─────────────────────────────────────────────────
+  /** Focus Mode side panel (rail-opened schema/saved/history). Persisted to localStorage. */
+  sideOpen: boolean
+  sideSection: SideSection
 
   // ── LLM assistant ─────────────────────────────────────────────────────────
   assistantOpen: boolean
@@ -197,6 +205,10 @@ interface AppState {
   /** Open the commit-confirmation review for a tab's staged edits. */
   openCommitModal: (tabId: string) => void
   closeCommitModal: () => void
+
+  toggleSide: () => void
+  /** Rail click: closed → open on that section; open+different → switch; open+same → collapse. */
+  selectSideSection: (section: SideSection) => void
 
   toggleAssistant: () => void
   setActiveConversation: (id: string | null) => void
@@ -248,6 +260,8 @@ interface AppState {
   focusPane: (pane: PaneId) => void
   startRun: (id: string, queryId: string, text: string) => void
   finishRun: (id: string, payload: { result: QueryResult } | { error: string }) => void
+  /** Record a failed Cancel on the tab whose run it targeted (shown in the status bar). */
+  setCancelError: (tabId: string, message: string) => void
   /** Append a scroll-loaded page onto the current result (rows + mongo documents) and update hasMore. */
   appendRows: (id: string, page: { rows: unknown[][]; documents: Record<string, unknown>[] | null; hasMore: boolean }) => void
   /** Toggle the in-flight flag around a load-more fetch, so duplicate scroll triggers no-op. */
@@ -337,6 +351,7 @@ function blankTab(fields: {
     scriptRun: null,
     edits: {},
     editError: null,
+    cancelError: null,
   }
 }
 
@@ -364,6 +379,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   commitModal: null,
   ssmOpen: false,
   runningSsm: [],
+  sideOpen: loadSideOpen(),
+  sideSection: loadSideSection(),
   assistantOpen: false,
   activeConversationId: null,
   modelManagerOpen: false,
@@ -417,6 +434,22 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => ({
       runningSsm: running ? [...new Set([...s.runningSsm, id])] : s.runningSsm.filter((x) => x !== id)
     })),
+
+  toggleSide: () =>
+    set((s) => {
+      saveSideOpen(!s.sideOpen)
+      return { sideOpen: !s.sideOpen }
+    }),
+  selectSideSection: (section) =>
+    set((s) => {
+      if (s.sideOpen && s.sideSection === section) {
+        saveSideOpen(false)
+        return { sideOpen: false }
+      }
+      saveSideOpen(true)
+      saveSideSection(section)
+      return { sideOpen: true, sideSection: section }
+    }),
 
   toggleAssistant: () => set((s) => ({ assistantOpen: !s.assistantOpen })),
   setActiveConversation: (id) => set({ activeConversationId: id }),
@@ -749,7 +782,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       tabs: s.tabs.map((t) =>
         // scriptRun cleared: a single run supersedes a previous script's results.
         // Staged edits belong to the old result, so they're dropped on a new run.
-        t.id === id ? { ...t, running: true, error: null, queryId, lastRunText: text, runOnOpen: false, scriptRun: null, edits: {}, editError: null, resultQueryId: null, hasMore: false, loadingMore: false, filter: '', columnFilters: {}, filterView: null } : t
+        t.id === id ? { ...t, running: true, error: null, cancelError: null, queryId, lastRunText: text, runOnOpen: false, scriptRun: null, edits: {}, editError: null, resultQueryId: null, hasMore: false, loadingMore: false, filter: '', columnFilters: {}, filterView: null } : t
       ),
     })),
 
@@ -759,9 +792,15 @@ export const useAppStore = create<AppState>((set, get) => ({
         if (t.id !== id) return t
         if ('result' in payload)
           // Keep the finished queryId as resultQueryId so scroll load-more can page it.
-          return { ...t, running: false, queryId: null, resultQueryId: t.queryId, hasMore: payload.result.hasMore ?? false, loadingMore: false, result: payload.result, error: null, scriptRun: null, edits: {}, editError: null }
-        return { ...t, running: false, queryId: null, resultQueryId: null, hasMore: false, loadingMore: false, error: payload.error, result: null, scriptRun: null, edits: {}, editError: null }
+          // cancelError cleared: a cancel-failure message is moot once the run it targeted ends.
+          return { ...t, running: false, queryId: null, resultQueryId: t.queryId, hasMore: payload.result.hasMore ?? false, loadingMore: false, result: payload.result, error: null, cancelError: null, scriptRun: null, edits: {}, editError: null }
+        return { ...t, running: false, queryId: null, resultQueryId: null, hasMore: false, loadingMore: false, error: payload.error, result: null, cancelError: null, scriptRun: null, edits: {}, editError: null }
       }),
+    })),
+
+  setCancelError: (tabId, message) =>
+    set((s) => ({
+      tabs: s.tabs.map((t) => (t.id === tabId ? { ...t, cancelError: message } : t)),
     })),
 
   appendRows: (id, page) =>
@@ -939,6 +978,10 @@ export const useAppStore = create<AppState>((set, get) => ({
               ...t,
               running: true,
               error: null,
+              // A late cancel-IPC rejection can land cancelError on an idle tab
+              // (the run finished before the rejection returned) — don't carry it
+              // into the new script run.
+              cancelError: null,
               result: null,
               queryId: null,
               runOnOpen: false,
@@ -975,6 +1018,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   finishScript: (id) =>
     set((s) => ({
-      tabs: s.tabs.map((t) => (t.id === id ? { ...t, running: false, queryId: null } : t)),
+      // cancelError cleared: the run a failed Cancel targeted is over.
+      tabs: s.tabs.map((t) => (t.id === id ? { ...t, running: false, queryId: null, cancelError: null } : t)),
     })),
 }))

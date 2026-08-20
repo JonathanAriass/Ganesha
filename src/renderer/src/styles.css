@@ -30,8 +30,10 @@
   --obj-table: #a5b4fc;
   --obj-view: #67e8f9;
   --obj-coll: #86efac;
-  --radius: 6px;
-  --topbar-h: 38px;
+  --radius: 7px;
+  --topbar-h: 46px;
+  --rail-w: 52px;
+  --statusbar-h: 26px;
   --chat-user-bg: #2b3160;
   --chat-user-text: #e3e7f0;
   --chat-user-border: #3a4080;
@@ -284,8 +286,8 @@ button, input, select, textarea {
   display: flex;
   align-items: center;
   height: var(--topbar-h);
-  padding: 0 8px;
-  gap: 5px;
+  padding: 0 12px;
+  gap: 8px;
   background: var(--bg-2);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
@@ -434,16 +436,52 @@ button, input, select, textarea {
   background: rgba(239,68,68,0.12);
 }
 
-/* ── Sidebar ── */
-.sidebar {
-  width: 260px;
+/* ── Focus Mode: icon rail + side panel ── */
+.rail {
+  width: var(--rail-w);
   flex-shrink: 0;
   background: var(--bg-2);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  align-items: center;
+  padding: 10px 0;
+  gap: 4px;
 }
+.rail-spacer { flex: 1; }
+.rail-btn {
+  width: 38px; height: 38px;
+  display: grid; place-items: center;
+  background: none; border: none; border-radius: var(--radius);
+  color: var(--text-2); cursor: pointer; position: relative;
+  transition: color 0.12s, background 0.12s;
+}
+.rail-btn:hover { color: var(--text); background: var(--btn-hover-bg); }
+.rail-btn:disabled { opacity: 0.4; cursor: default; }
+.rail-btn.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.rail-btn.active::before {
+  content: ""; position: absolute; left: -7px; top: 50%; transform: translateY(-50%);
+  width: 3px; height: 20px; border-radius: 0 3px 3px 0; background: var(--accent);
+}
+.side-panel {
+  position: relative; flex-shrink: 0;
+  background: var(--bg-2); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; min-height: 0; overflow: hidden;
+}
+.side-head {
+  padding: 8px 12px 6px; font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-2); flex-shrink: 0;
+}
+.side-body { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; }
+.side-resizer {
+  position: absolute; right: 0; top: 0; bottom: 0; width: 6px; z-index: 2;
+  cursor: col-resize; touch-action: none;
+  background: linear-gradient(var(--border), var(--border)) right / 1px 100% no-repeat;
+}
+.side-resizer:hover, .side-resizer:focus-visible {
+  background: linear-gradient(var(--accent), var(--accent)) right / 2px 100% no-repeat; outline: none;
+}
+.panel-section { display: flex; flex-direction: column; }
 
 /* ── Main area ── */
 /* Scoped to the app layout: `.main` is a generic class Monaco also uses for its
@@ -538,9 +576,22 @@ button, input, select, textarea {
   flex: 1 1 0; /* right slot takes the remainder */
 }
 
-.editor-pane.focused .tabbar-wrap {
-  box-shadow: inset 0 2px 0 var(--accent);
+.cmd-cluster { display: flex; align-items: center; gap: 6px; margin-right: 4px; }
+.cmd-divider { width: 1px; height: 20px; background: var(--border); }
+/* subtle focused-pane cue: the command bar drives THIS pane */
+.editor-pane.focused { box-shadow: inset 0 2px 0 var(--accent); }
+
+.statusbar {
+  height: var(--statusbar-h);
+  display: flex; align-items: center; gap: 12px;
+  padding: 0 12px;
+  background: var(--bg-2); border-top: 1px solid var(--border);
+  flex-shrink: 0; font-size: 11.5px; color: var(--text-2); user-select: none;
 }
+.sb-status { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.sb-status.err { color: var(--danger-text); }
+.sb-ok { color: var(--ok); }
+.sb-conn { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 
 .pane-divider {
   flex: 0 0 6px;
@@ -1019,6 +1070,7 @@ input[type="password"]::placeholder {
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  padding-top: 4px;
   /* Breathing room between the server-group row and the query-subtab row. */
   gap: 6px;
 }
@@ -1220,24 +1272,6 @@ input[type="password"]::placeholder {
   min-height: 0;
 }
 
-.qt-toolbar {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-2);
-  flex-shrink: 0;
-}
-
-.qt-status {
-  margin-left: auto;
-  color: var(--text-2);
-  font-size: 12px;
-  white-space: nowrap;
-}
-
 /* Bottom strip shown while a scroll-triggered "load more" page is fetching. */
 .grid-loading-more {
   flex: 0 0 auto;
@@ -1254,22 +1288,6 @@ input[type="password"]::placeholder {
   font-size: 12px;
   color: var(--text-2);
   border-bottom: 1px solid var(--border);
-}
-
-.qt-status.err {
-  color: var(--danger-text);
-}
-
-.conn-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: var(--bg-3);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 2px 8px;
-  font-size: 12px;
-  white-space: nowrap;
 }
 
 .qt-editor-pane {
@@ -1971,21 +1989,6 @@ mark.hl {
 }
 
 /* ── History ── */
-.history {
-  border-top: 1px solid var(--border);
-  max-height: 40%;
-  overflow: auto;
-  flex-shrink: 0;
-}
-
-.history > summary {
-  padding: 8px 10px;
-  font-size: 12px;
-  color: var(--text-2);
-  cursor: pointer;
-  user-select: none;
-}
-
 .history-item {
   display: flex;
   gap: 6px;
@@ -2315,7 +2318,7 @@ mark.hl {
 .ssh-hop-order { font-size: 12px; color: var(--text-2); font-weight: 600; }
 .ssh-key-pick { display: flex; gap: 6px; }
 .ssh-key-pick input { flex: 1; }
-.btn.xs { padding: 2px 6px; font-size: 12px; line-height: 1; }
+.btn.xs { padding: 2px 6px; font-size: 12px; line-height: 1; border-radius: 6px; }
 
 /* ── Assistant panel ── */
 .btn.ghost.active { background: var(--btn-hover-bg); border-color: var(--accent); }
@@ -2324,7 +2327,38 @@ mark.hl {
 /* width comes inline from React (the persisted, drag-set value). The max-width
    guard keeps a wide saved width from clipping the panel / starving the editor
    on a narrow window (leaves room for the sidebar + a usable main area). */
-.assistant-panel { position: relative; display: flex; flex-direction: column; flex-shrink: 0; max-width: calc(100vw - 480px); border-left: 1px solid var(--border); background: var(--bg-2); min-height: 0; }
+/* Accepted overlap: while open, the overlay may cover transient banners
+   (Update/SSM) and the docked SSM panel — by design. */
+.assistant-panel {
+  position: fixed; top: var(--topbar-h); right: 0; bottom: var(--statusbar-h);
+  z-index: 900; /* below modals (1000) and the palette (1100) */
+  display: flex; flex-direction: column; min-height: 0;
+  max-width: calc(100vw - 480px);
+  border-left: 1px solid var(--border); background: var(--bg-2);
+  box-shadow: -14px 0 44px -18px rgba(0, 0, 0, 0.5);
+  transform: translateX(calc(100% + 16px)); /* +16 hides the shadow too */
+  /* visibility keeps the closed panel out of tab order / AT (React 18 has no
+     inert prop); the 0.25s delay lets the slide-out finish before it hides. */
+  visibility: hidden;
+  transition: transform 0.25s cubic-bezier(0.32, 0.72, 0, 1), visibility 0s linear 0.25s;
+}
+.assistant-panel.open {
+  transform: none;
+  visibility: visible; /* immediately on open — only the close is delayed */
+  transition: transform 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  /* both states: .open's own transition outweighs the bare class */
+  .assistant-panel, .assistant-panel.open { transition: none; }
+}
+.assistant-peek {
+  position: fixed; right: 0; top: calc(var(--topbar-h) + 56px); z-index: 899;
+  padding: 12px 6px; background: var(--bg-2); color: var(--accent);
+  border: 1px solid var(--border); border-right: none; border-radius: 8px 0 0 8px;
+  cursor: pointer; box-shadow: -6px 4px 18px -8px rgba(0, 0, 0, 0.45);
+}
+.assistant-peek:hover { background: var(--btn-hover-bg); }
+.assistant-peek-label { writing-mode: vertical-rl; transform: rotate(180deg); font-size: 11px; font-weight: 600; letter-spacing: 0.4px; }
 .assistant-resizer { position: absolute; left: 0; top: 0; bottom: 0; width: 6px; z-index: 2; cursor: col-resize; touch-action: none; background: linear-gradient(var(--border), var(--border)) center / 1px 100% no-repeat; }
 .assistant-resizer:hover, .assistant-resizer:focus-visible { background: linear-gradient(var(--accent), var(--accent)) center / 2px 100% no-repeat; outline: none; }
 
@@ -2519,12 +2553,14 @@ mark.hl {
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
   opacity: 0;
   pointer-events: none;
-  z-index: 200;
+  z-index: 950; /* above the assistant overlay (900); pointer-events: none keeps this safe */
   transition: opacity 0.1s ease 0.3s;
 }
 [data-tooltip]:hover::after { opacity: 1; }
 /* Right-anchor for buttons near the window's right edge so the tooltip can't clip. */
 [data-tooltip][data-tip="right"]::after { left: auto; right: 0; transform: none; }
+/* rail tooltips fly right, not below (the bar is vertical) */
+[data-tip='rail']::after { top: 50%; left: calc(100% + 8px); transform: translateY(-50%); }
 
 /* ── Table info tab ── */
 .ti-view {

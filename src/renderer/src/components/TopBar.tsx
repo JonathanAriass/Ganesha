@@ -1,7 +1,8 @@
 import type { ChangeEvent } from 'react'
 import { useAppStore } from '../state/store'
-import { useConnections, useSsmTunnels, useObjects } from '../lib/hooks'
+import { useConnections, useSsmTunnels, useObjects, useCancelQuery } from '../lib/hooks'
 import { mod } from '../lib/platform'
+import { getTabActions } from '../lib/tab-actions'
 import { Icon } from './icons'
 import logo from '../assets/logo.png'
 
@@ -17,6 +18,16 @@ export default function TopBar(): JSX.Element {
   const runningSsm = useAppStore((s) => s.runningSsm)
   const openDiagramTab = useAppStore((s) => s.openDiagramTab)
   const openTelescopeTab = useAppStore((s) => s.openTelescopeTab)
+  const openSaveQueryModal = useAppStore((s) => s.openSaveQueryModal)
+  const requestScriptStop = useAppStore((s) => s.requestScriptStop)
+  const setCancelError = useAppStore((s) => s.setCancelError)
+  // The tab the command bar drives: the focused pane's active QUERY tab.
+  const tab = useAppStore((s) => {
+    const id = s.activeTabByPane[s.focusedPane]
+    const t = id ? s.tabs.find((x) => x.id === id) ?? null : null
+    return t && (t.kind ?? 'query') === 'query' ? t : null
+  })
+  const cancelQuery = useCancelQuery()
 
   const { data: connections = [] } = useConnections()
   const { data: tunnels = [] } = useSsmTunnels()
@@ -96,6 +107,68 @@ export default function TopBar(): JSX.Element {
       )}
 
       <span className="spacer" />
+
+      {/* Always rendered — buttons disable (not hide) without a focused query tab,
+          so the right-side icons never shift when focus crosses tab kinds. */}
+      <div className="cmd-cluster">
+        <button
+          className="btn xs"
+          disabled={!tab || tab.running || !tab.lastRunText}
+          onClick={() => tab && getTabActions(tab.id)?.refresh()}
+          title="Refresh — re-run the current query"
+          aria-label="Refresh query"
+        >
+          ↻
+        </button>
+        <button
+          className="btn xs"
+          disabled={!tab || !tab.text.trim()}
+          onClick={() =>
+            tab &&
+            openSaveQueryModal({ mode: 'create', connectionId: tab.connectionId, query: tab.text })
+          }
+          title="Save query to favourites"
+          aria-label="Save query to favourites"
+        >
+          ☆
+        </button>
+        <button
+          className="btn xs"
+          disabled={!tab || tab.running || !tab.text.trim()}
+          onClick={() => tab && getTabActions(tab.id)?.runAll()}
+          title={`Run all statements (${mod}⇧↵)`}
+          aria-label="Run all statements"
+        >
+          ▶▶
+        </button>
+        <div className="cmd-divider" aria-hidden="true" />
+        {tab?.running && tab.queryId ? (
+          <button
+            className="btn xs"
+            onClick={() => {
+              const tabId = tab.id // capture: the error must land on the clicked tab, not the focus at rejection time
+              if (tab.scriptRun) requestScriptStop(tabId)
+              cancelQuery.mutate(
+                { connectionId: tab.connectionId, queryId: tab.queryId! },
+                { onError: (e) => setCancelError(tabId, e instanceof Error ? e.message : String(e)) }
+              )
+            }}
+            aria-label="Cancel query"
+          >
+            Cancel
+          </button>
+        ) : (
+          <button
+            className="btn xs primary"
+            disabled={!tab || tab.running || !tab.text.trim()}
+            onClick={() => tab && getTabActions(tab.id)?.run()}
+            title={`Run (${mod}↵) — selection, else statement at cursor`}
+            aria-label="Run query"
+          >
+            ▶ Run
+          </button>
+        )}
+      </div>
 
       <button className="icon-btn" onClick={() => openModal({ mode: 'create' })} aria-label="New connection" data-tooltip="New connection" data-tip="right">
         <Icon name="plus" />

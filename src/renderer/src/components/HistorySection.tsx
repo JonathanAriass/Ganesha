@@ -10,8 +10,7 @@ export default function HistorySection(): JSX.Element | null {
   if (!activeConnectionId) return null
 
   return (
-    <details className="history">
-      <summary>History</summary>
+    <div className="panel-section">
       {!isLoading && entries && entries.length === 0 && (
         <div className="h-empty">No queries yet</div>
       )}
@@ -43,6 +42,6 @@ export default function HistorySection(): JSX.Element | null {
             </button>
           )
         })}
-    </details>
+    </div>
   )
 }

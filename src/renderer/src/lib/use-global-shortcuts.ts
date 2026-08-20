@@ -56,6 +56,9 @@ export function useGlobalShortcuts(): void {
         case 'close-tab':
           if (s.activeTabId) s.closeTab(s.activeTabId)
           break
+        case 'toggle-side':
+          s.toggleSide()
+          break
         case 'commit-edits': {
           // ⌘S reviews+commits staged results-grid edits — it opens the confirmation
           // modal (the actual write happens on Confirm) rather than committing silently.

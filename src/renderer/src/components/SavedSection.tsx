@@ -15,8 +15,7 @@ export default function SavedSection(): JSX.Element | null {
   if (!activeConnectionId) return null
 
   return (
-    <details className="history">
-      <summary>Saved</summary>
+    <div className="panel-section">
       {isError && <div className="h-empty">Couldn’t load saved queries</div>}
       {del.isError && (
         <div className="h-empty" role="alert">
@@ -24,7 +23,7 @@ export default function SavedSection(): JSX.Element | null {
         </div>
       )}
       {!isLoading && snippets && snippets.length === 0 && (
-        <div className="h-empty">Nothing saved yet — ☆ Save in the editor toolbar</div>
+        <div className="h-empty">Nothing saved yet — ☆ Save in the command bar</div>
       )}
       {snippets &&
         snippets.map((q) => (
@@ -80,6 +79,6 @@ export default function SavedSection(): JSX.Element | null {
             )}
           </div>
         ))}
-    </details>
+    </div>
   )
 }

@@ -12,13 +12,15 @@ interface ObjectNodeProps {
   connectionId: string
   obj: DbObject
   query: string
+  /** Columns shown for this node. Owned by ObjectTree (not local state) because the
+   *  right-click menu — the only way to toggle it — renders in the parent. */
+  expanded: boolean
   onDoubleClick: (obj: DbObject) => void
   onContextMenu: (obj: DbObject, x: number, y: number) => void
   onInfo: (obj: DbObject) => void
 }
 
-function ObjectNode({ connectionId, obj, query, onDoubleClick, onContextMenu, onInfo }: ObjectNodeProps): JSX.Element {
-  const [expanded, setExpanded] = useState(false)
+function ObjectNode({ connectionId, obj, query, expanded, onDoubleClick, onContextMenu, onInfo }: ObjectNodeProps): JSX.Element {
   const ref = { schema: obj.schema, name: obj.name }
 
   const {
@@ -33,11 +35,8 @@ function ObjectNode({ connectionId, obj, query, onDoubleClick, onContextMenu, on
     <div className="tree-node">
       <button
         className="tree-row"
-        onClick={(e) => {
-          // Clicks that are part of a double-click would toggle twice before onDoubleClick fires.
-          if (e.detail > 1) return
-          setExpanded((ex) => !ex)
-        }}
+        // Single click deliberately does nothing: columns open only via the right-click
+        // menu's "View columns description" (accidental expansion was too easy).
         onDoubleClick={() => onDoubleClick(obj)}
         onContextMenu={(e) => {
           e.preventDefault()
@@ -133,8 +132,27 @@ export default function ObjectTree(): JSX.Element {
   const activeConn = connections.find((c) => c.id === activeConnectionId)
 
   const [query, setQuery] = useState('')
-  // Objects differ per connection — a stale filter would hide everything.
-  useEffect(() => setQuery(''), [activeConnectionId])
+  // Which nodes show their columns, keyed `schema:name`. Toggled ONLY from the
+  // right-click menu ("View columns description") — row clicks never expand.
+  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set())
+  // Objects differ per connection — a stale filter would hide everything, and
+  // expanded keys would leak onto same-named tables of the next connection.
+  useEffect(() => {
+    setQuery('')
+    setExpandedKeys(new Set())
+  }, [activeConnectionId])
+
+  const keyOf = (o: DbObject): string => `${o.schema ?? ''}:${o.name}`
+
+  function toggleColumns(obj: DbObject): void {
+    setExpandedKeys((prev) => {
+      const next = new Set(prev)
+      if (next.has(keyOf(obj))) next.delete(keyOf(obj))
+      else next.add(keyOf(obj))
+      return next
+    })
+    setMenu(null)
+  }
 
   // Sort order is a global preference (survives connection switches + restarts), not per-connection.
   const [sortMode, setSortMode] = useState<SortMode>(() => loadSortMode())
@@ -166,6 +184,9 @@ export default function ObjectTree(): JSX.Element {
       onContextMenu={(e) => { e.preventDefault(); setMenu(null) }}
     >
       <div className="tab-menu" role="menu" style={{ left: menu.x, top: menu.y }} onMouseDown={(e) => e.stopPropagation()}>
+        <button className="tab-menu-item" role="menuitem" onClick={() => toggleColumns(menu.obj)}>
+          {expandedKeys.has(keyOf(menu.obj)) ? 'Hide columns description' : 'View columns description'}
+        </button>
         <button className="tab-menu-item" role="menuitem" onClick={() => handleTableInfo(menu.obj)}>Table info</button>
         <button className="tab-menu-item" role="menuitem" onClick={() => { handleDoubleClick(menu.obj); setMenu(null) }}>Open query</button>
       </div>
@@ -258,10 +279,11 @@ export default function ObjectTree(): JSX.Element {
         {filterBar}
         {filtered.map((obj) => (
           <ObjectNode
-            key={`${obj.schema ?? ''}:${obj.name}`}
+            key={keyOf(obj)}
             connectionId={activeConnectionId}
             obj={obj}
             query={query}
+            expanded={expandedKeys.has(keyOf(obj))}
             onDoubleClick={handleDoubleClick}
             onContextMenu={(o, x, y) => setMenu({ obj: o, x, y })}
             onInfo={handleTableInfo}
@@ -293,10 +315,11 @@ export default function ObjectTree(): JSX.Element {
           )}
           {objs.map((obj) => (
             <ObjectNode
-              key={`${obj.schema ?? ''}:${obj.name}`}
+              key={keyOf(obj)}
               connectionId={activeConnectionId}
               obj={obj}
               query={query}
+              expanded={expandedKeys.has(keyOf(obj))}
               onDoubleClick={handleDoubleClick}
               onContextMenu={(o, x, y) => setMenu({ obj: o, x, y })}
               onInfo={handleTableInfo}
