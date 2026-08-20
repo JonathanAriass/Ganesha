@@ -978,6 +978,10 @@ export const useAppStore = create<AppState>((set, get) => ({
               ...t,
               running: true,
               error: null,
+              // A late cancel-IPC rejection can land cancelError on an idle tab
+              // (the run finished before the rejection returned) — don't carry it
+              // into the new script run.
+              cancelError: null,
               result: null,
               queryId: null,
               runOnOpen: false,

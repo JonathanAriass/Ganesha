@@ -287,6 +287,15 @@ describe('cancel-error surfacing', () => {
     useAppStore.getState().finishScript(tabs()[0].id)
     expect(tabs()[0].cancelError).toBeNull()
   })
+
+  it('startScript clears a stale cancelError (late cancel-rejection landed on an idle tab)', () => {
+    // Race: Cancel clicked → the run finishes naturally (finishRun clears) → the cancel
+    // IPC rejects late, setting cancelError on the now-idle tab. The next Run-all must
+    // not show the stale failure for its whole duration.
+    useAppStore.getState().setCancelError(tabs()[0].id, 'Atlas refused killOp')
+    useAppStore.getState().startScript(tabs()[0].id, 2, 'run-1')
+    expect(tabs()[0].cancelError).toBeNull()
+  })
 })
 
 describe('renameTab', () => {
