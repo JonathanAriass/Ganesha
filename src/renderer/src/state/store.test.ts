@@ -233,6 +233,62 @@ describe('script run lifecycle', () => {
   })
 })
 
+describe('cancel-error surfacing', () => {
+  const result = {
+    columns: [{ name: 'a', dataType: null }],
+    rows: [[1]],
+    rowCount: 1,
+    durationMs: 5,
+    truncated: false,
+    documents: null,
+    editable: null
+  }
+
+  beforeEach(() => {
+    useAppStore.setState({
+      tabs: [], activeTabId: null, _queryCounter: 0,
+      focusedPane: 'left', activeTabByPane: { left: null, right: null }, activeConnByPane: { left: null, right: null },
+    })
+    useAppStore.getState().openQueryTab({ connectionId: 'c1', text: 'select 1' })
+    useAppStore.getState().openQueryTab({ connectionId: 'c1', text: 'select 2' })
+  })
+
+  const tabs = () => useAppStore.getState().tabs
+
+  it('setCancelError sets the message on the targeted tab only', () => {
+    useAppStore.getState().setCancelError(tabs()[0].id, 'Atlas refused killOp')
+    expect(tabs()[0].cancelError).toBe('Atlas refused killOp')
+    expect(tabs()[1].cancelError).toBeNull()
+  })
+
+  it('startRun clears a stale cancelError', () => {
+    useAppStore.getState().setCancelError(tabs()[0].id, 'Atlas refused killOp')
+    useAppStore.getState().startRun(tabs()[0].id, 'q1', 'select 1')
+    expect(tabs()[0].cancelError).toBeNull()
+  })
+
+  it('finishRun clears it — the run the Cancel targeted is over (result branch)', () => {
+    useAppStore.getState().startRun(tabs()[0].id, 'q1', 'select 1')
+    useAppStore.getState().setCancelError(tabs()[0].id, 'Atlas refused killOp')
+    useAppStore.getState().finishRun(tabs()[0].id, { result })
+    expect(tabs()[0].cancelError).toBeNull()
+  })
+
+  it('finishRun clears it on the error branch too', () => {
+    useAppStore.getState().startRun(tabs()[0].id, 'q1', 'select 1')
+    useAppStore.getState().setCancelError(tabs()[0].id, 'Atlas refused killOp')
+    useAppStore.getState().finishRun(tabs()[0].id, { error: 'boom' })
+    expect(tabs()[0].cancelError).toBeNull()
+  })
+
+  it('finishScript clears it when a Run-all ends', () => {
+    useAppStore.getState().startScript(tabs()[0].id, 2, 'run-1')
+    useAppStore.getState().setCancelError(tabs()[0].id, 'Atlas refused killOp')
+    useAppStore.getState().finishScript(tabs()[0].id)
+    expect(tabs()[0].cancelError).toBeNull()
+  })
+})
+
 describe('renameTab', () => {
   beforeEach(() => {
     useAppStore.setState({
@@ -292,7 +348,7 @@ describe('hydrateTabs', () => {
       epoch: 0, runOnOpen: false, running: false, queryId: null,
       result: null, resultQueryId: null, lastRunText: null, hasMore: false, loadingMore: false,
       filter: '', filterMode: { caseSensitive: false, wholeWord: false, regex: false }, columnFilters: {}, filterView: null,
-      error: null, scriptRun: null, edits: {}, editError: null
+      error: null, scriptRun: null, edits: {}, editError: null, cancelError: null
     })
     expect(s.activeTabId).toBe('b')
   })
@@ -723,7 +779,7 @@ describe('split views — reorderTab (drag-and-drop)', () => {
     id, connectionId, title: id, pane, text: '', epoch: 0, runOnOpen: false, running: false,
     queryId: null, result: null, resultQueryId: null, lastRunText: null, hasMore: false, loadingMore: false,
     filter: '', filterMode: { caseSensitive: false, wholeWord: false, regex: false }, columnFilters: {}, filterView: null,
-    error: null, scriptRun: null, edits: {}, editError: null,
+    error: null, scriptRun: null, edits: {}, editError: null, cancelError: null,
   })
 
   it('reorders within a pane and keeps the tab active', () => {

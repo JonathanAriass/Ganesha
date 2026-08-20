@@ -20,6 +20,7 @@ export default function TopBar(): JSX.Element {
   const openTelescopeTab = useAppStore((s) => s.openTelescopeTab)
   const openSaveQueryModal = useAppStore((s) => s.openSaveQueryModal)
   const requestScriptStop = useAppStore((s) => s.requestScriptStop)
+  const setCancelError = useAppStore((s) => s.setCancelError)
   // The tab the command bar drives: the focused pane's active QUERY tab.
   const tab = useAppStore((s) => {
     const id = s.activeTabByPane[s.focusedPane]
@@ -144,8 +145,12 @@ export default function TopBar(): JSX.Element {
           <button
             className="btn xs"
             onClick={() => {
-              if (tab.scriptRun) requestScriptStop(tab.id)
-              cancelQuery.mutate({ connectionId: tab.connectionId, queryId: tab.queryId! })
+              const tabId = tab.id // capture: the error must land on the clicked tab, not the focus at rejection time
+              if (tab.scriptRun) requestScriptStop(tabId)
+              cancelQuery.mutate(
+                { connectionId: tab.connectionId, queryId: tab.queryId! },
+                { onError: (e) => setCancelError(tabId, e instanceof Error ? e.message : String(e)) }
+              )
             }}
             aria-label="Cancel query"
           >

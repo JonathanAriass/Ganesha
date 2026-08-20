@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/reac
 import type { SsmTunnel } from '@shared/domain'
 import { useAppStore } from './state/store'
 import TopBar from './components/TopBar'
+import StatusBar from './components/StatusBar'
 import Welcome from './components/Welcome'
 import Rail from './components/Rail'
 import SidePanel from './components/SidePanel'
@@ -97,6 +98,7 @@ function AppShell(): JSX.Element {
         <AssistantPanel />
         <SsmPanel />
       </div>
+      <StatusBar />
       {connectionModal && <ConnectionModal />}
       {settingsOpen && <SettingsModal />}
       {paletteOpen && <CommandPalette />}

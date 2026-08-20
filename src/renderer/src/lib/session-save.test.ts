@@ -7,7 +7,7 @@ const base = (over: Partial<QueryTabData> & { id: string; connectionId: string; 
   title: 'Q', text: 't', kind: undefined, epoch: 0, runOnOpen: false, running: false,
   queryId: null, result: null, resultQueryId: null, lastRunText: null, hasMore: false, loadingMore: false,
   filter: '', filterMode: { caseSensitive: false, wholeWord: false, regex: false }, columnFilters: {}, filterView: null,
-  error: null, scriptRun: null, edits: {}, editError: null, ...over,
+  error: null, scriptRun: null, edits: {}, editError: null, cancelError: null, ...over,
 })
 
 describe('toSessionTabs', () => {
