@@ -580,6 +580,10 @@ button, input, select, textarea {
   box-shadow: inset 0 2px 0 var(--accent);
 }
 
+.cmd-cluster { display: flex; align-items: center; gap: 6px; margin-right: 4px; }
+/* subtle focused-pane cue: the command bar drives THIS pane */
+.editor-pane.focused { box-shadow: inset 0 2px 0 var(--accent); }
+
 .pane-divider {
   flex: 0 0 6px;
   cursor: col-resize;

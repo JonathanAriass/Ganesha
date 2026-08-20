@@ -1,15 +1,14 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { QueryTabData } from '../state/store'
 import { useAppStore } from '../state/store'
-import { useConnections, useRunQuery, useCancelQuery, useObjects, useDatabases } from '../lib/hooks'
+import { useConnections, useRunQuery, useObjects, useDatabases } from '../lib/hooks'
 import MonacoEditor, { type MonacoEditorHandle } from './MonacoEditor'
 import ResultsPanel from './ResultsPanel'
 import type { ConnectionType } from '@shared/domain'
 import type { ObjectRef } from '@shared/schema'
-import { mod } from '../lib/platform'
-import { rowCountLabel, affectedRowsLabel } from '../lib/result-label'
 import { unwrap } from '../lib/result'
+import { setTabActions, clearTabActions } from '../lib/tab-actions'
 import type { CompletionCtx } from '../lib/monaco-completions'
 import {
   splitSqlStatements,
@@ -48,15 +47,12 @@ export default function QueryTab({ tab }: Props): JSX.Element {
   const setTabText = useAppStore((s) => s.setTabText)
   const startRun = useAppStore((s) => s.startRun)
   const finishRun = useAppStore((s) => s.finishRun)
-  const openSaveQueryModal = useAppStore((s) => s.openSaveQueryModal)
   const startScript = useAppStore((s) => s.startScript)
-  const requestScriptStop = useAppStore((s) => s.requestScriptStop)
   const scriptStatementStart = useAppStore((s) => s.scriptStatementStart)
   const scriptStatementDone = useAppStore((s) => s.scriptStatementDone)
   const finishScript = useAppStore((s) => s.finishScript)
 
   const runQuery = useRunQuery()
-  const cancelQuery = useCancelQuery()
 
   const { data: objects = [] } = useObjects(tab.connectionId)
   // Database/schema name suggestions are SQL-only; Mongo completes databases via getSiblingDB.
@@ -156,7 +152,6 @@ export default function QueryTab({ tab }: Props): JSX.Element {
     const text = textOverride ?? runnableText()
     // Re-checks live tab.running each render (run is recreated per render) — keep that if memoizing.
     if (!text.trim() || tab.running) return
-    cancelQuery.reset() // a stale "Cancel failed" must not haunt the next run
     const queryId = crypto.randomUUID()
     startRun(tab.id, queryId, text)
     runQuery
@@ -171,6 +166,18 @@ export default function QueryTab({ tab }: Props): JSX.Element {
   function refresh(): void {
     if (tab.lastRunText && !tab.running) run(tab.lastRunText)
   }
+
+  // Expose run handlers to the global command bar (TopBar). Ref-thunk so the
+  // registry always sees this render's closures; registered once per mount.
+  // useLayoutEffect (not useEffect): registration must precede the first paint
+  // so a command-bar click can never land in an unregistered window.
+  const actionsRef = useRef({ run: () => run(), runAll: () => void runAll(), refresh })
+  actionsRef.current = { run: () => run(), runAll: () => void runAll(), refresh }
+  useLayoutEffect(() => {
+    setTabActions(tab.id, () => actionsRef.current)
+    return () => clearTabActions(tab.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tab.id is stable for a mounted tab
+  }, [])
 
   /** Run every statement in the tab, top to bottom, stopping at the first error
    *  (later statements report as skipped — scripts assume their predecessors ran).
@@ -197,7 +204,6 @@ export default function QueryTab({ tab }: Props): JSX.Element {
         return
       }
     }
-    cancelQuery.reset()
     startScript(tab.id, statements.length, crypto.randomUUID())
     let failed = false
     for (const st of statements) {
@@ -243,118 +249,8 @@ export default function QueryTab({ tab }: Props): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: auto-run once on mount
   }, [])
 
-  let statusEl: JSX.Element | null = null
-  if (tab.running) {
-    const label = tab.scriptRun
-      ? `Running statement ${Math.min(tab.scriptRun.entries.length + 1, tab.scriptRun.total)} of ${tab.scriptRun.total}…`
-      : 'Running…'
-    // A Cancel that silently does nothing is worse than no button — some servers
-    // (e.g. Atlas free tier) refuse $currentOp/killOp, so surface the failure.
-    statusEl = (
-      <>
-        <span className="qt-status">{label}</span>
-        {cancelQuery.isError && (
-          <span className="qt-status err">
-            {cancelQuery.error instanceof Error ? cancelQuery.error.message : String(cancelQuery.error)}
-          </span>
-        )}
-      </>
-    )
-  } else if (tab.scriptRun) {
-    const { entries, total } = tab.scriptRun
-    const failedAt = entries.findIndex((e) => e.error !== null)
-    const ran = entries.filter((e) => !e.skipped).length
-    const ms = entries.reduce((acc, e) => acc + (e.result?.durationMs ?? 0), 0)
-    statusEl =
-      failedAt !== -1 ? (
-        <span className="qt-status err">failed at statement {failedAt + 1} of {total}</span>
-      ) : ran < total ? (
-        // Cancel landed between statements: nothing errored, the rest skipped.
-        <span className="qt-status err">canceled — ran {ran} of {total} statements</span>
-      ) : (
-        <span className="qt-status">
-          {total} statements · {ms} ms
-        </span>
-      )
-  } else if (tab.result) {
-    // No columns = a write/command — label the affected-row count, not "N rows".
-    const label =
-      tab.result.columns.length === 0 ? affectedRowsLabel(tab.result) : rowCountLabel(tab.result)
-    statusEl = (
-      <span className="qt-status">
-        {label} · {tab.result.durationMs} ms
-      </span>
-    )
-  } else if (tab.error) {
-    statusEl = <span className="qt-status err">{tab.error}</span>
-  }
-
   return (
     <div className="querytab" ref={containerRef}>
-      <div className="qt-toolbar">
-        <button
-          className="btn primary"
-          disabled={tab.running || !tab.text.trim()}
-          onClick={() => run()}
-          title={`Run (${mod}↵) — runs the selection, else the statement at the cursor`}
-        >
-          ▶ Run
-        </button>
-        <button
-          className="btn"
-          disabled={tab.running || !tab.text.trim()}
-          onClick={() => void runAll()}
-          title={`Run all statements, top to bottom (${mod}⇧↵) — stops at the first error`}
-        >
-          ▶▶ Run all
-        </button>
-        <button
-          className="btn ghost"
-          disabled={tab.running || !tab.lastRunText}
-          onClick={refresh}
-          title="Refresh — re-run the current query and reload its rows"
-        >
-          ↻ Refresh
-        </button>
-        <button
-          className="btn ghost"
-          disabled={!tab.text.trim()}
-          onClick={() =>
-            openSaveQueryModal({ mode: 'create', connectionId: tab.connectionId, query: tab.text })
-          }
-          title="Save query to favourites"
-        >
-          ☆ Save
-        </button>
-        {/* All drivers cancel for real now: pg_cancel_backend / KILL QUERY /
-            mongo killOp on the comment-tagged op. */}
-        {tab.running && tab.queryId && (
-          <button
-            className="btn ghost"
-            onClick={() => {
-              // For scripts, also request a boundary stop — this render's
-              // queryId may belong to a statement that just finished, and the
-              // drivers no-op (successfully) on ids they no longer know.
-              if (tab.scriptRun) requestScriptStop(tab.id)
-              cancelQuery.mutate({ connectionId: tab.connectionId, queryId: tab.queryId! })
-            }}
-          >
-            Cancel
-          </button>
-        )}
-        {connection && (
-          <span className="conn-chip">
-            <span
-              className="conn-dot"
-              style={{ background: connection.color, width: 8, height: 8 }}
-              aria-hidden="true"
-            />
-            {connection.name}
-            {connection.readOnly && ' 🔒'}
-          </span>
-        )}
-        {statusEl}
-      </div>
       <div
         className="qt-editor-pane"
         ref={editorPaneRef}
