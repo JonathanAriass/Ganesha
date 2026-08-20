@@ -135,15 +135,24 @@ export default function AssistantPanel(): JSX.Element | null {
 
   function stop(): void { if (reqRef.current) void window.api.llm.cancel(reqRef.current) }
 
-  if (!open) return null
-
   const hasModel = (models?.downloaded.length ?? 0) > 0
   // Default true while the status query loads (main enforces the real gate) to avoid input flicker.
   const engineReady = engine?.installed ?? true
   const ready = hasModel && engineReady
 
   return (
-    <aside className="assistant-panel" ref={panelRef} style={{ width }}>
+    <>
+      {!open && (
+        <button className="assistant-peek" onClick={toggle} aria-label="Open assistant">
+          <span className="assistant-peek-label">✦ Assistant</span>
+        </button>
+      )}
+      <aside
+        className={`assistant-panel${open ? ' open' : ''}`}
+        ref={panelRef}
+        style={{ width }}
+        aria-hidden={!open}
+      >
       <div
         className="assistant-resizer"
         role="separator"
@@ -176,7 +185,17 @@ export default function AssistantPanel(): JSX.Element | null {
           {(conversations ?? []).map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
         </select>
         <button className="btn ghost xs" onClick={openModelManager} title="Manage models">⚙</button>
-        <button className="btn ghost xs" onClick={toggle} aria-label="Close assistant">✕</button>
+        <button
+          className="btn ghost xs"
+          onClick={() => {
+            // Focus can't stay inside an aria-hidden subtree (the ✕ itself holds it post-click).
+            ;(document.activeElement as HTMLElement | null)?.blur()
+            toggle()
+          }}
+          aria-label="Close assistant"
+        >
+          ✕
+        </button>
       </div>
 
       {!connectionId && <div className="assistant-empty">Select a connection to get schema-aware suggestions.</div>}
@@ -249,6 +268,7 @@ export default function AssistantPanel(): JSX.Element | null {
           ? <button className="btn" onClick={stop}>Stop</button>
           : <button className="btn primary" onClick={() => void send()} disabled={!connectionId || !ready || !draft.trim()}>Send</button>}
       </div>
-    </aside>
+      </aside>
+    </>
   )
 }

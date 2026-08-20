@@ -2377,7 +2377,25 @@ mark.hl {
 /* width comes inline from React (the persisted, drag-set value). The max-width
    guard keeps a wide saved width from clipping the panel / starving the editor
    on a narrow window (leaves room for the sidebar + a usable main area). */
-.assistant-panel { position: relative; display: flex; flex-direction: column; flex-shrink: 0; max-width: calc(100vw - 480px); border-left: 1px solid var(--border); background: var(--bg-2); min-height: 0; }
+.assistant-panel {
+  position: fixed; top: var(--topbar-h); right: 0; bottom: var(--statusbar-h);
+  z-index: 900; /* below modals (1000) and the palette (1100) */
+  display: flex; flex-direction: column; min-height: 0;
+  max-width: calc(100vw - 480px);
+  border-left: 1px solid var(--border); background: var(--bg-2);
+  box-shadow: -14px 0 44px -18px rgba(0, 0, 0, 0.5);
+  transform: translateX(calc(100% + 16px)); /* +16 hides the shadow too */
+  transition: transform 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.assistant-panel.open { transform: none; }
+.assistant-peek {
+  position: fixed; right: 0; top: calc(var(--topbar-h) + 56px); z-index: 899;
+  padding: 12px 6px; background: var(--bg-2); color: var(--accent);
+  border: 1px solid var(--border); border-right: none; border-radius: 8px 0 0 8px;
+  cursor: pointer; box-shadow: -6px 4px 18px -8px rgba(0, 0, 0, 0.45);
+}
+.assistant-peek:hover { background: var(--btn-hover-bg); }
+.assistant-peek-label { writing-mode: vertical-rl; transform: rotate(180deg); font-size: 11px; font-weight: 600; letter-spacing: 0.4px; }
 .assistant-resizer { position: absolute; left: 0; top: 0; bottom: 0; width: 6px; z-index: 2; cursor: col-resize; touch-action: none; background: linear-gradient(var(--border), var(--border)) center / 1px 100% no-repeat; }
 .assistant-resizer:hover, .assistant-resizer:focus-visible { background: linear-gradient(var(--accent), var(--accent)) center / 2px 100% no-repeat; outline: none; }
 
