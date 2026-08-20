@@ -107,54 +107,62 @@ export default function TopBar(): JSX.Element {
 
       <span className="spacer" />
 
-      {tab && (
-        <div className="cmd-cluster">
+      {/* Always rendered — buttons disable (not hide) without a focused query tab,
+          so the right-side icons never shift when focus crosses tab kinds. */}
+      <div className="cmd-cluster">
+        <button
+          className="btn xs"
+          disabled={!tab || tab.running || !tab.lastRunText}
+          onClick={() => tab && getTabActions(tab.id)?.refresh()}
+          title="Refresh — re-run the current query"
+          aria-label="Refresh query"
+        >
+          ↻
+        </button>
+        <button
+          className="btn xs"
+          disabled={!tab || !tab.text.trim()}
+          onClick={() =>
+            tab &&
+            openSaveQueryModal({ mode: 'create', connectionId: tab.connectionId, query: tab.text })
+          }
+          title="Save query to favourites"
+          aria-label="Save query to favourites"
+        >
+          ☆
+        </button>
+        <button
+          className="btn xs"
+          disabled={!tab || tab.running || !tab.text.trim()}
+          onClick={() => tab && getTabActions(tab.id)?.runAll()}
+          title={`Run all statements (${mod}⇧↵)`}
+          aria-label="Run all statements"
+        >
+          ▶▶
+        </button>
+        {tab?.running && tab.queryId ? (
           <button
             className="btn xs"
-            disabled={tab.running || !tab.lastRunText}
-            onClick={() => getTabActions(tab.id)?.refresh()}
-            title="Refresh — re-run the current query"
+            onClick={() => {
+              if (tab.scriptRun) requestScriptStop(tab.id)
+              cancelQuery.mutate({ connectionId: tab.connectionId, queryId: tab.queryId! })
+            }}
+            aria-label="Cancel query"
           >
-            ↻
+            Cancel
           </button>
+        ) : (
           <button
-            className="btn xs"
-            disabled={!tab.text.trim()}
-            onClick={() => openSaveQueryModal({ mode: 'create', connectionId: tab.connectionId, query: tab.text })}
-            title="Save query to favourites"
+            className="btn xs primary"
+            disabled={!tab || tab.running || !tab.text.trim()}
+            onClick={() => tab && getTabActions(tab.id)?.run()}
+            title={`Run (${mod}↵) — selection, else statement at cursor`}
+            aria-label="Run query"
           >
-            ☆
+            ▶ Run
           </button>
-          <button
-            className="btn xs"
-            disabled={tab.running || !tab.text.trim()}
-            onClick={() => getTabActions(tab.id)?.runAll()}
-            title={`Run all statements (${mod}⇧↵)`}
-          >
-            ▶▶
-          </button>
-          {tab.running && tab.queryId ? (
-            <button
-              className="btn xs"
-              onClick={() => {
-                if (tab.scriptRun) requestScriptStop(tab.id)
-                cancelQuery.mutate({ connectionId: tab.connectionId, queryId: tab.queryId! })
-              }}
-            >
-              Cancel
-            </button>
-          ) : (
-            <button
-              className="btn xs primary"
-              disabled={tab.running || !tab.text.trim()}
-              onClick={() => getTabActions(tab.id)?.run()}
-              title={`Run (${mod}↵) — selection, else statement at cursor`}
-            >
-              ▶ Run
-            </button>
-          )}
-        </div>
-      )}
+        )}
+      </div>
 
       <button className="icon-btn" onClick={() => openModal({ mode: 'create' })} aria-label="New connection" data-tooltip="New connection" data-tip="right">
         <Icon name="plus" />
