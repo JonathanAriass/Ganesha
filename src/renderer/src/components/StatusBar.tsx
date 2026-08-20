@@ -38,7 +38,7 @@ export default function StatusBar(): JSX.Element {
       )
   } else if (isQuery && tab.result) {
     const label = tab.result.columns.length === 0 ? affectedRowsLabel(tab.result) : rowCountLabel(tab.result)
-    statusEl = <span className="sb-status">✓ {label} · {tab.result.durationMs} ms</span>
+    statusEl = <span className="sb-status"><span className="sb-ok">✓</span> {label} · {tab.result.durationMs} ms</span>
   } else if (isQuery && tab.error) {
     statusEl = <span className="sb-status err" title={tab.error}>{tab.error}</span>
   }

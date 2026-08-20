@@ -12,9 +12,10 @@ function mkMsg(conversationId: string, role: 'user' | 'assistant', content: stri
   return { id: `live-${liveSeq++}`, conversationId, role, content, createdAt: 0 }
 }
 
-export default function AssistantPanel(): JSX.Element | null {
+export default function AssistantPanel(): JSX.Element {
   const open = useAppStore((s) => s.assistantOpen)
   const toggle = useAppStore((s) => s.toggleAssistant)
+  const ssmOpen = useAppStore((s) => s.ssmOpen)
   const openModelManager = useAppStore((s) => s.openModelManager)
   const connectionId = useAppStore((s) => s.activeConnectionId)
   const convId = useAppStore((s) => s.activeConversationId)
@@ -142,7 +143,9 @@ export default function AssistantPanel(): JSX.Element | null {
 
   return (
     <>
-      {!open && (
+      {/* Peek hides while the SSM panel is open — it floated over the SSM list.
+          The TopBar toggle still opens the assistant regardless. */}
+      {!open && !ssmOpen && (
         <button className="assistant-peek" onClick={toggle} aria-label="Open assistant">
           <span className="assistant-peek-label">✦ Assistant</span>
         </button>
@@ -191,6 +194,8 @@ export default function AssistantPanel(): JSX.Element | null {
             // Focus can't stay inside an aria-hidden subtree (the ✕ itself holds it post-click).
             ;(document.activeElement as HTMLElement | null)?.blur()
             toggle()
+            // Hand focus to the peek once React has rendered it (it appears on close).
+            requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('.assistant-peek')?.focus())
           }}
           aria-label="Close assistant"
         >

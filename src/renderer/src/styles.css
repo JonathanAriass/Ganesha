@@ -30,7 +30,7 @@
   --obj-table: #a5b4fc;
   --obj-view: #67e8f9;
   --obj-coll: #86efac;
-  --radius: 6px;
+  --radius: 7px;
   --topbar-h: 46px;
   --rail-w: 52px;
   --statusbar-h: 26px;
@@ -286,8 +286,8 @@ button, input, select, textarea {
   display: flex;
   align-items: center;
   height: var(--topbar-h);
-  padding: 0 8px;
-  gap: 5px;
+  padding: 0 12px;
+  gap: 8px;
   background: var(--bg-2);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
@@ -576,11 +576,8 @@ button, input, select, textarea {
   flex: 1 1 0; /* right slot takes the remainder */
 }
 
-.editor-pane.focused .tabbar-wrap {
-  box-shadow: inset 0 2px 0 var(--accent);
-}
-
 .cmd-cluster { display: flex; align-items: center; gap: 6px; margin-right: 4px; }
+.cmd-divider { width: 1px; height: 20px; background: var(--border); }
 /* subtle focused-pane cue: the command bar drives THIS pane */
 .editor-pane.focused { box-shadow: inset 0 2px 0 var(--accent); }
 
@@ -593,6 +590,7 @@ button, input, select, textarea {
 }
 .sb-status { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .sb-status.err { color: var(--danger-text); }
+.sb-ok { color: var(--ok); }
 .sb-conn { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 
 .pane-divider {
@@ -1072,6 +1070,7 @@ input[type="password"]::placeholder {
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  padding-top: 4px;
   /* Breathing room between the server-group row and the query-subtab row. */
   gap: 6px;
 }
@@ -1273,24 +1272,6 @@ input[type="password"]::placeholder {
   min-height: 0;
 }
 
-.qt-toolbar {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-2);
-  flex-shrink: 0;
-}
-
-.qt-status {
-  margin-left: auto;
-  color: var(--text-2);
-  font-size: 12px;
-  white-space: nowrap;
-}
-
 /* Bottom strip shown while a scroll-triggered "load more" page is fetching. */
 .grid-loading-more {
   flex: 0 0 auto;
@@ -1307,22 +1288,6 @@ input[type="password"]::placeholder {
   font-size: 12px;
   color: var(--text-2);
   border-bottom: 1px solid var(--border);
-}
-
-.qt-status.err {
-  color: var(--danger-text);
-}
-
-.conn-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: var(--bg-3);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 2px 8px;
-  font-size: 12px;
-  white-space: nowrap;
 }
 
 .qt-editor-pane {
@@ -2024,21 +1989,6 @@ mark.hl {
 }
 
 /* ── History ── */
-.history {
-  border-top: 1px solid var(--border);
-  max-height: 40%;
-  overflow: auto;
-  flex-shrink: 0;
-}
-
-.history > summary {
-  padding: 8px 10px;
-  font-size: 12px;
-  color: var(--text-2);
-  cursor: pointer;
-  user-select: none;
-}
-
 .history-item {
   display: flex;
   gap: 6px;
@@ -2368,7 +2318,7 @@ mark.hl {
 .ssh-hop-order { font-size: 12px; color: var(--text-2); font-weight: 600; }
 .ssh-key-pick { display: flex; gap: 6px; }
 .ssh-key-pick input { flex: 1; }
-.btn.xs { padding: 2px 6px; font-size: 12px; line-height: 1; }
+.btn.xs { padding: 2px 6px; font-size: 12px; line-height: 1; border-radius: 6px; }
 
 /* ── Assistant panel ── */
 .btn.ghost.active { background: var(--btn-hover-bg); border-color: var(--accent); }
@@ -2377,6 +2327,8 @@ mark.hl {
 /* width comes inline from React (the persisted, drag-set value). The max-width
    guard keeps a wide saved width from clipping the panel / starving the editor
    on a narrow window (leaves room for the sidebar + a usable main area). */
+/* Accepted overlap: while open, the overlay may cover transient banners
+   (Update/SSM) and the docked SSM panel — by design. */
 .assistant-panel {
   position: fixed; top: var(--topbar-h); right: 0; bottom: var(--statusbar-h);
   z-index: 900; /* below modals (1000) and the palette (1100) */
@@ -2385,9 +2337,20 @@ mark.hl {
   border-left: 1px solid var(--border); background: var(--bg-2);
   box-shadow: -14px 0 44px -18px rgba(0, 0, 0, 0.5);
   transform: translateX(calc(100% + 16px)); /* +16 hides the shadow too */
+  /* visibility keeps the closed panel out of tab order / AT (React 18 has no
+     inert prop); the 0.25s delay lets the slide-out finish before it hides. */
+  visibility: hidden;
+  transition: transform 0.25s cubic-bezier(0.32, 0.72, 0, 1), visibility 0s linear 0.25s;
+}
+.assistant-panel.open {
+  transform: none;
+  visibility: visible; /* immediately on open — only the close is delayed */
   transition: transform 0.25s cubic-bezier(0.32, 0.72, 0, 1);
 }
-.assistant-panel.open { transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  /* both states: .open's own transition outweighs the bare class */
+  .assistant-panel, .assistant-panel.open { transition: none; }
+}
 .assistant-peek {
   position: fixed; right: 0; top: calc(var(--topbar-h) + 56px); z-index: 899;
   padding: 12px 6px; background: var(--bg-2); color: var(--accent);
@@ -2590,7 +2553,7 @@ mark.hl {
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
   opacity: 0;
   pointer-events: none;
-  z-index: 200;
+  z-index: 950; /* above the assistant overlay (900); pointer-events: none keeps this safe */
   transition: opacity 0.1s ease 0.3s;
 }
 [data-tooltip]:hover::after { opacity: 1; }

@@ -50,14 +50,8 @@ export default function SidePanel(): JSX.Element | null {
 
   return (
     <aside className="side-panel" ref={panelRef} style={{ width }} aria-label={TITLES[section]}>
-      <div className="side-head">{TITLES[section]}</div>
-      <div className="side-body">
-        {section === 'schema' && <ObjectTree />}
-        {section === 'saved' &&
-          (activeConnectionId ? <SavedSection hosted /> : <div className="sidebar-empty"><p>No connection selected.</p></div>)}
-        {section === 'history' &&
-          (activeConnectionId ? <HistorySection hosted /> : <div className="sidebar-empty"><p>No connection selected.</p></div>)}
-      </div>
+      {/* Resizer first (position: absolute → visually unchanged) so keyboard users
+          reach it without tabbing through the whole tree; matches AssistantPanel. */}
       <div
         className="side-resizer"
         role="separator"
@@ -75,6 +69,14 @@ export default function SidePanel(): JSX.Element | null {
         onDoubleClick={() => commitWidth(SIDE_DEFAULT_WIDTH)}
         onKeyDown={onResizeKeyDown}
       />
+      <div className="side-head">{TITLES[section]}</div>
+      <div className="side-body">
+        {section === 'schema' && <ObjectTree />}
+        {section === 'saved' &&
+          (activeConnectionId ? <SavedSection /> : <div className="sidebar-empty"><p>No connection selected.</p></div>)}
+        {section === 'history' &&
+          (activeConnectionId ? <HistorySection /> : <div className="sidebar-empty"><p>No connection selected.</p></div>)}
+      </div>
     </aside>
   )
 }

@@ -141,6 +141,7 @@ export default function TopBar(): JSX.Element {
         >
           ▶▶
         </button>
+        <div className="cmd-divider" aria-hidden="true" />
         {tab?.running && tab.queryId ? (
           <button
             className="btn xs"

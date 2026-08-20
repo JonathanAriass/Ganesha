@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useAppStore } from '../state/store'
 import { useSavedQueries, useDeleteSavedQuery } from '../lib/hooks'
 
-export default function SavedSection({ hosted = false }: { hosted?: boolean } = {}): JSX.Element | null {
+export default function SavedSection(): JSX.Element | null {
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
   const openQueryTab = useAppStore((s) => s.openQueryTab)
   const openSaveQueryModal = useAppStore((s) => s.openSaveQueryModal)
@@ -14,8 +14,8 @@ export default function SavedSection({ hosted = false }: { hosted?: boolean } = 
 
   if (!activeConnectionId) return null
 
-  const body = (
-    <>
+  return (
+    <div className="panel-section">
       {isError && <div className="h-empty">Couldn’t load saved queries</div>}
       {del.isError && (
         <div className="h-empty" role="alert">
@@ -79,14 +79,6 @@ export default function SavedSection({ hosted = false }: { hosted?: boolean } = 
             )}
           </div>
         ))}
-    </>
-  )
-
-  if (hosted) return <div className="panel-section">{body}</div>
-  return (
-    <details className="history">
-      <summary>Saved</summary>
-      {body}
-    </details>
+    </div>
   )
 }

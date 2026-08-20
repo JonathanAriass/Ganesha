@@ -16,7 +16,7 @@ export default function Rail(): JSX.Element {
   const sections: Array<{ id: SideSection; icon: 'db' | 'bookmark' | 'clock'; label: string }> = [
     { id: 'schema', icon: 'db', label: 'Schema' },
     { id: 'saved', icon: 'bookmark', label: 'Saved queries' },
-    { id: 'history', icon: 'clock', label: 'Query history' },
+    { id: 'history', icon: 'clock', label: 'History' },
   ]
 
   return (
