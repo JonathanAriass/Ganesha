@@ -177,6 +177,9 @@ interface AppState {
   /** Focus Mode side panel (rail-opened schema/saved/history). Persisted to localStorage. */
   sideOpen: boolean
   sideSection: SideSection
+  /** The connections dashboard shown over the workspace (rail Home button).
+   *  Volatile — never persisted; any tab activation closes it (App effect). */
+  dashboardOpen: boolean
 
   // ── LLM assistant ─────────────────────────────────────────────────────────
   assistantOpen: boolean
@@ -209,6 +212,8 @@ interface AppState {
   toggleSide: () => void
   /** Rail click: closed → open on that section; open+different → switch; open+same → collapse. */
   selectSideSection: (section: SideSection) => void
+  setDashboardOpen: (open: boolean) => void
+  toggleDashboard: () => void
 
   toggleAssistant: () => void
   setActiveConversation: (id: string | null) => void
@@ -381,6 +386,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   runningSsm: [],
   sideOpen: loadSideOpen(),
   sideSection: loadSideSection(),
+  dashboardOpen: false,
   assistantOpen: false,
   activeConversationId: null,
   modelManagerOpen: false,
@@ -440,6 +446,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       saveSideOpen(!s.sideOpen)
       return { sideOpen: !s.sideOpen }
     }),
+  setDashboardOpen: (open) => set({ dashboardOpen: open }),
+  toggleDashboard: () => set((s) => ({ dashboardOpen: !s.dashboardOpen })),
   selectSideSection: (section) =>
     set((s) => {
       if (s.sideOpen && s.sideSection === section) {

@@ -568,6 +568,7 @@ button, input, select, textarea {
   gap: 4px;
 }
 .rail-spacer { flex: 1; }
+.rail-sep { width: 24px; height: 1px; background: var(--border); margin: 4px 0; flex-shrink: 0; }
 .rail-btn {
   width: 38px; height: 38px;
   display: grid; place-items: center;

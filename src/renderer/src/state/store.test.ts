@@ -997,3 +997,15 @@ describe('side panel state', () => {
     expect(useAppStore.getState()).toMatchObject({ sideOpen: false, sideSection: 'history' })
   })
 })
+
+describe('connections dashboard', () => {
+  afterEach(() => useAppStore.setState({ dashboardOpen: false }))
+
+  it('defaults closed; toggle and set flip it', () => {
+    expect(useAppStore.getState().dashboardOpen).toBe(false)
+    useAppStore.getState().toggleDashboard()
+    expect(useAppStore.getState().dashboardOpen).toBe(true)
+    useAppStore.getState().setDashboardOpen(false)
+    expect(useAppStore.getState().dashboardOpen).toBe(false)
+  })
+})

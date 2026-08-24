@@ -40,7 +40,21 @@ function AppShell(): JSX.Element {
   const commitModal = useAppStore((s) => s.commitModal)
   const tabs = useAppStore((s) => s.tabs)
   const splitView = useAppStore((s) => s.tabs.some((t) => t.pane === 'right'))
+  const dashboardOpen = useAppStore((s) => s.dashboardOpen)
+  const activeTabId = useAppStore((s) => s.activeTabId)
   const leftPaneRef = useRef<HTMLDivElement>(null)
+
+  // Any tab activation (open, sidebar double-click, palette jump…) dismisses the
+  // dashboard — one central hook instead of wiring every open path.
+  const prevTabRef = useRef(activeTabId)
+  useEffect(() => {
+    if (activeTabId !== prevTabRef.current) {
+      prevTabRef.current = activeTabId
+      if (activeTabId && useAppStore.getState().dashboardOpen) {
+        useAppStore.getState().setDashboardOpen(false)
+      }
+    }
+  }, [activeTabId])
   // Pin to first render: avoids re-reading localStorage on every render and a mid-drag flicker if
   // the tree re-renders while the divider is being dragged (PaneDivider writes flex-basis directly).
   const [initialLeftFraction] = useState(() => loadPaneFraction())
@@ -79,7 +93,7 @@ function AppShell(): JSX.Element {
         <Rail />
         <SidePanel />
         <main className="main">
-          {tabs.length === 0 ? (
+          {tabs.length === 0 || dashboardOpen ? (
             <Welcome />
           ) : splitView ? (
             <div className="panes">

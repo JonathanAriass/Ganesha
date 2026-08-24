@@ -1,5 +1,12 @@
 /** Small monochrome line icons (inherit currentColor) for the compact top-bar toolbar. */
 const ICONS = {
+  home: (
+    <>
+      <path d="M3 10.5 12 3.5l9 7" />
+      <path d="M5.5 9.5V20h13V9.5" />
+      <path d="M10 20v-5h4v5" />
+    </>
+  ),
   plus: <path d="M12 5v14M5 12h14" />,
   chat: <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />,
   plug: <path d="M8.5 3v3M15.5 3v3M6 6h12v3a6 6 0 0 1-12 0zM12 15v6" />,

@@ -12,6 +12,8 @@ export default function Rail(): JSX.Element {
   const toggleSide = useAppStore((s) => s.toggleSide)
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
   const openDiagramTab = useAppStore((s) => s.openDiagramTab)
+  const dashboardOpen = useAppStore((s) => s.dashboardOpen)
+  const toggleDashboard = useAppStore((s) => s.toggleDashboard)
 
   const sections: Array<{ id: SideSection; icon: 'db' | 'bookmark' | 'clock'; label: string }> = [
     { id: 'schema', icon: 'db', label: 'Schema' },
@@ -21,6 +23,17 @@ export default function Rail(): JSX.Element {
 
   return (
     <nav className="rail" aria-label="Sidebar sections">
+      <button
+        className={`rail-btn${dashboardOpen ? ' active' : ''}`}
+        onClick={toggleDashboard}
+        aria-label="Connections dashboard"
+        aria-pressed={dashboardOpen}
+        data-tooltip="Connections dashboard"
+        data-tip="rail"
+      >
+        <Icon name="home" size={18} />
+      </button>
+      <div className="rail-sep" aria-hidden="true" />
       {sections.map((s) => (
         <button
           key={s.id}

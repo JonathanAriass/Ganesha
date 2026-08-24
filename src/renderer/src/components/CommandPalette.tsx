@@ -72,6 +72,15 @@ export default function CommandPalette(): JSX.Element {
                   Open Telescope inspector
                 </Command.Item>
               )}
+              <Command.Item
+                value="action connections dashboard"
+                onSelect={() => {
+                  useAppStore.getState().setDashboardOpen(true)
+                  close()
+                }}
+              >
+                Show connections dashboard
+              </Command.Item>
               <Command.Item value="action open settings" onSelect={openSettings}>
                 Open settings
                 <span className="kbd">{mod},</span>
