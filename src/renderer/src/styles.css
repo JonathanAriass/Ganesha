@@ -411,6 +411,80 @@ button, input, select, textarea {
 .connmenu-empty { padding: 10px 12px; color: var(--text-2); font-size: 12px; }
 .connmenu-footer { border-top: 1px solid var(--border); padding: 4px; flex-shrink: 0; }
 
+/* ── Connections dashboard (the empty-pane Welcome view) ──
+   Cards per connection; --card-accent is set inline from the connection color. */
+.dash { flex: 1; min-height: 0; width: 100%; overflow-y: auto; padding: 28px 32px; }
+.dash-title { font-size: 18px; font-weight: 650; margin-bottom: 4px; }
+.dash-sub { color: var(--text-2); font-size: 12.5px; margin-bottom: 18px; }
+.dash-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 12px;
+  max-width: 1100px;
+}
+.dash-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  text-align: left;
+  padding: 14px 14px 12px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.12s, transform 0.08s, box-shadow 0.12s;
+}
+.dash-card:hover {
+  border-color: var(--btn-hover-border);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px -10px rgba(0, 0, 0, 0.45);
+}
+.dash-card.active {
+  border-color: var(--card-accent, var(--accent));
+  box-shadow: 0 0 0 1px var(--card-accent, var(--accent));
+}
+.dash-card-strip { position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--card-accent, var(--accent)); }
+.dash-card-head { display: flex; align-items: center; gap: 8px; width: 100%; }
+.dash-card-name { font-weight: 600; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-card-edit { margin-left: auto; color: var(--text-2); border-radius: 5px; padding: 1px 5px; opacity: 0; transition: opacity 0.12s; flex-shrink: 0; }
+.dash-card:hover .dash-card-edit, .dash-card-edit:focus-visible { opacity: 1; outline: none; }
+.dash-card-edit:hover { background: var(--hover-overlay); color: var(--text); }
+.dash-card-meta { display: flex; gap: 6px; flex-wrap: wrap; }
+.dash-badge {
+  font-size: 10.5px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+}
+.dash-card-host {
+  font-size: 11.5px;
+  color: var(--text-2);
+  font-family: ui-monospace, 'SF Mono', 'Fira Mono', monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.dash-card-check { font-size: 11px; color: var(--card-accent, var(--accent)); font-weight: 600; }
+.dash-card.new {
+  align-items: center;
+  justify-content: center;
+  border-style: dashed;
+  background: transparent;
+  color: var(--text-2);
+  gap: 4px;
+  min-height: 108px;
+}
+.dash-card.new:hover { color: var(--text); border-color: var(--accent); transform: none; box-shadow: none; }
+.dash-new-plus { font-size: 20px; line-height: 1; }
+.dash-hint { margin-top: 18px; color: var(--text-2); font-size: 11.5px; }
+
 .spacer { flex: 1; }
 
 /* ── Buttons ── */
