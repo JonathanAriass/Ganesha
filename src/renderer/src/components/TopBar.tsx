@@ -1,14 +1,13 @@
-import type { ChangeEvent } from 'react'
 import { useAppStore } from '../state/store'
 import { useConnections, useSsmTunnels, useObjects, useCancelQuery } from '../lib/hooks'
 import { mod } from '../lib/platform'
 import { getTabActions } from '../lib/tab-actions'
+import ConnectionMenu from './ConnectionMenu'
 import { Icon } from './icons'
 import logo from '../assets/logo.png'
 
 export default function TopBar(): JSX.Element {
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
-  const setActiveConnection = useAppStore((s) => s.setActiveConnection)
   const openModal = useAppStore((s) => s.openModal)
   const openSettings = useAppStore((s) => s.openSettings)
   const toggleAssistant = useAppStore((s) => s.toggleAssistant)
@@ -41,37 +40,12 @@ export default function TopBar(): JSX.Element {
     ? tunnels.filter((t) => t.connectionId === activeConnectionId && !runningSsm.includes(t.id))
     : []
 
-  function handleSelectChange(e: ChangeEvent<HTMLSelectElement>) {
-    const val = e.target.value
-    setActiveConnection(val === '' ? null : val)
-  }
-
   return (
     <>
     <header className="topbar">
       <img className="brand-logo" src={logo} alt="Ganesha" title="Ganesha" />
 
-      {activeConn && (
-        <span
-          className="conn-dot"
-          style={{ background: activeConn.color }}
-          aria-hidden="true"
-        />
-      )}
-
-      <select
-        className="conn-select"
-        value={activeConnectionId ?? ''}
-        onChange={handleSelectChange}
-        aria-label="Active connection"
-      >
-        <option value="">— no connection —</option>
-        {connections.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.name} ({c.type}){c.readOnly ? ' 🔒' : ''}
-          </option>
-        ))}
-      </select>
+      <ConnectionMenu />
 
       {activeConn && (
         <button

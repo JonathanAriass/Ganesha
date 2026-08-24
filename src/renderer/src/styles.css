@@ -342,29 +342,74 @@ button, input, select, textarea {
   border: 1px solid rgba(255,255,255,0.1);
 }
 
-.conn-select {
+/* ── Connection menu (TopBar picker) ──
+   Replaces the old native .conn-select, which cramped long connection lists. */
+.connmenu { position: relative; }
+.connmenu-trigger {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 26px;
+  padding: 0 9px;
+  min-width: 150px;
+  max-width: 280px;
   background: var(--bg-3);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   color: var(--text);
-  padding: 3px 24px 3px 8px;
-  height: 26px;
-  min-width: 150px;
-  max-width: 260px;
-  appearance: none;
-  -webkit-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238b93a7'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 8px center;
   cursor: pointer;
-  outline: none;
   font-size: 12px;
 }
-
-.conn-select:focus {
+.connmenu-trigger:hover { background: var(--btn-hover-bg); border-color: var(--btn-hover-border); }
+.connmenu-trigger:focus-visible {
+  outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(99,102,241,0.2);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
 }
+.cm-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cm-name.muted { color: var(--text-2); }
+.cm-type { color: var(--text-2); font-size: 11px; flex-shrink: 0; }
+.connmenu-caret { color: var(--text-2); font-size: 9px; margin-left: auto; }
+
+.connmenu-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 960; /* above the assistant overlay (900) and tooltips (950), below modals (1000) */
+  width: 320px;
+  max-height: min(480px, 70vh);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--modal-shadow);
+  overflow: hidden;
+}
+.connmenu-filter { padding: 8px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.connmenu-filter .filter-input { width: 100%; }
+.connmenu-list { flex: 1; min-height: 0; overflow-y: auto; padding: 4px; }
+.connmenu-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 7px 9px;
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12.5px;
+}
+.connmenu-row:hover, .connmenu-row:focus-visible { background: var(--hover-overlay); outline: none; }
+.connmenu-row.active { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.connmenu-row .cm-type { margin-left: auto; }
+.connmenu-check { color: var(--accent); flex-shrink: 0; }
+.connmenu-plus { color: var(--text-2); }
+.connmenu-empty { padding: 10px 12px; color: var(--text-2); font-size: 12px; }
+.connmenu-footer { border-top: 1px solid var(--border); padding: 4px; flex-shrink: 0; }
 
 .spacer { flex: 1; }
 
