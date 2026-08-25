@@ -69,7 +69,49 @@ describe('groups service', () => {
   it('stays idempotent when migrate runs twice on the same database', () => {
     migrate(db) // second run over an already-migrated schema
     const g = createGroup(db, 'ok', 1)
-    expect(listGroups(db)).toEqual([g])
+    const sub = createGroup(db, 'sub', 2, g.id) // parent_id column survived the re-migrate
+    expect(listGroups(db)).toEqual([g, sub])
+  })
+})
+
+describe('subgroups', () => {
+  it('creates a subgroup under a root group and listGroups maps parentId', () => {
+    const parent = createGroup(db, 'parent', 1)
+    const child = createGroup(db, 'child', 2, parent.id)
+    expect(parent.parentId).toBeNull()
+    expect(child.parentId).toBe(parent.id)
+    const byName = new Map(listGroups(db).map((g) => [g.name, g.parentId]))
+    expect(byName.get('parent')).toBeNull()
+    expect(byName.get('child')).toBe(parent.id)
+  })
+
+  it('throws when the parent does not exist', () => {
+    expect(() => createGroup(db, 'child', 1, 'nope')).toThrow(/group not found/i)
+  })
+
+  it('caps depth at 2: a subgroup cannot have children', () => {
+    const parent = createGroup(db, 'parent', 1)
+    const child = createGroup(db, 'child', 2, parent.id)
+    expect(() => createGroup(db, 'grandchild', 3, child.id)).toThrow(/subgroups cannot have subgroups/i)
+  })
+
+  it('deleting a parent promotes its children to root, never deletes them', () => {
+    const parent = createGroup(db, 'parent', 1)
+    const child = createGroup(db, 'child', 2, parent.id)
+    deleteGroup(db, parent.id)
+    const after = listGroups(db)
+    expect(after.map((g) => g.id)).toEqual([child.id]) // child survives, parent gone
+    expect(after[0].parentId).toBeNull() // ON DELETE SET NULL promoted it to root
+  })
+
+  it('deleting a subgroup still just ungroups its member connections', () => {
+    const parent = createGroup(db, 'parent', 1)
+    const child = createGroup(db, 'child', 2, parent.id)
+    const c = createConnection(db, input, 3)
+    setConnectionGroup(db, c.id, child.id, 4)
+    deleteGroup(db, child.id)
+    expect(getConnection(db, c.id)!.groupId).toBeNull()
+    expect(listGroups(db).map((g) => g.id)).toEqual([parent.id])
   })
 })
 

@@ -19,7 +19,7 @@ export interface DbClientApi {
   }
   groups: {
     list(): Promise<IpcResult<'groups.list'>>
-    create(name: string): Promise<IpcResult<'groups.create'>>
+    create(name: string, parentId: string | null): Promise<IpcResult<'groups.create'>>
     rename(id: string, name: string): Promise<IpcResult<'groups.rename'>>
     delete(id: string): Promise<IpcResult<'groups.delete'>>
   }

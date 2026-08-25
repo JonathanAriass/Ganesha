@@ -22,7 +22,7 @@ const api: DbClientApi = {
   },
   groups: {
     list: () => invoke('groups.list', undefined),
-    create: (name) => invoke('groups.create', name),
+    create: (name, parentId) => invoke('groups.create', { name, parentId }),
     rename: (id, name) => invoke('groups.rename', { id, name }),
     delete: (id) => invoke('groups.delete', id)
   },

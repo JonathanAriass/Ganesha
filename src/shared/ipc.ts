@@ -26,7 +26,7 @@ export interface IpcChannels {
   'connections.duplicate': { req: string; res: ConnectionConfig }
   'connections.setGroup': { req: { connectionId: string; groupId: string | null }; res: ConnectionConfig }
   'groups.list': { req: void; res: ConnectionGroup[] }
-  'groups.create': { req: string; res: ConnectionGroup }
+  'groups.create': { req: { name: string; parentId: string | null }; res: ConnectionGroup }
   'groups.rename': { req: { id: string; name: string }; res: ConnectionGroup }
   'groups.delete': { req: string; res: null }
   'history.add': { req: HistoryEntryInput; res: HistoryEntry }

@@ -5,6 +5,7 @@ import { groupSections } from './connection-groups'
 const group = (id: string, position: number, createdAt = 0): ConnectionGroup => ({
   id,
   name: `Group ${id}`,
+  parentId: null,
   position,
   createdAt,
 })

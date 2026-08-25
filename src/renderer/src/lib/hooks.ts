@@ -30,7 +30,10 @@ export function useGroups() {
 export function useCreateGroup() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (name: string) => window.api.groups.create(name).then(unwrap),
+    // parentId non-null creates a subgroup (max depth 2). UI wiring for subgroup
+    // creation (choosing a parent) is owned by the dashboard, not this hook.
+    mutationFn: ({ name, parentId }: { name: string; parentId: string | null }) =>
+      window.api.groups.create(name, parentId).then(unwrap),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['groups'] }),
   })
 }

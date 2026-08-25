@@ -81,7 +81,7 @@ export default function Welcome(): JSX.Element {
   function commitNewGroup(): void {
     const name = (newGroupName ?? '').trim()
     setNewGroupName(null)
-    if (name) createGroup.mutate(name) // empty → just cancel (backend rejects blanks too)
+    if (name) createGroup.mutate({ name, parentId: null }) // empty → just cancel (backend rejects blanks too)
   }
 
   function commitRename(): void {

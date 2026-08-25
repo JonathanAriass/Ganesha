@@ -118,6 +118,8 @@ export function migrate(db: DB): void {
   addColumnIfMissing(db, 'session_tabs', 'pane', "TEXT NOT NULL DEFAULT 'left'")
   // Connection groups (added later): nullable folder; deleting a group ungroups via FK.
   addColumnIfMissing(db, 'connections', 'group_id', 'TEXT REFERENCES connection_groups(id) ON DELETE SET NULL')
+  // Subgroups (added later): nullable parent; deleting a parent promotes its children to root via FK.
+  addColumnIfMissing(db, 'connection_groups', 'parent_id', 'TEXT REFERENCES connection_groups(id) ON DELETE SET NULL')
   migrateSecretsCompositeKey(db)
 }
 

@@ -56,6 +56,8 @@ export interface ConnectionConfig extends ConnectionInput {
 export interface ConnectionGroup {
   id: string
   name: string
+  /** Parent group; null = root. Max depth 2 — a subgroup can't have children. */
+  parentId: string | null
   /** Display order on the dashboard; new groups append. */
   position: number
   createdAt: number

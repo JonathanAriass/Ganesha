@@ -224,7 +224,7 @@ export function registerIpcHandlers(): void {
   handle('connections.setGroup', ({ connectionId, groupId }) => ok(conns.setConnectionGroup(store().db, connectionId, groupId, now())))
 
   handle('groups.list', () => ok(groups.listGroups(store().db)))
-  handle('groups.create', (name) => ok(groups.createGroup(store().db, name, now())))
+  handle('groups.create', ({ name, parentId }) => ok(groups.createGroup(store().db, name, now(), parentId)))
   handle('groups.rename', ({ id, name }) => ok(groups.renameGroup(store().db, id, name)))
   handle('groups.delete', (id) => { groups.deleteGroup(store().db, id); return ok(null) })
 
