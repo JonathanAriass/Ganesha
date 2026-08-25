@@ -11,11 +11,12 @@ export interface GroupSection {
 }
 
 /** Arrange the dashboard: one section per group ordered by `position` (ties broken by
- *  `createdAt`), each holding its connections in the incoming order, plus a final
- *  ungrouped section. The ungrouped section appears only when something is actually
- *  ungrouped OR there are no groups at all (so the dashboard is never empty of
- *  sections). A connection whose `groupId` matches no known group (stale — e.g. the
- *  group was deleted under it) falls back to ungrouped rather than vanishing. */
+ *  `createdAt`), each holding its connections in the incoming order, plus the
+ *  ungrouped section ALWAYS last. With no groups it is the only section (the
+ *  dashboard renders it headerless — today's pre-groups look); with groups it is
+ *  present even when empty, so there is always a drop target to un-group a card.
+ *  A connection whose `groupId` matches no known group (stale — e.g. the group was
+ *  deleted under it) falls back to ungrouped rather than vanishing. */
 export function groupSections(
   groups: ConnectionGroup[],
   connections: ConnectionConfig[]
@@ -34,8 +35,6 @@ export function groupSections(
     group: g,
     connections: byGroup.get(g.id)!,
   }))
-  if (ungrouped.length > 0 || ordered.length === 0) {
-    sections.push({ group: null, connections: ungrouped })
-  }
+  sections.push({ group: null, connections: ungrouped })
   return sections
 }

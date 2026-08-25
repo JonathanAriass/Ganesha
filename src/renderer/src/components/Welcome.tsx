@@ -68,7 +68,11 @@ export default function Welcome(): JSX.Element {
 
   const sections = groupSections(groups ?? [], connections)
   const knownGroupIds = new Set((groups ?? []).map((g) => g.id))
-  const hasUngroupedSection = sections.some((s) => s.group === null)
+  // No groups → the single ungrouped section renders headerless (pre-groups look)
+  // and isn't a drop target — there is nowhere to move a card to.
+  const hasGroups = (groups ?? []).length > 0
+  // The ungrouped section is always last; empty means every connection is grouped.
+  const ungroupedEmpty = sections[sections.length - 1].connections.length === 0
 
   // First mutation error wins for the inline notice; each clears on its next mutate.
   const mutError = createGroup.error ?? renameGroup.error ?? deleteGroup.error ?? setGroup.error
@@ -98,7 +102,8 @@ export default function Welcome(): JSX.Element {
   }
 
   function onSectionDragOver(e: DragEvent<HTMLElement>, section: GroupSection): void {
-    if (!e.dataTransfer.types.includes(CONN_MIME)) return
+    // Without preventDefault here, drop never fires — so this also disables drops.
+    if (!hasGroups || !e.dataTransfer.types.includes(CONN_MIME)) return
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
     setDragOverKey(sectionKey(section))
@@ -269,45 +274,47 @@ export default function Welcome(): JSX.Element {
             onDragLeave={onSectionDragLeave}
             onDrop={(e) => onSectionDrop(e, section)}
           >
-            <div
-              className="dash-group-head"
-              onContextMenu={
-                g
-                  ? (e) => {
-                      e.preventDefault()
-                      setMenu({ x: e.clientX, y: e.clientY, group: g })
-                    }
-                  : undefined
-              }
-            >
-              {g && renaming?.id === g.id ? (
-                <input
-                  className="filter-input"
-                  autoFocus
-                  value={renaming.name}
-                  onChange={(e) => setRenaming({ id: g.id, name: e.target.value })}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') commitRename()
-                    else if (e.key === 'Escape') setRenaming(null)
-                  }}
-                  onBlur={() => setRenaming(null)}
-                />
-              ) : (
-                <span className="dash-group-name">{g ? g.name : 'Ungrouped'}</span>
-              )}
-              <span className="dash-badge">{section.connections.length}</span>
-              {g && (
-                <button
-                  className="dash-group-menu"
-                  aria-label={`Group ${g.name} menu`}
-                  title="Rename or delete group"
-                  onClick={(e) => setMenu({ x: e.clientX, y: e.clientY, group: g })}
-                >
-                  ⋯
-                </button>
-              )}
-            </div>
-            {section.connections.length === 0 && g ? (
+            {hasGroups && (
+              <div
+                className="dash-group-head"
+                onContextMenu={
+                  g
+                    ? (e) => {
+                        e.preventDefault()
+                        setMenu({ x: e.clientX, y: e.clientY, group: g })
+                      }
+                    : undefined
+                }
+              >
+                {g && renaming?.id === g.id ? (
+                  <input
+                    className="filter-input"
+                    autoFocus
+                    value={renaming.name}
+                    onChange={(e) => setRenaming({ id: g.id, name: e.target.value })}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') commitRename()
+                      else if (e.key === 'Escape') setRenaming(null)
+                    }}
+                    onBlur={() => setRenaming(null)}
+                  />
+                ) : (
+                  <span className="dash-group-name">{g ? g.name : 'Ungrouped'}</span>
+                )}
+                <span className="dash-badge">{section.connections.length}</span>
+                {g && (
+                  <button
+                    className="dash-group-menu"
+                    aria-label={`Group ${g.name} menu`}
+                    title="Rename or delete group"
+                    onClick={(e) => setMenu({ x: e.clientX, y: e.clientY, group: g })}
+                  >
+                    ⋯
+                  </button>
+                )}
+              </div>
+            )}
+            {section.connections.length === 0 ? (
               <p className="dash-drop-hint">Drag connections here</p>
             ) : (
               <div className="dash-grid">
@@ -318,9 +325,9 @@ export default function Welcome(): JSX.Element {
           </section>
         )
       })}
-      {/* Every connection is grouped → no ungrouped section, so the new-connection
-          card gets its own trailing grid. */}
-      {!hasUngroupedSection && <div className="dash-grid">{newConnectionCard}</div>}
+      {/* Everything is grouped → the Ungrouped section shows only the drop hint,
+          so the new-connection card gets its own trailing grid. */}
+      {ungroupedEmpty && <div className="dash-grid">{newConnectionCard}</div>}
       {menuEl}
       <p className="dash-hint">
         {mod}K palette · double-click a table to query it · {mod}B toggles the side panel

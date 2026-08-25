@@ -18,24 +18,24 @@ const sectionIds = (groups: ConnectionGroup[], connections: ConnectionConfig[]):
 describe('groupSections', () => {
   it('orders sections by position, then createdAt', () => {
     const groups = [group('b', 2, 5), group('a', 1, 9), group('c', 2, 3)]
-    expect(sectionIds(groups, [])).toEqual(['a', 'c', 'b'])
+    expect(sectionIds(groups, [])).toEqual(['a', 'c', 'b', null])
   })
 
   it('assigns connections to their group, keeping the incoming order within a section', () => {
     const groups = [group('g1', 0), group('g2', 1)]
     const conns = [conn('x', 'g2'), conn('y', 'g1'), conn('z', 'g2')]
     const sections = groupSections(groups, conns)
-    expect(sections.map((s) => s.connections.map((c) => c.id))).toEqual([['y'], ['x', 'z']])
+    expect(sections.map((s) => s.connections.map((c) => c.id))).toEqual([['y'], ['x', 'z'], []])
   })
 
   it('includes empty groups (they are drop targets)', () => {
     const groups = [group('g1', 0), group('g2', 1)]
     const sections = groupSections(groups, [conn('x', 'g1')])
-    expect(sectionIds(groups, [conn('x', 'g1')])).toEqual(['g1', 'g2'])
+    expect(sectionIds(groups, [conn('x', 'g1')])).toEqual(['g1', 'g2', null])
     expect(sections[1].connections).toEqual([])
   })
 
-  it('appends an ungrouped section when there are ungrouped connections', () => {
+  it('puts ungrouped connections in the trailing ungrouped section', () => {
     const groups = [group('g1', 0)]
     const conns = [conn('x', 'g1'), conn('y', null)]
     const sections = groupSections(groups, conns)
@@ -43,12 +43,20 @@ describe('groupSections', () => {
     expect(sections[1].connections.map((c) => c.id)).toEqual(['y'])
   })
 
-  it('omits the ungrouped section when every connection is grouped and groups exist', () => {
+  it('always appends the ungrouped section when groups exist — even empty (the un-group drop target)', () => {
     const groups = [group('g1', 0)]
-    expect(sectionIds(groups, [conn('x', 'g1')])).toEqual(['g1'])
+    const sections = groupSections(groups, [conn('x', 'g1')])
+    expect(sections.map((s) => s.group?.id ?? null)).toEqual(['g1', null])
+    expect(sections[1].connections).toEqual([])
   })
 
-  it('always shows the ungrouped section when there are no groups at all', () => {
+  it('keeps the ungrouped section last, after every group', () => {
+    const groups = [group('g2', 1), group('g1', 0)]
+    const conns = [conn('y', null), conn('x', 'g2')]
+    expect(sectionIds(groups, conns)).toEqual(['g1', 'g2', null])
+  })
+
+  it('returns exactly one ungrouped section when there are no groups (rendered headerless)', () => {
     expect(sectionIds([], [conn('x', null)])).toEqual([null])
     expect(sectionIds([], [])).toEqual([null]) // even with zero connections
   })
