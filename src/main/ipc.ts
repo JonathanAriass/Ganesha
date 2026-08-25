@@ -206,7 +206,10 @@ export function registerIpcHandlers(): void {
     const src = conns.getConnection(db, id)
     if (!src) throw new Error(`Connection not found: ${id}`)
     const { id: _id, createdAt: _ca, updatedAt: _ua, ...input } = src
-    const copy = conns.createConnection(db, { ...input, name: `${src.name} (copy)` }, now())
+    let copy = conns.createConnection(db, { ...input, name: `${src.name} (copy)` }, now())
+    // createConnection doesn't write group_id (groups are set via setGroup, not the
+    // create modal) — carry the source's group over so the copy lands beside it.
+    if (src.groupId) copy = conns.setConnectionGroup(db, copy.id, src.groupId, now())
     const pw = secrets.getPassword(id)
     if (pw !== null) secrets.setPassword(copy.id, pw)
     if (src.ssh) {
