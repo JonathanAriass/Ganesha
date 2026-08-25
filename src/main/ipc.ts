@@ -6,6 +6,7 @@ import { ok, err, type Result } from '../shared/result'
 import { openDb } from './persistence/db'
 import { safeStorageEncryptor, makeSecretStore, resolveTestPassword } from './persistence/secrets'
 import * as conns from './persistence/connections'
+import * as groups from './persistence/groups'
 import * as hist from './persistence/history'
 import * as saved from './persistence/saved-queries'
 import * as sess from './persistence/session'
@@ -217,6 +218,13 @@ export function registerIpcHandlers(): void {
     return ok(copy)
   })
 
+  handle('connections.setGroup', ({ connectionId, groupId }) => ok(conns.setConnectionGroup(store().db, connectionId, groupId, now())))
+
+  handle('groups.list', () => ok(groups.listGroups(store().db)))
+  handle('groups.create', (name) => ok(groups.createGroup(store().db, name, now())))
+  handle('groups.rename', ({ id, name }) => ok(groups.renameGroup(store().db, id, name)))
+  handle('groups.delete', (id) => { groups.deleteGroup(store().db, id); return ok(null) })
+
   handle('history.add', (entry) => ok(hist.addHistory(store().db, entry)))
   handle('history.list', ({ connectionId, limit }) => ok(hist.listHistory(store().db, connectionId, limit)))
 
@@ -246,7 +254,7 @@ export function registerIpcHandlers(): void {
     // Throwaway pooled connection under a test id, brought up through the tunnel
     // (typed SSH secrets win; blank-on-edit falls back to the stored ones).
     const testId = `test:${id ?? 'new'}`
-    const config: ConnectionConfig = { ...input, id: testId, createdAt: 0, updatedAt: 0 }
+    const config: ConnectionConfig = { ...input, id: testId, groupId: null, createdAt: 0, updatedAt: 0 }
     try {
       // Open the tunnel (if any), then a REAL connectivity probe through it.
       // testConnection actually dials + runs SELECT 1 / ping — the lazy pooled

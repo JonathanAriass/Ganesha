@@ -1,6 +1,6 @@
 import type { Result } from './result'
 import type {
-  ConnectionConfig, ConnectionInput, HistoryEntry, HistoryEntryInput, AppSettings,
+  ConnectionConfig, ConnectionInput, ConnectionGroup, HistoryEntry, HistoryEntryInput, AppSettings,
   SavedQuery, SavedQueryInput, SavedQueryPatch, SessionTab,
   LocalModel, CatalogModel, LlmConversation, LlmMessage, SsmTunnel, SsmTunnelInput, AwsInstance
 } from './domain'
@@ -24,6 +24,11 @@ export interface IpcChannels {
   'connections.update': { req: { id: string; patch: Partial<ConnectionInput>; password?: string | null; sshSecrets?: Record<string, string> }; res: ConnectionConfig }
   'connections.delete': { req: string; res: null }
   'connections.duplicate': { req: string; res: ConnectionConfig }
+  'connections.setGroup': { req: { connectionId: string; groupId: string | null }; res: ConnectionConfig }
+  'groups.list': { req: void; res: ConnectionGroup[] }
+  'groups.create': { req: string; res: ConnectionGroup }
+  'groups.rename': { req: { id: string; name: string }; res: ConnectionGroup }
+  'groups.delete': { req: string; res: null }
   'history.add': { req: HistoryEntryInput; res: HistoryEntry }
   'history.list': { req: { connectionId: string; limit?: number }; res: HistoryEntry[] }
   'savedQueries.list': { req: string; res: SavedQuery[] }

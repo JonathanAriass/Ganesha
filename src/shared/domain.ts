@@ -46,8 +46,19 @@ export interface ConnectionInput {
 /** A stored connection (input + identity + timestamps), password excluded. */
 export interface ConnectionConfig extends ConnectionInput {
   id: string
+  /** Group this connection belongs to; null = ungrouped. Set via connections.setGroup, not the edit modal. */
+  groupId: string | null
   createdAt: number
   updatedAt: number
+}
+
+/** A named folder for connections (dashboard drag-and-drop target). */
+export interface ConnectionGroup {
+  id: string
+  name: string
+  /** Display order on the dashboard; new groups append. */
+  position: number
+  createdAt: number
 }
 
 /** Fields the user supplies for an AWS SSM port-forwarding tunnel. */

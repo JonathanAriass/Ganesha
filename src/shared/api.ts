@@ -15,6 +15,13 @@ export interface DbClientApi {
     duplicate(id: string): Promise<IpcResult<'connections.duplicate'>>
     test(input: ConnectionInput, password: string | null, id?: string, sshSecrets?: Record<string, string>): Promise<IpcResult<'connections.test'>>
     disconnect(id: string): Promise<IpcResult<'connections.disconnect'>>
+    setGroup(connectionId: string, groupId: string | null): Promise<IpcResult<'connections.setGroup'>>
+  }
+  groups: {
+    list(): Promise<IpcResult<'groups.list'>>
+    create(name: string): Promise<IpcResult<'groups.create'>>
+    rename(id: string, name: string): Promise<IpcResult<'groups.rename'>>
+    delete(id: string): Promise<IpcResult<'groups.delete'>>
   }
   history: {
     add(entry: HistoryEntryInput): Promise<IpcResult<'history.add'>>

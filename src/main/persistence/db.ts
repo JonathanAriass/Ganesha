@@ -86,6 +86,12 @@ export function migrate(db: DB): void {
       created_at      INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_llm_msg ON llm_messages(conversation_id, created_at);
+    CREATE TABLE IF NOT EXISTS connection_groups (
+      id         TEXT PRIMARY KEY,
+      name       TEXT NOT NULL,
+      position   INTEGER NOT NULL,
+      created_at INTEGER NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS ssm_tunnels (
       id            TEXT PRIMARY KEY,
       name          TEXT NOT NULL,
@@ -110,6 +116,8 @@ export function migrate(db: DB): void {
   addColumnIfMissing(db, 'connections', 'repo_path', 'TEXT')
   // Split views (added later): which side of a two-pane split a tab was on.
   addColumnIfMissing(db, 'session_tabs', 'pane', "TEXT NOT NULL DEFAULT 'left'")
+  // Connection groups (added later): nullable folder; deleting a group ungroups via FK.
+  addColumnIfMissing(db, 'connections', 'group_id', 'TEXT REFERENCES connection_groups(id) ON DELETE SET NULL')
   migrateSecretsCompositeKey(db)
 }
 

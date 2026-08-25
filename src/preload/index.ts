@@ -17,7 +17,14 @@ const api: DbClientApi = {
     delete: (id) => invoke('connections.delete', id),
     duplicate: (id) => invoke('connections.duplicate', id),
     test: (input, password, id, sshSecrets) => invoke('connections.test', { input, password, id, sshSecrets }),
-    disconnect: (id) => invoke('connections.disconnect', id)
+    disconnect: (id) => invoke('connections.disconnect', id),
+    setGroup: (connectionId, groupId) => invoke('connections.setGroup', { connectionId, groupId })
+  },
+  groups: {
+    list: () => invoke('groups.list', undefined),
+    create: (name) => invoke('groups.create', name),
+    rename: (id, name) => invoke('groups.rename', { id, name }),
+    delete: (id) => invoke('groups.delete', id)
   },
   history: {
     add: (entry) => invoke('history.add', entry),

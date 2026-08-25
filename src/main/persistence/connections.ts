@@ -6,7 +6,7 @@ interface Row {
   id: string; type: string; name: string; color: string; host: string; port: number
   username: string; db_name: string; ssl: number; read_only: number; require_commit: number
   auth_source: string; replica_set: string; ssh_json: string | null; repo_path: string | null
-  created_at: number; updated_at: number
+  group_id: string | null; created_at: number; updated_at: number
 }
 
 function toConfig(r: Row): ConnectionConfig {
@@ -16,7 +16,7 @@ function toConfig(r: Row): ConnectionConfig {
     ssl: !!r.ssl, readOnly: !!r.read_only, requireCommit: !!r.require_commit,
     authSource: r.auth_source, replicaSet: r.replica_set,
     ssh: r.ssh_json ? (JSON.parse(r.ssh_json) as ConnectionConfig['ssh']) : null,
-    repoPath: r.repo_path,
+    repoPath: r.repo_path, groupId: r.group_id,
     createdAt: r.created_at, updatedAt: r.updated_at
   }
 }
@@ -55,4 +55,16 @@ export function updateConnection(db: DB, id: string, patch: Partial<ConnectionIn
 
 export function deleteConnection(db: DB, id: string): void {
   db.prepare('DELETE FROM connections WHERE id = ?').run(id)
+}
+
+/** Assign/clear a connection's group. Validates the group exists (FK would also catch it,
+ *  but a clear error beats a constraint failure). */
+export function setConnectionGroup(db: DB, connectionId: string, groupId: string | null, now: number): ConnectionConfig {
+  if (groupId !== null) {
+    const g = db.prepare('SELECT id FROM connection_groups WHERE id = ?').get(groupId)
+    if (!g) throw new Error(`Group not found: ${groupId}`)
+  }
+  const res = db.prepare('UPDATE connections SET group_id = ?, updated_at = ? WHERE id = ?').run(groupId, now, connectionId)
+  if (res.changes === 0) throw new Error(`Connection not found: ${connectionId}`)
+  return getConnection(db, connectionId) as ConnectionConfig
 }
