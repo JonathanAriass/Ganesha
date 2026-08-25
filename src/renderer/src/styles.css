@@ -485,6 +485,50 @@ button, input, select, textarea {
 .dash-new-plus { font-size: 20px; line-height: 1; }
 .dash-hint { margin-top: 18px; color: var(--text-2); font-size: 11.5px; }
 
+/* Group sections: header (name · count · ⋯ menu) over that group's card grid.
+   The whole section — header included — is a drop target for dragged cards. */
+.dash-title-row { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+.dash-title-row .dash-title { margin-bottom: 0; }
+.dash-group {
+  max-width: 1100px;
+  /* Negative margin + matching padding: the dragover tint bleeds past the
+     content edge while cards stay aligned with the title. */
+  margin: 0 0 16px -8px;
+  padding: 6px 8px 10px;
+  border-radius: 8px;
+  outline: 2px dashed transparent;
+  outline-offset: -2px;
+}
+.dash-group.dragover {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  outline-color: var(--accent);
+}
+.dash-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 6px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.dash-group-name { font-weight: 600; font-size: 13px; }
+.dash-group-menu {
+  margin-left: auto;
+  padding: 0 6px;
+  background: none;
+  border: none;
+  border-radius: 5px;
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+.dash-group-menu:hover { background: var(--hover-overlay); color: var(--text); }
+.dash-drop-hint { color: var(--text-2); font-style: italic; font-size: 12px; padding: 6px 2px; }
+.dash-newgroup { display: inline-flex; align-items: center; }
+.dash-newgroup .filter-input { width: 170px; }
+.dash-error { color: var(--danger-text); font-size: 12px; margin-bottom: 12px; }
+
 .spacer { flex: 1; }
 
 /* ── Buttons ── */

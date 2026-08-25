@@ -17,6 +17,58 @@ export function useConnections() {
   })
 }
 
+// ── Connection groups ────────────────────────────────────────────────────────
+
+export function useGroups() {
+  return useQuery({
+    queryKey: ['groups'],
+    queryFn: () => window.api.groups.list().then(unwrap),
+    retry: false,
+  })
+}
+
+export function useCreateGroup() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (name: string) => window.api.groups.create(name).then(unwrap),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['groups'] }),
+  })
+}
+
+export function useRenameGroup() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, name }: { id: string; name: string }) =>
+      window.api.groups.rename(id, name).then(unwrap),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['groups'] }),
+  })
+}
+
+export function useDeleteGroup() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => window.api.groups.delete(id).then(unwrap),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['groups'] })
+      // Delete ungroups its members server-side — their groupId changed.
+      void qc.invalidateQueries({ queryKey: ['connections'] })
+    },
+  })
+}
+
+export function useSetConnectionGroup() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ connectionId, groupId }: { connectionId: string; groupId: string | null }) =>
+      window.api.connections.setGroup(connectionId, groupId).then(unwrap),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['groups'] })
+      // The connections list carries groupId — refetch so sections re-derive.
+      void qc.invalidateQueries({ queryKey: ['connections'] })
+    },
+  })
+}
+
 // ── Schema: objects ──────────────────────────────────────────────────────────
 
 export function useObjects(connectionId: string | null) {
