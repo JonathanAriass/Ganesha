@@ -525,8 +525,26 @@ button, input, select, textarea {
 }
 .dash-group-menu:hover { background: var(--hover-overlay); color: var(--text); }
 .dash-drop-hint { color: var(--text-2); font-style: italic; font-size: 12px; padding: 6px 2px; }
+/* Indented subgroup sub-section inside a root group section (max depth 2). Its own
+   nested drop target — the accent left border marks the containment. */
+.dash-subgroup {
+  margin: 10px 0 4px 18px;
+  padding: 4px 8px 8px;
+  border-left: 2px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  border-radius: 0 6px 6px 0;
+  outline: 2px dashed transparent;
+  outline-offset: -2px;
+}
+.dash-subgroup.dragover {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  outline-color: var(--accent);
+}
+.dash-subgroup .dash-group-head { padding-bottom: 4px; margin-bottom: 8px; }
+.dash-subgroup .dash-group-name { font-size: 12.5px; }
 .dash-newgroup { display: inline-flex; align-items: center; }
 .dash-newgroup .filter-input { width: 170px; }
+/* The "New subgroup" inline form, indented to line up with the subgroups it creates. */
+.dash-newgroup.sub { display: block; margin: 8px 0 2px 18px; }
 .dash-error { color: var(--danger-text); font-size: 12px; margin-bottom: 12px; }
 
 .spacer { flex: 1; }

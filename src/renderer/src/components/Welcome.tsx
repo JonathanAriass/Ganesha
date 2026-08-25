@@ -7,9 +7,10 @@ import { mod } from '../lib/platform'
 
 /** The empty-pane view, now a connections dashboard: every connection as a
  *  card (click = select, double-click = open a query tab, ✎ = edit), arranged
- *  in group sections (drag a card onto a section to move it), plus a dashed
- *  "New connection" card. The TopBar dropdown remains the quick picker;
- *  this is the visual overview. */
+ *  in group sections — root groups may nest one level of subgroups (indented
+ *  sub-sections, each its own drop target) — plus a dashed "New connection"
+ *  card. Drag a card onto any section to move it. The TopBar dropdown remains
+ *  the quick picker; this is the visual overview. */
 export default function Welcome(): JSX.Element {
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
   const setActiveConnection = useAppStore((s) => s.setActiveConnection)
@@ -26,6 +27,8 @@ export default function Welcome(): JSX.Element {
 
   // ＋ New group inline form (null = collapsed, string = the draft name).
   const [newGroupName, setNewGroupName] = useState<string | null>(null)
+  // "New subgroup" inline form inside a root section (from that group's ⋯ menu).
+  const [newSubgroup, setNewSubgroup] = useState<{ parentId: string; name: string } | null>(null)
   // Inline header rename (which group + the draft name).
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null)
   // Right-click / ⋯ context menu on a group header.
@@ -84,6 +87,14 @@ export default function Welcome(): JSX.Element {
     if (name) createGroup.mutate({ name, parentId: null }) // empty → just cancel (backend rejects blanks too)
   }
 
+  function commitNewSubgroup(): void {
+    if (!newSubgroup) return
+    const { parentId } = newSubgroup
+    const name = newSubgroup.name.trim()
+    setNewSubgroup(null)
+    if (name) createGroup.mutate({ name, parentId })
+  }
+
   function commitRename(): void {
     if (!renaming) return
     const name = renaming.name.trim()
@@ -101,9 +112,12 @@ export default function Welcome(): JSX.Element {
     return c.groupId != null && knownGroupIds.has(c.groupId) ? c.groupId : null
   }
 
-  function onSectionDragOver(e: DragEvent<HTMLElement>, section: GroupSection): void {
+  function onSectionDragOver(e: DragEvent<HTMLElement>, section: GroupSection, sub = false): void {
     // Without preventDefault here, drop never fires — so this also disables drops.
     if (!hasGroups || !e.dataTransfer.types.includes(CONN_MIME)) return
+    // Nested drop targets: a subgroup handles the drag alone — don't let the event
+    // bubble into the enclosing root section's handler too.
+    if (sub) e.stopPropagation()
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
     setDragOverKey(sectionKey(section))
@@ -114,8 +128,9 @@ export default function Welcome(): JSX.Element {
     if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOverKey(null)
   }
 
-  function onSectionDrop(e: DragEvent<HTMLElement>, section: GroupSection): void {
+  function onSectionDrop(e: DragEvent<HTMLElement>, section: GroupSection, sub = false): void {
     if (!e.dataTransfer.types.includes(CONN_MIME)) return
+    if (sub) e.stopPropagation() // the parent section must not also claim this drop
     e.preventDefault()
     setDragOverKey(null)
     const id = e.dataTransfer.getData(CONN_MIME)
@@ -143,11 +158,24 @@ export default function Welcome(): JSX.Element {
         >
           Rename
         </button>
+        {menu.group.parentId === null && (
+          <button
+            className="tab-menu-item"
+            role="menuitem"
+            onClick={() => {
+              setNewSubgroup({ parentId: menu.group.id, name: '' })
+              setMenu(null)
+            }}
+          >
+            New subgroup
+          </button>
+        )}
         <button
           className="tab-menu-item"
           role="menuitem"
           onClick={() => {
-            deleteGroup.mutate(menu.group.id) // non-destructive: members just become ungrouped
+            // Non-destructive: members ungroup; a parent's subgroups become root groups.
+            deleteGroup.mutate(menu.group.id)
             setMenu(null)
           }}
         >
@@ -232,6 +260,71 @@ export default function Welcome(): JSX.Element {
     </button>
   )
 
+  /** Section header — shared by root sections, subgroup sections, and Ungrouped
+   *  (g = null: fixed name, no menu, no rename). */
+  const groupHead = (g: ConnectionGroup | null, count: number): JSX.Element => (
+    <div
+      className="dash-group-head"
+      onContextMenu={
+        g
+          ? (e) => {
+              e.preventDefault()
+              setMenu({ x: e.clientX, y: e.clientY, group: g })
+            }
+          : undefined
+      }
+    >
+      {g && renaming?.id === g.id ? (
+        <input
+          className="filter-input"
+          autoFocus
+          value={renaming.name}
+          onChange={(e) => setRenaming({ id: g.id, name: e.target.value })}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commitRename()
+            else if (e.key === 'Escape') setRenaming(null)
+          }}
+          onBlur={() => setRenaming(null)}
+        />
+      ) : (
+        <span className="dash-group-name">{g ? g.name : 'Ungrouped'}</span>
+      )}
+      <span className="dash-badge">{count}</span>
+      {g && (
+        <button
+          className="dash-group-menu"
+          aria-label={`Group ${g.name} menu`}
+          title={g.parentId === null ? 'Rename, subgroup, or delete group' : 'Rename or delete group'}
+          onClick={(e) => setMenu({ x: e.clientX, y: e.clientY, group: g })}
+        >
+          ⋯
+        </button>
+      )}
+    </div>
+  )
+
+  /** One indented subgroup sub-section: smaller header + its own grid, and its own
+   *  drop target (handlers stop propagation so the parent section doesn't fire). */
+  const renderSubgroup = (s: GroupSection): JSX.Element => {
+    const g = s.group! // subgroup sections always carry a group
+    return (
+      <div
+        key={g.id}
+        className={`dash-subgroup${dragOverKey === g.id ? ' dragover' : ''}`}
+        onDragOver={(e) => onSectionDragOver(e, s, true)}
+        onDragLeave={onSectionDragLeave}
+        onDrop={(e) => onSectionDrop(e, s, true)}
+      >
+        {groupHead(g, s.connections.length)}
+        {s.connections.length === 0 ? (
+          <p className="dash-drop-hint">Drag connections here</p>
+        ) : (
+          <div className="dash-grid">{s.connections.map(card)}</div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="dash">
       <div className="dash-title-row">
@@ -274,46 +367,7 @@ export default function Welcome(): JSX.Element {
             onDragLeave={onSectionDragLeave}
             onDrop={(e) => onSectionDrop(e, section)}
           >
-            {hasGroups && (
-              <div
-                className="dash-group-head"
-                onContextMenu={
-                  g
-                    ? (e) => {
-                        e.preventDefault()
-                        setMenu({ x: e.clientX, y: e.clientY, group: g })
-                      }
-                    : undefined
-                }
-              >
-                {g && renaming?.id === g.id ? (
-                  <input
-                    className="filter-input"
-                    autoFocus
-                    value={renaming.name}
-                    onChange={(e) => setRenaming({ id: g.id, name: e.target.value })}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') commitRename()
-                      else if (e.key === 'Escape') setRenaming(null)
-                    }}
-                    onBlur={() => setRenaming(null)}
-                  />
-                ) : (
-                  <span className="dash-group-name">{g ? g.name : 'Ungrouped'}</span>
-                )}
-                <span className="dash-badge">{section.connections.length}</span>
-                {g && (
-                  <button
-                    className="dash-group-menu"
-                    aria-label={`Group ${g.name} menu`}
-                    title="Rename or delete group"
-                    onClick={(e) => setMenu({ x: e.clientX, y: e.clientY, group: g })}
-                  >
-                    ⋯
-                  </button>
-                )}
-              </div>
-            )}
+            {hasGroups && groupHead(g, section.connections.length)}
             {section.connections.length === 0 ? (
               <p className="dash-drop-hint">Drag connections here</p>
             ) : (
@@ -321,6 +375,23 @@ export default function Welcome(): JSX.Element {
                 {section.connections.map(card)}
                 {g === null && newConnectionCard}
               </div>
+            )}
+            {section.sub.map(renderSubgroup)}
+            {g && newSubgroup?.parentId === g.id && (
+              <span className="dash-newgroup sub">
+                <input
+                  className="filter-input"
+                  placeholder="Subgroup name"
+                  autoFocus
+                  value={newSubgroup.name}
+                  onChange={(e) => setNewSubgroup({ parentId: g.id, name: e.target.value })}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') commitNewSubgroup()
+                    else if (e.key === 'Escape') setNewSubgroup(null)
+                  }}
+                  onBlur={() => setNewSubgroup(null)}
+                />
+              </span>
             )}
           </section>
         )
