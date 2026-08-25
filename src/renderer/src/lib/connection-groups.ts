@@ -21,9 +21,10 @@ export interface GroupSection {
  *  there is always a drop target to un-group a card.
  *
  *  Stale references never drop data: a group whose `parentId` matches no existing
- *  root is promoted to a root section, and a connection whose `groupId` matches no
- *  group falls back to ungrouped. (`position` is global append order and a subgroup
- *  is always created after its parent, so parents precede children in the sort.) */
+ *  group is promoted to a root section, and a connection whose `groupId` matches no
+ *  group falls back to ungrouped. The tree build is two-pass (roots first, then
+ *  attach children by id), so it does NOT depend on parents sorting before children —
+ *  a future group-reorder API can't silently flatten the tree. */
 export function groupSections(
   groups: ConnectionGroup[],
   connections: ConnectionConfig[]
@@ -39,18 +40,27 @@ export function groupSections(
     else ungrouped.push(c) // null groupId, or stale id pointing at no group
   }
 
+  // A root is a group with no parent, or whose parent doesn't exist (stale → promoted).
+  const ids = new Set(ordered.map((g) => g.id))
+  const isRoot = (g: ConnectionGroup): boolean => g.parentId == null || !ids.has(g.parentId)
+
+  // Pass 1: root sections in position order. Pass 2: attach children by parent id —
+  // a child whose parent is itself a child (corrupt depth>2 data) promotes to root
+  // rather than vanishing.
   const sections: GroupSection[] = []
   const rootById = new Map<string, GroupSection>()
   for (const g of ordered) {
+    if (!isRoot(g)) continue
     const section: GroupSection = { group: g, connections: byGroup.get(g.id)!, sub: [] }
-    const parent = g.parentId != null ? rootById.get(g.parentId) : undefined
-    if (parent) {
-      parent.sub.push(section)
-    } else {
-      // parentId null, or stale (no such root) → root section, in position order.
-      sections.push(section)
-      rootById.set(g.id, section)
-    }
+    sections.push(section)
+    rootById.set(g.id, section)
+  }
+  for (const g of ordered) {
+    if (isRoot(g)) continue
+    const section: GroupSection = { group: g, connections: byGroup.get(g.id)!, sub: [] }
+    const parent = rootById.get(g.parentId!)
+    if (parent) parent.sub.push(section)
+    else sections.push(section)
   }
   sections.push({ group: null, connections: ungrouped, sub: [] })
   return sections

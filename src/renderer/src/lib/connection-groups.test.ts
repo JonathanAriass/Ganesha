@@ -119,3 +119,14 @@ describe('groupSections', () => {
     expect(conns).toEqual(connsCopy)
   })
 })
+
+describe('order independence', () => {
+  it('nests a child that sorts BEFORE its parent (future reorder APIs must not flatten it)', () => {
+    // Inverted positions: the child carries position 0, the parent 1.
+    const parent = { id: 'p', name: 'Prod', position: 1, createdAt: 2, parentId: null }
+    const child = { id: 'c', name: 'EU', position: 0, createdAt: 1, parentId: 'p' }
+    const out = groupSections([parent, child], [])
+    expect(out.map((s) => s.group?.id ?? null)).toEqual(['p', null])
+    expect(out[0].sub.map((s) => s.group?.id)).toEqual(['c'])
+  })
+})
