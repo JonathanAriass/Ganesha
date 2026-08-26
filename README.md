@@ -42,7 +42,7 @@ Ganesha is a desktop client for the four databases people actually reach for, bu
 
 ### Connect
 
-- **Four engines, one app** — create, test, edit and color-code connections for PostgreSQL, MySQL, MariaDB and MongoDB. Passwords are encrypted with the OS keychain (Electron `safeStorage`) and are *write-only*: no IPC channel can read one back into the UI.
+- **Four engines, one app** — create, test, edit and color-code connections for PostgreSQL, MySQL, MariaDB and MongoDB, shown as cards on a connections dashboard you can organize into **groups and subgroups** by drag-and-drop. Passwords are encrypted with the OS keychain (Electron `safeStorage`) and are *write-only*: no IPC channel can read one back into the UI.
 - **SSH tunnels** — reach a database through one or more SSH hops (a jump-server chain, e.g. bastion → private host), configured per connection. Each hop authenticates with a private key (+ optional passphrase) or a password; those secrets are keychain-encrypted and write-only too. The tunnel is opened in the main process and the drivers connect through it unchanged.
 - **Read-only enforcement, twice** — on connections marked read-only, SQL is statement-guarded (writes/DDL rejected, including `SELECT INTO`) *and* runs inside a server-side `READ ONLY` transaction; Mongo commands pass an allow-list that also blocks `$out`/`$merge` aggregations.
 
@@ -138,8 +138,8 @@ npm run dev        # launch the app with hot reload
 
 ```bash
 npm run typecheck && npm run lint
-npm test                  # 839 unit tests (Vitest, Node ABI)
-npm run test:integration  # 42 tests vs real Postgres/MySQL/Mongo + an SSH tunnel (testcontainers, needs Docker)
+npm test                  # 870 unit tests (Vitest, Node ABI)
+npm run test:integration  # 47 tests vs real Postgres/MySQL/Mongo + an SSH tunnel (testcontainers, needs Docker)
 ```
 
 CI (GitHub Actions) runs typecheck + lint + unit tests on every push.
