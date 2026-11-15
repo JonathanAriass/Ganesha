@@ -44,6 +44,7 @@ Ganesha is a desktop client for the four databases people actually reach for, bu
 
 - **Four engines, one app** — create, test, edit and color-code connections for PostgreSQL, MySQL, MariaDB and MongoDB, shown as cards on a connections dashboard you can organize into **groups and subgroups** by drag-and-drop. Passwords are encrypted with the OS keychain (Electron `safeStorage`) and are *write-only*: no IPC channel can read one back into the UI.
 - **SSH tunnels** — reach a database through one or more SSH hops (a jump-server chain, e.g. bastion → private host), configured per connection. Each hop authenticates with a private key (+ optional passphrase) or a password; those secrets are keychain-encrypted and write-only too. The tunnel is opened in the main process and the drivers connect through it unchanged.
+- **Export & import** — move your setup to another machine or hand your connections to teammates: **Export…** on the dashboard writes the connections you pick (with their groups and subgroups) to a `.ganesha-connections` file, and **Import…** adds them to another install. Passwords and SSH secrets stay out of the file unless you opt in, in which case they're encrypted with a passphrase you choose (AES-256-GCM, scrypt-derived key) — share the passphrase separately. Importing never changes what you already have: connections you already have are skipped and groups are matched by name. Saved queries, history and SSM tunnels aren't included.
 - **Read-only enforcement, twice** — on connections marked read-only, SQL is statement-guarded (writes/DDL rejected, including `SELECT INTO`) *and* runs inside a server-side `READ ONLY` transaction; Mongo commands pass an allow-list that also blocks `$out`/`$merge` aggregations.
 
 ### Explore & query
@@ -138,7 +139,7 @@ npm run dev        # launch the app with hot reload
 
 ```bash
 npm run typecheck && npm run lint
-npm test                  # 870 unit tests (Vitest, Node ABI)
+npm test                  # 883 unit tests (Vitest, Node ABI)
 npm run test:integration  # 47 tests vs real Postgres/MySQL/Mongo + an SSH tunnel (testcontainers, needs Docker)
 ```
 
@@ -178,7 +179,7 @@ The full design spec and the per-feature implementation plans live in [`docs/sup
 - The renderer runs sandboxed (`sandbox: true`, `contextIsolation: true`, `nodeIntegration: false`) behind a strict CSP.
 - All main↔renderer traffic goes through one typed IPC contract (`src/shared/ipc.ts`); every handler returns a `Result<T>` envelope — no exceptions cross the bridge.
 - Popups are denied and navigation is locked to the app itself (`will-navigate` compared by origin, deny on anything unparseable).
-- Credentials never leave the main process in a plaintext-readable form.
+- Credentials never leave the main process in a plaintext-readable form. The one way out is an export you explicitly opt into, where the main process encrypts them with your passphrase before writing the file — the renderer never sees them.
 
 Found a security issue? Please open a private report rather than a public issue (see [CONTRIBUTING.md](CONTRIBUTING.md)).
 

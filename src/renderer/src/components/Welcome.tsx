@@ -4,6 +4,8 @@ import { useAppStore } from '../state/store'
 import { useConnections, useGroups, useCreateGroup, useRenameGroup, useDeleteGroup, useSetConnectionGroup } from '../lib/hooks'
 import { groupSections, CONN_MIME, type GroupSection } from '../lib/connection-groups'
 import { mod } from '../lib/platform'
+import { unwrap } from '../lib/result'
+import ConnectionTransferModal, { type TransferModalState } from './ConnectionTransferModal'
 
 /** The empty-pane view, now a connections dashboard: every connection as a
  *  card (click = select, double-click = open a query tab, ✎ = edit), arranged
@@ -35,6 +37,22 @@ export default function Welcome(): JSX.Element {
   const [menu, setMenu] = useState<{ x: number; y: number; group: ConnectionGroup } | null>(null)
   // Section currently hovered by a card drag (key = group id or 'ungrouped').
   const [dragOverKey, setDragOverKey] = useState<string | null>(null)
+  // Export / import dialog (null = closed) and a failure picking the import file.
+  const [transfer, setTransfer] = useState<TransferModalState | null>(null)
+  const [importError, setImportError] = useState<string | null>(null)
+
+  /** Native file picker first; the dialog only opens once a valid file is chosen. */
+  async function startImport(): Promise<void> {
+    setImportError(null)
+    try {
+      const preview = unwrap(await window.api.connections.importPick())
+      if (preview) setTransfer({ mode: 'import', preview })
+    } catch (e) {
+      setImportError(e instanceof Error ? e.message : String(e))
+    }
+  }
+
+  const transferEl = transfer && <ConnectionTransferModal state={transfer} onClose={() => setTransfer(null)} />
 
   if (isLoading || groupsLoading) {
     return (
@@ -65,6 +83,15 @@ export default function Welcome(): JSX.Element {
         <button className="btn primary" onClick={() => openModal({ mode: 'create' })}>
           + New connection
         </button>
+        <button className="btn" onClick={() => void startImport()}>
+          Import connections…
+        </button>
+        {importError && (
+          <p className="dash-error" role="alert">
+            {importError}
+          </p>
+        )}
+        {transferEl}
       </div>
     )
   }
@@ -79,7 +106,7 @@ export default function Welcome(): JSX.Element {
 
   // First mutation error wins for the inline notice; each clears on its next mutate.
   const mutError = createGroup.error ?? renameGroup.error ?? deleteGroup.error ?? setGroup.error
-  const mutErrorMsg = mutError ? (mutError instanceof Error ? mutError.message : String(mutError)) : null
+  const mutErrorMsg = mutError ? (mutError instanceof Error ? mutError.message : String(mutError)) : importError
 
   function commitNewGroup(): void {
     const name = (newGroupName ?? '').trim()
@@ -349,6 +376,12 @@ export default function Welcome(): JSX.Element {
             </button>
           )}
         </span>
+        <button className="btn" onClick={() => void startImport()}>
+          Import…
+        </button>
+        <button className="btn" onClick={() => setTransfer({ mode: 'export', connections })}>
+          Export…
+        </button>
       </div>
       <p className="dash-sub">Click a card to select it — double-click to open a query tab.</p>
       {mutErrorMsg && (
@@ -400,6 +433,7 @@ export default function Welcome(): JSX.Element {
           so the new-connection card gets its own trailing grid. */}
       {ungroupedEmpty && <div className="dash-grid">{newConnectionCard}</div>}
       {menuEl}
+      {transferEl}
       <p className="dash-hint">
         {mod}K palette · double-click a table to query it · {mod}B toggles the side panel
       </p>

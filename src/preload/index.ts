@@ -18,7 +18,10 @@ const api: DbClientApi = {
     duplicate: (id) => invoke('connections.duplicate', id),
     test: (input, password, id, sshSecrets) => invoke('connections.test', { input, password, id, sshSecrets }),
     disconnect: (id) => invoke('connections.disconnect', id),
-    setGroup: (connectionId, groupId) => invoke('connections.setGroup', { connectionId, groupId })
+    setGroup: (connectionId, groupId) => invoke('connections.setGroup', { connectionId, groupId }),
+    export: (connectionIds, passphrase) => invoke('connections.export', { connectionIds, passphrase }),
+    importPick: () => invoke('connections.importPick', undefined),
+    import: (passphrase) => invoke('connections.import', { passphrase })
   },
   groups: {
     list: () => invoke('groups.list', undefined),

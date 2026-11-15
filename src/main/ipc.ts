@@ -22,7 +22,10 @@ import { ResultCache } from './query-cache'
 import { SshTunnelManager } from './ssh/tunnel-manager'
 import { connectVia, disconnectVia, openTunnel } from './connection-runtime'
 import { buildConnectParams } from './drivers/params'
-import { readFileSync } from 'fs'
+import { readFileSync, writeFileSync, existsSync } from 'fs'
+import { basename } from 'path'
+import { buildExport, applyImport, parseTransferFile, type TransferFile } from './persistence/connection-transfer'
+import { TRANSFER_EXTENSION } from '../shared/transfer'
 import { randomUUID } from 'crypto'
 import { EngineHost } from './llm/engine-host'
 import { MODEL_CATALOG } from './llm/catalog'
@@ -121,6 +124,10 @@ function connectStored(driver: ReturnType<DriverManager['get']>, config: Connect
     dbPassword: secrets.getPassword(config.id)
   })
 }
+
+/** The file chosen via connections.importPick, held here (never sent to the renderer)
+ *  until connections.import commits it. */
+let pendingImport: TransferFile | null = null
 
 type Handler<K extends ChannelName> = (req: Req<K>) => Result<Res<K>> | Promise<Result<Res<K>>>
 
@@ -222,6 +229,49 @@ export function registerIpcHandlers(): void {
   })
 
   handle('connections.setGroup', ({ connectionId, groupId }) => ok(conns.setConnectionGroup(store().db, connectionId, groupId, now())))
+
+  // ── Export / import ──
+  // Secrets are read, encrypted and written entirely in the main process: the renderer
+  // supplies only ids and a passphrase, so stored passwords stay write-only to the UI.
+  handle('connections.export', async ({ connectionIds, passphrase }) => {
+    const { db, secrets } = store()
+    // Build (and validate) before prompting, so a bad passphrase never opens a dialog.
+    const file = buildExport(db, secrets, { connectionIds, passphrase }, now())
+    const win = BrowserWindow.getFocusedWindow()
+    const opts = {
+      title: 'Export connections',
+      defaultPath: `connections.${TRANSFER_EXTENSION}`,
+      filters: [{ name: 'Ganesha connections', extensions: [TRANSFER_EXTENSION] }]
+    }
+    const r = win ? await dialog.showSaveDialog(win, opts) : await dialog.showSaveDialog(opts)
+    if (r.canceled || !r.filePath) return ok(null)
+    // Owner-only: even without secrets the file lists hosts and usernames.
+    writeFileSync(r.filePath, JSON.stringify(file, null, 2), { mode: 0o600 })
+    return ok({ path: r.filePath, connections: file.connections.length, withSecrets: file.secrets !== null })
+  })
+  handle('connections.importPick', async () => {
+    const win = BrowserWindow.getFocusedWindow()
+    const opts = {
+      title: 'Import connections',
+      properties: ['openFile'] as Array<'openFile'>,
+      filters: [{ name: 'Ganesha connections', extensions: [TRANSFER_EXTENSION, 'json'] }]
+    }
+    const r = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
+    if (r.canceled || r.filePaths.length === 0) return ok(null)
+    const file = parseTransferFile(readFileSync(r.filePaths[0], 'utf8'))
+    pendingImport = file
+    return ok({
+      fileName: basename(r.filePaths[0]), connections: file.connections.length,
+      groups: file.groups.length, hasSecrets: file.secrets !== null
+    })
+  })
+  handle('connections.import', ({ passphrase }) => {
+    if (!pendingImport) throw new Error('No file selected to import')
+    const { db, secrets } = store()
+    const result = applyImport(db, secrets, pendingImport, passphrase, now(), (p) => existsSync(p))
+    pendingImport = null // kept on a thrown error (wrong passphrase) so the user can retry
+    return ok(result)
+  })
 
   handle('groups.list', () => ok(groups.listGroups(store().db)))
   handle('groups.create', ({ name, parentId }) => ok(groups.createGroup(store().db, name, now(), parentId)))

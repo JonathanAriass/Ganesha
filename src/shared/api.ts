@@ -16,6 +16,9 @@ export interface DbClientApi {
     test(input: ConnectionInput, password: string | null, id?: string, sshSecrets?: Record<string, string>): Promise<IpcResult<'connections.test'>>
     disconnect(id: string): Promise<IpcResult<'connections.disconnect'>>
     setGroup(connectionId: string, groupId: string | null): Promise<IpcResult<'connections.setGroup'>>
+    export(connectionIds: string[] | null, passphrase: string | null): Promise<IpcResult<'connections.export'>>
+    importPick(): Promise<IpcResult<'connections.importPick'>>
+    import(passphrase: string | null): Promise<IpcResult<'connections.import'>>
   }
   groups: {
     list(): Promise<IpcResult<'groups.list'>>

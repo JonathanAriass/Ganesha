@@ -546,6 +546,14 @@ button, input, select, textarea {
 /* The "New subgroup" inline form, indented to line up with the subgroups it creates. */
 .dash-newgroup.sub { display: block; margin: 8px 0 2px 18px; }
 .dash-error { color: var(--danger-text); font-size: 12px; margin-bottom: 12px; }
+/* Export dialog: scrollable pick-list of connections. */
+.transfer-list {
+  display: flex; flex-direction: column; gap: 6px;
+  max-height: 220px; overflow-y: auto;
+  padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius);
+}
+.transfer-list .transfer-name { color: var(--text); }
+.transfer-list .hint { margin-left: auto; white-space: nowrap; }
 
 .spacer { flex: 1; }
 

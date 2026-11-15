@@ -4,6 +4,7 @@ import type {
   SavedQuery, SavedQueryInput, SavedQueryPatch, SessionTab,
   LocalModel, CatalogModel, LlmConversation, LlmMessage, SsmTunnel, SsmTunnelInput, AwsInstance
 } from './domain'
+import type { ExportResult, ImportPreview, ImportResult } from './transfer'
 import type { QueryResult, RowEdit, FilterQuery } from './query'
 import type { DbObject, ObjectRef, ColumnInfo, Relationship, TableColumns, TableInfo } from './schema'
 import type { TelescopeEntry, TelescopeEntryDetail, TelescopePage, TelescopeDetectResult, TelescopeFilter } from './telescope'
@@ -25,6 +26,13 @@ export interface IpcChannels {
   'connections.delete': { req: string; res: null }
   'connections.duplicate': { req: string; res: ConnectionConfig }
   'connections.setGroup': { req: { connectionId: string; groupId: string | null }; res: ConnectionConfig }
+  /** Shows a save dialog and writes the export file; null = the user cancelled.
+   *  passphrase null = no secrets in the file. Secrets never pass through the renderer. */
+  'connections.export': { req: { connectionIds: string[] | null; passphrase: string | null }; res: ExportResult | null }
+  /** Shows an open dialog and parses the picked file (kept in main until imported); null = cancelled. */
+  'connections.importPick': { req: void; res: ImportPreview | null }
+  /** Imports the file picked by importPick. passphrase null = skip the file's secrets. */
+  'connections.import': { req: { passphrase: string | null }; res: ImportResult }
   'groups.list': { req: void; res: ConnectionGroup[] }
   'groups.create': { req: { name: string; parentId: string | null }; res: ConnectionGroup }
   'groups.rename': { req: { id: string; name: string }; res: ConnectionGroup }
