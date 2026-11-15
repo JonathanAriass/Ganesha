@@ -9,7 +9,7 @@ on:
 
 jobs:
   publish:
-    runs-on: macos-14 # Apple Silicon — yields the arm64 @node-llama-cpp/mac-arm64-metal prebuilt
+    runs-on: macos-15 # Apple Silicon — yields the arm64 @node-llama-cpp/mac-arm64-metal prebuilt
     permissions:
       contents: write
     steps:
