@@ -2,21 +2,27 @@ import { useState, type DragEvent } from 'react'
 import type { ConnectionConfig, ConnectionGroup } from '@shared/domain'
 import { useAppStore } from '../state/store'
 import { useConnections, useGroups, useCreateGroup, useRenameGroup, useDeleteGroup, useSetConnectionGroup } from '../lib/hooks'
-import { groupSections, CONN_MIME, type GroupSection } from '../lib/connection-groups'
+import { groupSections, filterSections, CONN_MIME, type GroupSection } from '../lib/connection-groups'
+import { groupTabs } from '../lib/tab-groups'
+import { connectionModeText, connectionModeShort, openTabsLabel } from '../lib/connection-display'
+import EnvTag from './EnvTag'
+import { Icon } from './icons'
 import { mod } from '../lib/platform'
 import { startImport } from '../lib/transfer-actions'
 
 /** The empty-pane view, now a connections dashboard: every connection as a
- *  card (click = select, double-click = open a query tab, ✎ = edit), arranged
+ *  card (click = select, double-click = open a query tab, pencil = edit), arranged
  *  in group sections — root groups may nest one level of subgroups (indented
- *  sub-sections, each its own drop target) — plus a dashed "New connection"
- *  card. Drag a card onto any section to move it. The TopBar dropdown remains
+ *  sub-sections, each its own drop target) — under one action row (filter, import,
+ *  export, new group, new connection). Drag a card onto any section to move it
+ *  (not while a filter is active). The TopBar dropdown remains
  *  the quick picker; this is the visual overview. */
 export default function Welcome(): JSX.Element {
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
   const setActiveConnection = useAppStore((s) => s.setActiveConnection)
   const openQueryTab = useAppStore((s) => s.openQueryTab)
   const openModal = useAppStore((s) => s.openModal)
+  const tabs = useAppStore((s) => s.tabs)
 
   const { data: connections, isLoading, error } = useConnections()
   const { data: groups, isLoading: groupsLoading, error: groupsError } = useGroups()
@@ -39,6 +45,8 @@ export default function Welcome(): JSX.Element {
   // A failure picking the import file (the dialog itself lives in the store).
   const setTransferModal = useAppStore((s) => s.setTransferModal)
   const [importError, setImportError] = useState<string | null>(null)
+  // Dashboard filter (name / host / engine).
+  const [filter, setFilter] = useState('')
 
   async function importConnections(): Promise<void> {
     setImportError(null)
@@ -86,13 +94,13 @@ export default function Welcome(): JSX.Element {
     )
   }
 
-  const sections = groupSections(groups ?? [], connections)
+  const filtering = filter.trim() !== ''
+  const sections = filterSections(groupSections(groups ?? [], connections), filter)
+  const openTabs = new Map(groupTabs(tabs).map((g) => [g.connectionId, g.tabs.length]))
   const knownGroupIds = new Set((groups ?? []).map((g) => g.id))
   // No groups → the single ungrouped section renders headerless (pre-groups look)
   // and isn't a drop target — there is nowhere to move a card to.
   const hasGroups = (groups ?? []).length > 0
-  // The ungrouped section is always last; empty means every connection is grouped.
-  const ungroupedEmpty = sections[sections.length - 1].connections.length === 0
 
   // First mutation error wins for the inline notice; each clears on its next mutate.
   const mutError = createGroup.error ?? renameGroup.error ?? deleteGroup.error ?? setGroup.error
@@ -131,7 +139,7 @@ export default function Welcome(): JSX.Element {
 
   function onSectionDragOver(e: DragEvent<HTMLElement>, section: GroupSection, sub = false): void {
     // Without preventDefault here, drop never fires — so this also disables drops.
-    if (!hasGroups || !e.dataTransfer.types.includes(CONN_MIME)) return
+    if (!hasGroups || filtering || !e.dataTransfer.types.includes(CONN_MIME)) return
     // Nested drop targets: a subgroup handles the drag alone — don't let the event
     // bubble into the enclosing root section's handler too.
     if (sub) e.stopPropagation()
@@ -202,7 +210,10 @@ export default function Welcome(): JSX.Element {
     </div>
   )
 
-  const card = (c: ConnectionConfig): JSX.Element => (
+  const card = (c: ConnectionConfig): JSX.Element => {
+    const modeShort = connectionModeShort(c)
+    const tabsLabel = openTabsLabel(openTabs.get(c.id) ?? 0)
+    return (
     <button
       key={c.id}
       className={`dash-card${c.id === activeConnectionId ? ' active' : ''}`}
@@ -245,14 +256,15 @@ export default function Welcome(): JSX.Element {
             }
           }}
         >
-          ✎
+          <Icon name="pencil" size={14} />
         </span>
       </span>
       <span className="dash-card-meta">
         <span className="dash-badge">{c.type}</span>
-        {c.readOnly && (
-          <span className="dash-badge lock" title="Read-only connection">
-            🔒 read-only
+        <EnvTag connection={c} />
+        {modeShort && (
+          <span className="dash-card-mode" title={connectionModeText(c)}>
+            {modeShort}
           </span>
         )}
       </span>
@@ -260,22 +272,15 @@ export default function Welcome(): JSX.Element {
         {c.host}:{c.port}
         {c.database ? ` · ${c.database}` : ''}
       </span>
+      {tabsLabel && <span className="dash-card-tabs">{tabsLabel}</span>}
       {c.id === activeConnectionId && (
         <span className="dash-card-check" aria-hidden="true">
           ✓ active
         </span>
       )}
     </button>
-  )
-
-  const newConnectionCard = (
-    <button className="dash-card new" onClick={() => openModal({ mode: 'create' })}>
-      <span className="dash-new-plus" aria-hidden="true">
-        ＋
-      </span>
-      <span>New connection</span>
-    </button>
-  )
+    )
+  }
 
   /** Section header — shared by root sections, subgroup sections, and Ungrouped
    *  (g = null: fixed name, no menu, no rename). */
@@ -314,7 +319,7 @@ export default function Welcome(): JSX.Element {
           title={g.parentId === null ? 'Rename, subgroup, or delete group' : 'Rename or delete group'}
           onClick={(e) => setMenu({ x: e.clientX, y: e.clientY, group: g })}
         >
-          ⋯
+          <Icon name="more" size={16} />
         </button>
       )}
     </div>
@@ -344,33 +349,47 @@ export default function Welcome(): JSX.Element {
 
   return (
     <div className="dash">
-      <div className="dash-title-row">
-        <h2 className="dash-title">Connections</h2>
-        <span className="dash-newgroup">
-          {newGroupName !== null ? (
-            <input
-              className="filter-input"
-              placeholder="Group name"
-              autoFocus
-              value={newGroupName}
-              onChange={(e) => setNewGroupName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') commitNewGroup()
-                else if (e.key === 'Escape') setNewGroupName(null)
-              }}
-              onBlur={() => setNewGroupName(null)}
-            />
-          ) : (
-            <button className="btn" onClick={() => setNewGroupName('')}>
-              ＋ New group
-            </button>
-          )}
-        </span>
+      <h2 className="dash-title">Connections</h2>
+      <div className="dash-actions">
+        <div className="dash-filter">
+          <Icon name="search" size={14} />
+          <input
+            className="dash-filter-input"
+            placeholder="Filter by name, host or engine"
+            aria-label="Filter connections"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setFilter('')
+            }}
+          />
+        </div>
         <button className="btn" onClick={() => void importConnections()}>
-          Import…
+          <Icon name="import" size={14} /> Import…
         </button>
         <button className="btn" onClick={() => setTransferModal({ mode: 'export', connections })}>
-          Export…
+          <Icon name="export" size={14} /> Export…
+        </button>
+        {newGroupName !== null ? (
+          <input
+            className="filter-input"
+            placeholder="Group name"
+            autoFocus
+            value={newGroupName}
+            onChange={(e) => setNewGroupName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitNewGroup()
+              else if (e.key === 'Escape') setNewGroupName(null)
+            }}
+            onBlur={() => setNewGroupName(null)}
+          />
+        ) : (
+          <button className="btn" onClick={() => setNewGroupName('')}>
+            <Icon name="plus" size={14} /> New group
+          </button>
+        )}
+        <button className="btn primary" onClick={() => openModal({ mode: 'create' })}>
+          <Icon name="plus" size={14} /> New connection
         </button>
       </div>
       <p className="dash-sub">Click a card to select it — double-click to open a query tab.</p>
@@ -379,6 +398,7 @@ export default function Welcome(): JSX.Element {
           {mutErrorMsg}
         </p>
       )}
+      {filtering && sections.length === 0 && <p className="dash-empty">No connections match</p>}
       {sections.map((section) => {
         const key = sectionKey(section)
         const g = section.group
@@ -394,10 +414,7 @@ export default function Welcome(): JSX.Element {
             {section.connections.length === 0 ? (
               <p className="dash-drop-hint">Drag connections here</p>
             ) : (
-              <div className="dash-grid">
-                {section.connections.map(card)}
-                {g === null && newConnectionCard}
-              </div>
+              <div className="dash-grid">{section.connections.map(card)}</div>
             )}
             {section.sub.map(renderSubgroup)}
             {g && newSubgroup?.parentId === g.id && (
@@ -419,9 +436,6 @@ export default function Welcome(): JSX.Element {
           </section>
         )
       })}
-      {/* Everything is grouped → the Ungrouped section shows only the drop hint,
-          so the new-connection card gets its own trailing grid. */}
-      {ungroupedEmpty && <div className="dash-grid">{newConnectionCard}</div>}
       {menuEl}
       <p className="dash-hint">
         {mod}K palette · double-click a table to query it · {mod}B toggles the side panel

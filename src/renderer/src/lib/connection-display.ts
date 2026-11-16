@@ -22,3 +22,16 @@ export function connectionAccessibleName(c: { name: string; environment: string;
 export function connectionHostText(c: { type: string; host: string; port: number }): string {
   return `${c.type} · ${c.host}:${c.port}`
 }
+
+/** Short edit-mode label for the dashboard card ('' when edits apply immediately). */
+export function connectionModeShort(c: { readOnly: boolean; requireCommit: boolean }): string {
+  if (c.readOnly) return 'Read-only'
+  if (c.requireCommit) return 'Edits staged'
+  return ''
+}
+
+/** "N tab(s) open" for the dashboard card; nothing for 0. */
+export function openTabsLabel(n: number): string {
+  if (n <= 0) return ''
+  return n === 1 ? '1 tab open' : `${n} tabs open`
+}

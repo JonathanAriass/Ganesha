@@ -101,3 +101,31 @@ export function sidebarRows(sections: GroupSection[], collapsed: ReadonlySet<str
   }
   return rows
 }
+
+/** Dashboard filter: case-insensitive substring match (plain text, never a pattern)
+ *  on name, host and engine. A blank query matches everything. */
+export function matchesConnection(
+  c: Pick<ConnectionConfig, 'name' | 'host' | 'type'>,
+  query: string
+): boolean {
+  const q = query.trim().toLowerCase()
+  if (!q) return true
+  return [c.name, c.host, c.type].some((f) => f.toLowerCase().includes(q))
+}
+
+/** Narrow the dashboard sections to the connections matching `query`. A blank query
+ *  returns the sections unchanged (empty groups stay — they are drop targets). With a
+ *  query, groups/subgroups left with nothing are removed, a root survives when it or
+ *  any of its subgroups match, and the ungrouped section survives only with matches. */
+export function filterSections(sections: GroupSection[], query: string): GroupSection[] {
+  if (!query.trim()) return sections
+  const out: GroupSection[] = []
+  for (const s of sections) {
+    const connections = s.connections.filter((c) => matchesConnection(c, query))
+    const sub = s.sub
+      .map((x) => ({ ...x, connections: x.connections.filter((c) => matchesConnection(c, query)) }))
+      .filter((x) => x.connections.length > 0)
+    if (connections.length > 0 || sub.length > 0) out.push({ ...s, connections, sub })
+  }
+  return out
+}

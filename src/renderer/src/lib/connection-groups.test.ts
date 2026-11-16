@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { ConnectionConfig, ConnectionGroup } from '@shared/domain'
-import { groupSections, sidebarRows } from './connection-groups'
+import { filterSections, groupSections, matchesConnection, sidebarRows } from './connection-groups'
 
 const group = (id: string, position: number, createdAt = 0, parentId: string | null = null): ConnectionGroup => ({
   id,
@@ -177,5 +177,57 @@ describe('sidebarRows', () => {
     const r = rows([], [group('empty', 0)], [])
     expect(r).toHaveLength(1)
     expect(r[0]).toMatchObject({ kind: 'group', depth: 0, collapsed: false, count: 0 })
+  })
+})
+
+describe('matchesConnection', () => {
+  const c = { name: 'orders-prod', host: 'db.internal', type: 'postgres' as const }
+  it('blank queries match everything', () => {
+    expect(matchesConnection(c, '')).toBe(true)
+    expect(matchesConnection(c, '   ')).toBe(true)
+  })
+  it('matches name, host and engine case-insensitively', () => {
+    expect(matchesConnection(c, 'ORDERS')).toBe(true)
+    expect(matchesConnection(c, 'internal')).toBe(true)
+    expect(matchesConnection(c, 'postg')).toBe(true)
+    expect(matchesConnection(c, 'mysql')).toBe(false)
+  })
+  it('treats the query as plain text, not a pattern', () => {
+    expect(matchesConnection(c, '.*')).toBe(false)
+    expect(matchesConnection({ ...c, name: 'a(b' }, '(')).toBe(true)
+  })
+})
+
+describe('filterSections', () => {
+  const named = (id: string, name: string, groupId: string | null = null): ConnectionConfig =>
+    ({ id, groupId, name, host: 'h', type: 'postgres' }) as ConnectionConfig
+  const groups = [group('work', 0), group('empty', 1), group('staging', 0, 0, 'work')]
+  const conns = [named('a', 'alpha', 'work'), named('b', 'beta', 'staging'), named('c', 'gamma')]
+  const sections = groupSections(groups, conns)
+
+  it('blank query returns the input unchanged, empty groups kept', () => {
+    expect(filterSections(sections, '')).toEqual(sections)
+    expect(filterSections(sections, '  ')).toEqual(sections)
+    expect(filterSections(sections, '').map((s) => s.group?.id ?? null)).toEqual(['work', 'empty', null])
+  })
+  it('keeps only matching connections and drops emptied groups', () => {
+    const r = filterSections(sections, 'alpha')
+    expect(r.map((s) => s.group?.id ?? null)).toEqual(['work'])
+    expect(r[0].connections.map((x) => x.id)).toEqual(['a'])
+    expect(r[0].sub).toEqual([])
+  })
+  it('keeps a root with no direct match when a subgroup matches', () => {
+    const r = filterSections(sections, 'beta')
+    expect(r).toHaveLength(1)
+    expect(r[0].group?.id).toBe('work')
+    expect(r[0].connections).toEqual([])
+    expect(r[0].sub.map((s) => s.group?.id)).toEqual(['staging'])
+  })
+  it('keeps the ungrouped section only when it has matches', () => {
+    expect(filterSections(sections, 'gamma').map((s) => s.group?.id ?? null)).toEqual([null])
+    expect(filterSections(sections, 'alpha').some((s) => s.group === null)).toBe(false)
+  })
+  it('returns [] when nothing matches', () => {
+    expect(filterSections(sections, 'zzz')).toEqual([])
   })
 })

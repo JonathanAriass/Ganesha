@@ -370,13 +370,26 @@ button, input, select, textarea {
 
 /* ── Connections dashboard (the empty-pane Welcome view) ──
    Cards per connection; --card-accent is set inline from the connection color. */
-.dash { flex: 1; min-height: 0; width: 100%; overflow-y: auto; padding: 28px 32px; }
-.dash-title { font-size: 18px; font-weight: 650; margin-bottom: 4px; }
-.dash-sub { color: var(--text-2); font-size: 12.5px; margin-bottom: 18px; }
+.dash { flex: 1; min-height: 0; width: 100%; overflow-y: auto; padding: 36px 40px; }
+.dash-title { font-size: 24px; font-weight: 650; margin-bottom: 4px; }
+.dash-sub { color: var(--text-2); font-size: var(--fs-sm); margin-bottom: 18px; }
+/* The one action row: filter, Import, Export, New group, New connection. */
+.dash-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap); max-width: 1100px; margin: 12px 0 14px; }
+.dash-actions .btn { display: inline-flex; align-items: center; gap: 6px; height: var(--control-h); font-size: var(--fs-base); }
+.dash-actions .filter-input { height: var(--control-h); }
+.dash-filter {
+  display: flex; align-items: center; gap: 8px; flex: 1 1 220px; min-width: 180px; max-width: 340px;
+  height: var(--control-h); padding: 0 var(--pad-x);
+  background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--radius-md);
+  color: var(--text-2);
+}
+.dash-filter:focus-within { border-color: var(--accent); }
+.dash-filter-input { flex: 1; min-width: 0; background: none; border: none; outline: none; color: var(--text); font-size: var(--fs-base); }
+.dash-empty { color: var(--text-2); font-size: var(--fs-base); padding: 24px 2px; }
 .dash-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-  gap: 12px;
+  gap: 14px;
   max-width: 1100px;
 }
 .dash-card {
@@ -386,17 +399,18 @@ button, input, select, textarea {
   align-items: flex-start;
   gap: 6px;
   text-align: left;
-  padding: 14px 14px 12px;
+  padding: 16px 16px 14px;
   background: var(--bg-2);
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
   color: var(--text);
   cursor: pointer;
   overflow: hidden;
   transition: border-color 0.12s, transform 0.08s, box-shadow 0.12s;
 }
+
 .dash-card:hover {
-  border-color: var(--btn-hover-border);
+  background: var(--bg-3);
   transform: translateY(-1px);
   box-shadow: 0 6px 18px -10px rgba(0, 0, 0, 0.45);
 }
@@ -407,7 +421,7 @@ button, input, select, textarea {
 .dash-card-strip { position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--card-accent, var(--accent)); }
 .dash-card-head { display: flex; align-items: center; gap: 8px; width: 100%; }
 .dash-card-name { font-weight: 600; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dash-card-edit { margin-left: auto; color: var(--text-2); border-radius: 5px; padding: 1px 5px; opacity: 0; transition: opacity 0.12s; flex-shrink: 0; }
+.dash-card-edit { display: inline-flex; margin-left: auto; color: var(--text-2); border-radius: 5px; padding: 1px 5px; opacity: 0; transition: opacity 0.12s; flex-shrink: 0; }
 .dash-card:hover .dash-card-edit, .dash-card-edit:focus-visible { opacity: 1; outline: none; }
 .dash-card-edit:hover { background: var(--hover-overlay); color: var(--text); }
 .dash-card-meta { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -428,29 +442,18 @@ button, input, select, textarea {
   white-space: nowrap;
   max-width: 100%;
 }
+.dash-card-mode { font-size: var(--fs-xs); color: var(--text-2); align-self: center; }
+.dash-card-tabs { font-size: var(--fs-xs); color: var(--text-2); }
 .dash-card-check { font-size: 11px; color: var(--card-accent, var(--accent)); font-weight: 600; }
-.dash-card.new {
-  align-items: center;
-  justify-content: center;
-  border-style: dashed;
-  background: transparent;
-  color: var(--text-2);
-  gap: 4px;
-  min-height: 108px;
-}
-.dash-card.new:hover { color: var(--text); border-color: var(--accent); transform: none; box-shadow: none; }
-.dash-new-plus { font-size: 20px; line-height: 1; }
 .dash-hint { margin-top: 18px; color: var(--text-2); font-size: 11.5px; }
 
 /* Group sections: header (name · count · ⋯ menu) over that group's card grid.
    The whole section — header included — is a drop target for dragged cards. */
-.dash-title-row { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
-.dash-title-row .dash-title { margin-bottom: 0; }
 .dash-group {
   max-width: 1100px;
   /* Negative margin + matching padding: the dragover tint bleeds past the
      content edge while cards stay aligned with the title. */
-  margin: 0 0 16px -8px;
+  margin: 24px 0 0 -8px;
   padding: 6px 8px 10px;
   border-radius: 8px;
   outline: 2px dashed transparent;
@@ -465,10 +468,9 @@ button, input, select, textarea {
   align-items: center;
   gap: 8px;
   padding-bottom: 6px;
-  margin-bottom: 10px;
-  border-bottom: 1px solid var(--border);
+  margin-bottom: 12px;
 }
-.dash-group-name { font-weight: 600; font-size: 13px; }
+.dash-group-name { font-weight: 600; font-size: var(--fs-base); }
 .dash-group-menu {
   margin-left: auto;
   padding: 0 6px;
@@ -476,7 +478,8 @@ button, input, select, textarea {
   border: none;
   border-radius: 5px;
   color: var(--text-2);
-  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
   line-height: 1.4;
   cursor: pointer;
 }
@@ -497,7 +500,7 @@ button, input, select, textarea {
   outline-color: var(--accent);
 }
 .dash-subgroup .dash-group-head { padding-bottom: 4px; margin-bottom: 8px; }
-.dash-subgroup .dash-group-name { font-size: 12.5px; }
+.dash-subgroup .dash-group-name { font-size: var(--fs-sm); }
 .dash-newgroup { display: inline-flex; align-items: center; }
 .dash-newgroup .filter-input { width: 170px; }
 /* The "New subgroup" inline form, indented to line up with the subgroups it creates. */

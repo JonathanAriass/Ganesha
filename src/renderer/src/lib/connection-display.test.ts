@@ -3,7 +3,9 @@ import {
   connectionAccessibleName,
   connectionHostText,
   connectionInitials,
-  connectionModeText
+  connectionModeShort,
+  connectionModeText,
+  openTabsLabel
 } from './connection-display'
 
 describe('connectionInitials', () => {
@@ -52,5 +54,21 @@ describe('connectionAccessibleName', () => {
 describe('connectionHostText', () => {
   it('joins type and host:port', () => {
     expect(connectionHostText({ type: 'postgres', host: 'db.internal', port: 5432 })).toBe('postgres · db.internal:5432')
+  })
+})
+
+describe('connectionModeShort', () => {
+  it('is short text for the card', () => {
+    expect(connectionModeShort({ readOnly: true, requireCommit: true })).toBe('Read-only')
+    expect(connectionModeShort({ readOnly: false, requireCommit: true })).toBe('Edits staged')
+    expect(connectionModeShort({ readOnly: false, requireCommit: false })).toBe('')
+  })
+})
+
+describe('openTabsLabel', () => {
+  it('says nothing for 0, singular for 1, plural otherwise', () => {
+    expect(openTabsLabel(0)).toBe('')
+    expect(openTabsLabel(1)).toBe('1 tab open')
+    expect(openTabsLabel(3)).toBe('3 tabs open')
   })
 })
