@@ -91,6 +91,11 @@ export default function SidebarConnections({ home, collapse }: { home: ReactNode
         {c.name}
       </span>
       <EnvTag connection={c} />
+      {c.readOnly && (
+        <span className="sidebar-lock" role="img" aria-label="Read-only" title="Read-only">
+          <Icon name="lock" size={12} />
+        </span>
+      )}
     </button>
   )
 

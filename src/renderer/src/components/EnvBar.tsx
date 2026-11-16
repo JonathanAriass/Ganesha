@@ -25,16 +25,27 @@ export default function EnvBar({ paneId }: { paneId: PaneId }): JSX.Element | nu
   if (!conn) return null
   const tab = (activeTab.kind ?? 'query') === 'query' ? activeTab : null
   const modeText = connectionModeText(conn)
+  const hostText = connectionHostText(conn)
 
+  // In a narrow pane the identity keeps one line (mode and host ellipsize; the title holds
+  // the full text) and the action group wraps below it rather than being clipped.
   return (
     <div
       className="env-bar"
       style={{ background: `color-mix(in srgb, ${conn.color} 9%, transparent)` }}
     >
-      <span className="conn-dot" style={{ background: conn.color }} aria-hidden="true" />
-      <EnvTag connection={conn} />
-      {modeText && <span className="env-bar-mode">{modeText}</span>}
-      <span className="env-bar-host">{connectionHostText(conn)}</span>
+      <div className="env-bar-id">
+        <span className="conn-dot" style={{ background: conn.color }} aria-hidden="true" />
+        <EnvTag connection={conn} />
+        {modeText && (
+          <span className="env-bar-mode" title={modeText}>
+            {modeText}
+          </span>
+        )}
+        <span className="env-bar-host" title={hostText}>
+          {hostText}
+        </span>
+      </div>
 
       {tab && (
         <div className="env-bar-actions">

@@ -653,6 +653,7 @@ button, input, select, textarea {
 .sidebar-row.active { background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .sidebar-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .sidebar-row > svg, .sidebar-row > .env-tag { flex-shrink: 0; }
+.sidebar-lock { display: inline-flex; flex-shrink: 0; color: var(--text-2); }
 .sidebar-group { color: var(--text-2); font-size: var(--fs-sm); font-weight: 600; }
 .sidebar-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sidebar-count { font-size: var(--fs-xs); font-weight: 400; color: var(--text-2); }
@@ -1984,7 +1985,7 @@ mark.hl {
   display: inline-block;
   padding: 1px 6px;
   border-radius: 4px;
-  font-size: 10px;
+  font-size: calc(var(--fs-xs) - 1px); /* 11px comfortable, 10px compact */
   font-weight: 600;
   letter-spacing: 0.04em;
 }
@@ -3438,10 +3439,15 @@ mark.hl {
   font-size: var(--fs-sm);
   color: var(--text);
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
-.env-bar-mode { color: var(--text); }
+/* Identity (dot, tag, mode, host) stays on one line and ellipsizes; when it and the action
+   group don't both fit, the action group drops to a second line instead of being clipped. */
+.env-bar-id { display: flex; align-items: center; gap: var(--gap); flex: 1 1 auto; min-width: 0; }
+.env-bar-id > .env-tag { flex-shrink: 0; }
+.env-bar-mode { color: var(--text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .env-bar-host { color: var(--text-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.env-bar-actions { display: flex; align-items: center; gap: var(--gap); margin-left: auto; }
+.env-bar-actions { display: flex; align-items: center; gap: var(--gap); margin-left: auto; flex-shrink: 0; }
 .env-bar-actions .btn { display: inline-flex; align-items: center; gap: 4px; }
 .env-bar-hint { font-size: var(--fs-xs); opacity: 0.75; }
 
