@@ -12,6 +12,13 @@ export function connectionModeText(c: { readOnly: boolean; requireCommit: boolea
   return ''
 }
 
+/** A text name that carries the environment cue colour alone can't (e.g. the collapsed
+ *  sidebar badge): `orders-prod (PROD), read-only`. */
+export function connectionAccessibleName(c: { name: string; environment: string; readOnly: boolean }): string {
+  const env = c.environment ? ` (${c.environment})` : ''
+  return `${c.name}${env}${c.readOnly ? ', read-only' : ''}`
+}
+
 export function connectionHostText(c: { type: string; host: string; port: number }): string {
   return `${c.type} · ${c.host}:${c.port}`
 }

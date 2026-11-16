@@ -1,13 +1,14 @@
 import { useAppStore } from '../state/store'
 import { useConnections } from '../lib/hooks'
 import { groupTabs } from '../lib/tab-groups'
-import { connectionInitials } from '../lib/connection-display'
+import { connectionAccessibleName, connectionInitials } from '../lib/connection-display'
 import { mod } from '../lib/platform'
 import { Icon } from './icons'
 
 /** The collapsed sidebar: Expand, Home, one badge per connection with open tabs
  *  (initials over a bar in its colour; click selects it), then + to expand to the
- *  full list. Badges scroll on their own, so they carry a native tooltip — a styled
+ *  full list. A badge's name and tooltip carry the environment and read-only mode in
+ *  text, not just colour. Badges scroll on their own, so they carry a native tooltip — a styled
  *  one would be clipped by the scroll box. */
 export default function SidebarBadges(): JSX.Element {
   const tabs = useAppStore((s) => s.tabs)
@@ -49,9 +50,9 @@ export default function SidebarBadges(): JSX.Element {
             key={c.id}
             className={`sidebar-badge${c.id === activeConnectionId ? ' active' : ''}`}
             onClick={() => setActiveConnection(c.id)}
-            aria-label={c.name}
+            aria-label={connectionAccessibleName(c)}
             aria-pressed={c.id === activeConnectionId}
-            title={c.name}
+            title={connectionAccessibleName(c)}
           >
             <span aria-hidden="true">{connectionInitials(c.name)}</span>
             <span className="sidebar-badge-bar" style={{ background: c.color }} aria-hidden="true" />
