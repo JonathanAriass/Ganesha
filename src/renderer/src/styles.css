@@ -3441,14 +3441,23 @@ mark.hl {
   flex-shrink: 0;
   flex-wrap: wrap;
 }
-/* Identity (dot, tag, mode, host) stays on one line and ellipsizes; when it and the action
-   group don't both fit, the action group drops to a second line instead of being clipped. */
-.env-bar-id { display: flex; align-items: center; gap: var(--gap); flex: 1 1 auto; min-width: 0; }
+/* Identity (dot, tag, mode, host) stays on one line and ellipsizes down to its 160px basis
+   before anything wraps, so a half-width pane keeps a single row. Below that the action group
+   drops to a second line, and in the narrowest panes its own buttons wrap instead of clipping. */
+.env-bar-id { display: flex; align-items: center; gap: var(--gap); flex: 1 1 160px; min-width: 0; }
 .env-bar-id > .env-tag { flex-shrink: 0; }
 .env-bar-mode { color: var(--text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .env-bar-host { color: var(--text-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.env-bar-actions { display: flex; align-items: center; gap: var(--gap); margin-left: auto; flex-shrink: 0; }
-.env-bar-actions .btn { display: inline-flex; align-items: center; gap: 4px; }
+.env-bar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--gap);
+  margin-left: auto;
+  min-width: 0;
+}
+.env-bar-actions .btn { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; white-space: nowrap; }
 .env-bar-hint { font-size: var(--fs-xs); opacity: 0.75; }
 
 /* ── Pane empty state ── */
