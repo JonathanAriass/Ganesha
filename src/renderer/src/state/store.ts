@@ -321,14 +321,19 @@ interface AppState {
 /** Apply a pane-aware bulk close and drop a commit modal whose tab no longer survives. */
 function closeTabsResult(s: AppState, mode: CloseMode, targetId: string) {
   const r = applyPaneClose(s.tabs, s.activeTabByPane, s.focusedPane, mode, targetId, s.tabScope)
-  // Each pane's active connection follows its (possibly new) active tab.
-  const connFor = (id: string | null): string | null =>
-    id ? (r.tabs.find((t) => t.id === id)?.connectionId ?? null) : null
+  // Each pane's active connection follows its (possibly new) active tab. A pane that was on a
+  // connection's empty state (no active tab) and still exists keeps that connection.
+  const connFor = (p: PaneId): string | null => {
+    const id = r.activeByPane[p]
+    if (id) return r.tabs.find((t) => t.id === id)?.connectionId ?? null
+    const paneLives = p === 'left' || r.tabs.some((t) => t.pane === 'right')
+    return s.activeTabByPane[p] === null && paneLives ? s.activeConnByPane[p] : null
+  }
   return withMirror({
     tabs: r.tabs,
     focusedPane: r.focusedPane,
     activeTabByPane: r.activeByPane,
-    activeConnByPane: { left: connFor(r.activeByPane.left), right: connFor(r.activeByPane.right) },
+    activeConnByPane: { left: connFor('left'), right: connFor('right') },
     commitModal: r.tabs.some((t) => t.id === s.commitModal?.tabId) ? s.commitModal : null,
   })
 }
@@ -527,7 +532,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         })
       }
       const p = s.focusedPane
-      const tab = blankTab({ connectionId, title: '🔭 Telescope', kind: 'telescope', pane: p })
+      const tab = blankTab({ connectionId, title: 'Telescope', kind: 'telescope', pane: p })
       return withMirror({
         tabs: [...s.tabs, tab],
         focusedPane: p,

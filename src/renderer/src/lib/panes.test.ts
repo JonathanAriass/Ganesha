@@ -111,6 +111,23 @@ describe('applyPaneClose', () => {
     expect(r.tabs.map((x) => x.id)).toEqual(['a', 'z']) // b closed, z (other conn) kept
   })
 
+  it('a pane with no active tab (a connection’s empty state) keeps none after a background close', () => {
+    const tabs = [t('a', 'left', 'A'), t('b', 'left', 'A'), t('c', 'left', 'A')]
+    const self = applyPaneClose(tabs, active(null, null), 'left', 'self', 'b', 'all')
+    expect(self.tabs.map((x) => x.id)).toEqual(['a', 'c'])
+    expect(self.activeByPane).toEqual({ left: null, right: null })
+    const others = applyPaneClose(tabs, active(null, null), 'left', 'others', 'b', 'all')
+    expect(others.tabs.map((x) => x.id)).toEqual(['b'])
+    expect(others.activeByPane).toEqual({ left: null, right: null })
+  })
+
+  it('a split pane with no active tab keeps none; the other pane is untouched', () => {
+    const tabs = [t('a', 'left', 'A'), t('b', 'left', 'A'), t('x', 'right', 'A')]
+    const r = applyPaneClose(tabs, active(null, 'x'), 'left', 'self', 'a', 'all')
+    expect(r.tabs.map((x) => x.id)).toEqual(['b', 'x'])
+    expect(r.activeByPane).toEqual({ left: null, right: 'x' })
+  })
+
   it('"all" clears the target pane+connection and collapses if nothing remains', () => {
     const tabs = [t('a', 'left'), t('b', 'left')]
     const r = applyPaneClose(tabs, active('a', null), 'left', 'all', 'a')

@@ -51,9 +51,9 @@ export function normalizePanes<T extends { pane: PaneId }>(
  *    set of the target's pane (same pane AND same connection) — exactly what the user sees.
  *  - The OTHER pane is never touched (its active tab stays put), unless a re-home collapses
  *    the split.
- *  - Reselection in the closed pane: keep its active tab if it survived; else the nearest
- *    survivor in the closed group; else the first remaining tab anywhere in that pane; else
- *    null.
+ *  - Reselection in the closed pane: none if it had no active tab (a connection's empty
+ *    state); else keep its active tab if it survived; else the nearest survivor in the closed
+ *    group; else the first remaining tab anywhere in that pane; else null.
  *  - Focus moves to the surviving pane only if the closed pane emptied; a collapse always
  *    lands on `left`. */
 export function applyPaneClose<T extends { id: string; connectionId: string; pane: PaneId }>(
@@ -79,7 +79,9 @@ export function applyPaneClose<T extends { id: string; connectionId: string; pan
   // Reselect the closed pane's active tab.
   const tpTabs = nextTabs.filter((t) => t.pane === tp)
   let tpActive: string | null
-  if (activeByPane[tp] && tpTabs.some((t) => t.id === activeByPane[tp])) {
+  if (activeByPane[tp] === null) {
+    tpActive = null // the pane shows a connection's empty state; closing a background tab keeps it
+  } else if (tpTabs.some((t) => t.id === activeByPane[tp])) {
     tpActive = activeByPane[tp] // the active tab wasn't among those closed
   } else {
     // nearest survivor in the closed group, else first remaining tab in the pane.

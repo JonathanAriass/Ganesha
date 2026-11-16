@@ -39,3 +39,9 @@ export function visibleTabs<T extends { connectionId: string }>(
 export function showScopeSwitch(paneTabs: { connectionId: string }[]): boolean {
   return new Set(paneTabs.map((t) => t.connectionId)).size > 1
 }
+
+/** The scope the strip applies: the chosen one while its switch shows, else 'all' — a hidden
+ *  switch must never leave the strip filtered (it could empty it with no way back). */
+export function effectiveTabScope(paneTabs: { connectionId: string }[], scope: TabScope): TabScope {
+  return showScopeSwitch(paneTabs) ? scope : 'all'
+}

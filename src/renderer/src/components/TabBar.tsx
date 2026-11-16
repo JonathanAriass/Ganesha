@@ -1,7 +1,7 @@
 import { useState, type DragEvent } from 'react'
 import { useAppStore } from '../state/store'
 import { useConnections } from '../lib/hooks'
-import { visibleTabs, showScopeSwitch } from '../lib/tab-groups'
+import { visibleTabs, showScopeSwitch, effectiveTabScope } from '../lib/tab-groups'
 import { Icon } from './icons'
 import TabContextMenu, { type TabCloseAction } from './TabContextMenu'
 import { type PaneId, paneTabs } from '../lib/panes'
@@ -89,9 +89,10 @@ export default function TabBar({ pane }: { pane: PaneId }): JSX.Element {
 
   const { data: connections = [] } = useConnections()
 
-  // One strip: every tab of the pane, or only the pane's active connection's, per the scope switch.
+  // One strip: every tab of the pane, or only the pane's active connection's, per the scope
+  // switch (all tabs whenever the switch is hidden).
   const paneAllTabs = paneTabs(tabs, pane)
-  const subtabs = visibleTabs(paneAllTabs, tabScope, activeConnectionId ?? null)
+  const subtabs = visibleTabs(paneAllTabs, effectiveTabScope(paneAllTabs, tabScope), activeConnectionId ?? null)
   const menuIdx = menu ? subtabs.findIndex((t) => t.id === menu.tabId) : -1
 
   return (

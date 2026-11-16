@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { groupTabs, visibleTabs, showScopeSwitch } from './tab-groups'
+import { groupTabs, visibleTabs, showScopeSwitch, effectiveTabScope } from './tab-groups'
 
 type T = { id: string; connectionId: string }
 const tab = (id: string, c: string): T => ({ id, connectionId: c })
@@ -30,5 +30,19 @@ describe('visibleTabs / showScopeSwitch', () => {
     expect(showScopeSwitch(tabs)).toBe(true)
     expect(showScopeSwitch(tabs.slice(0, 2))).toBe(false)
     expect(showScopeSwitch([])).toBe(false)
+  })
+})
+
+describe('effectiveTabScope', () => {
+  it("falls back to 'all' when the pane holds one connection (the switch is hidden)", () => {
+    expect(effectiveTabScope([tab('a1', 'A'), tab('a2', 'A')], 'connection')).toBe('all')
+  })
+  it('keeps the chosen scope when the pane holds 2+ connections', () => {
+    const two = [tab('a1', 'A'), tab('b1', 'B')]
+    expect(effectiveTabScope(two, 'connection')).toBe('connection')
+    expect(effectiveTabScope(two, 'all')).toBe('all')
+  })
+  it("is 'all' for an empty pane", () => {
+    expect(effectiveTabScope([], 'connection')).toBe('all')
   })
 })

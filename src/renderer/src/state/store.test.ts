@@ -771,6 +771,20 @@ describe('split views — close', () => {
     expect(s.activeTabByPane.left).toBe(s.tabs.find((t) => t.title === 'B')!.id)
   })
 
+  it('closing a background tab from a connection’s empty state keeps that connection selected', () => {
+    useAppStore.getState().openQueryTab({ connectionId: 'c1', title: 'A', text: 'a' })
+    useAppStore.getState().openQueryTab({ connectionId: 'c1', title: 'B', text: 'b' })
+    const aId = useAppStore.getState().tabs.find((t) => t.title === 'A')!.id
+    useAppStore.getState().setActiveConnection('c2') // no c2 tabs → the pane's empty state
+    expect(useAppStore.getState().activeTabId).toBeNull()
+    useAppStore.getState().closeTab(aId)
+    const s = useAppStore.getState()
+    expect(s.tabs.map((t) => t.title)).toEqual(['B'])
+    expect(s.activeTabByPane.left).toBeNull()
+    expect(s.activeConnByPane.left).toBe('c2')
+    expect(s.activeConnectionId).toBe('c2') // mirror
+  })
+
   it('closing the last left tab re-homes the right tabs to left', () => {
     const { bId } = splitTwo() // A left, B right
     useAppStore.getState().focusPane('left')
@@ -933,7 +947,7 @@ describe('openTelescopeTab', () => {
     const s = useAppStore.getState()
     expect(s.tabs).toHaveLength(1)
     expect(s.tabs[0].kind).toBe('telescope')
-    expect(s.tabs[0].title).toBe('🔭 Telescope')
+    expect(s.tabs[0].title).toBe('Telescope')
     expect(s.activeTabId).toBe(s.tabs[0].id)
     expect(s.activeConnectionId).toBe('c1')
   })
@@ -1012,7 +1026,7 @@ describe('connections dashboard', () => {
 
 describe('dock and tab scope state', () => {
   afterEach(() => {
-    useAppStore.setState({ dock: null, tabScope: 'connection' })
+    useAppStore.setState({ dock: null, tabScope: 'all' })
   })
 
   it('toggleAssistant then toggleSsm leaves the tunnels dock', () => {
@@ -1037,5 +1051,35 @@ describe('dock and tab scope state', () => {
   it('setTabScope updates tabScope', () => {
     useAppStore.getState().setTabScope('all')
     expect(useAppStore.getState().tabScope).toBe('all')
+  })
+
+  describe('close actions honour the scope', () => {
+    // One pane: c1 tabs A, B and a c2 tab Z.
+    function seed(): string {
+      useAppStore.setState({
+        tabs: [], activeTabId: null, activeConnectionId: null, _queryCounter: 0,
+        focusedPane: 'left', activeTabByPane: { left: null, right: null }, activeConnByPane: { left: null, right: null },
+        lastActiveByConnection: {}, commitModal: null,
+      })
+      useAppStore.getState().openQueryTab({ connectionId: 'c1', title: 'A' })
+      useAppStore.getState().openQueryTab({ connectionId: 'c1', title: 'B' })
+      useAppStore.getState().openQueryTab({ connectionId: 'c2', title: 'Z' })
+      return useAppStore.getState().tabs.find((t) => t.title === 'A')!.id
+    }
+    const titles = (): string[] => useAppStore.getState().tabs.map((t) => t.title)
+
+    it("'all': close others leaves only that tab", () => {
+      const aId = seed()
+      useAppStore.getState().setTabScope('all')
+      useAppStore.getState().closeOtherTabs(aId)
+      expect(titles()).toEqual(['A'])
+    })
+
+    it("'connection': close others leaves the other connection's tabs", () => {
+      const aId = seed()
+      useAppStore.getState().setTabScope('connection')
+      useAppStore.getState().closeOtherTabs(aId)
+      expect(titles()).toEqual(['A', 'Z'])
+    })
   })
 })
