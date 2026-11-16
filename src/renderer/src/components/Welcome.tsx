@@ -339,7 +339,7 @@ export default function Welcome(): JSX.Element {
       >
         {groupHead(g, s.connections.length)}
         {s.connections.length === 0 ? (
-          <p className="dash-drop-hint">Drag connections here</p>
+          !filtering && <p className="dash-drop-hint">Drag connections here</p>
         ) : (
           <div className="dash-grid">{s.connections.map(card)}</div>
         )}
@@ -412,7 +412,8 @@ export default function Welcome(): JSX.Element {
           >
             {hasGroups && groupHead(g, section.connections.length)}
             {section.connections.length === 0 ? (
-              <p className="dash-drop-hint">Drag connections here</p>
+              // Drops are off while filtering, so the hint would mislead.
+              !filtering && <p className="dash-drop-hint">Drag connections here</p>
             ) : (
               <div className="dash-grid">{section.connections.map(card)}</div>
             )}

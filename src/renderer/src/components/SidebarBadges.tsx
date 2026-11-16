@@ -6,9 +6,9 @@ import { mod } from '../lib/platform'
 import { Icon } from './icons'
 
 /** The collapsed sidebar: Expand, Home, one badge per connection with open tabs
- *  (initials over a bar in its colour; click selects it), then + to expand to the
- *  full list. A badge's name and tooltip carry the environment and read-only mode in
- *  text, not just colour. Badges scroll on their own, so they carry a native tooltip — a styled
+ *  (initials over a bar in its colour; click selects it and leaves the dashboard), then
+ *  + to expand the sidebar. A badge's name and tooltip carry the environment and read-only
+ *  mode in text, not just colour. Badges scroll on their own, so they carry a native tooltip — a styled
  *  one would be clipped by the scroll box. */
 export default function SidebarBadges(): JSX.Element {
   const tabs = useAppStore((s) => s.tabs)
@@ -17,6 +17,7 @@ export default function SidebarBadges(): JSX.Element {
   const toggleSide = useAppStore((s) => s.toggleSide)
   const dashboardOpen = useAppStore((s) => s.dashboardOpen)
   const toggleDashboard = useAppStore((s) => s.toggleDashboard)
+  const setDashboardOpen = useAppStore((s) => s.setDashboardOpen)
 
   const { data: connections = [] } = useConnections()
   const byId = new Map(connections.map((c) => [c.id, c]))
@@ -49,7 +50,11 @@ export default function SidebarBadges(): JSX.Element {
           <button
             key={c.id}
             className={`sidebar-badge${c.id === activeConnectionId ? ' active' : ''}`}
-            onClick={() => setActiveConnection(c.id)}
+            onClick={() => {
+              // Also for the already-active connection: selecting it must leave the dashboard.
+              setActiveConnection(c.id)
+              setDashboardOpen(false)
+            }}
             aria-label={connectionAccessibleName(c)}
             aria-pressed={c.id === activeConnectionId}
             title={connectionAccessibleName(c)}
@@ -62,8 +67,8 @@ export default function SidebarBadges(): JSX.Element {
       <button
         className="icon-btn"
         onClick={toggleSide}
-        aria-label="Show all connections"
-        data-tooltip="All connections"
+        aria-label="Expand sidebar"
+        data-tooltip="Expand sidebar"
         data-tip="beside"
       >
         <Icon name="plus" />
