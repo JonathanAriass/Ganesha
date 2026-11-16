@@ -8,6 +8,9 @@ import { unwrap } from '../lib/result'
 import { type CloseMode } from '../lib/tab-close'
 import { type PaneId, otherPane, normalizePanes, nextActiveInPane, applyPaneClose } from '../lib/panes'
 import { applyTabReorder, applyTabToSide, type TabMove } from '../lib/tab-reorder'
+import { toggleDock, type DockTab } from '../lib/dock'
+import { loadTabScope, saveTabScope, type TabScope } from '../lib/shell-prefs'
+import type { TransferModalState } from '../lib/transfer-actions'
 import { loadSideOpen, saveSideOpen, loadSideSection, saveSideSection, type SideSection } from '../lib/side-panel'
 
 type ConnectionModalState =
@@ -166,7 +169,15 @@ interface AppState {
   commitModal: { tabId: string } | null
 
   // ── SSM tunnels ───────────────────────────────────────────────────────────
-  ssmOpen: boolean
+  /** The single right-dock occupant (assistant or tunnels); null = dock closed. */
+  dock: DockTab | null
+  closeDock: () => void
+  /** Tab-strip scope: every tab of the pane, or only the active connection's. Persisted. */
+  tabScope: TabScope
+  setTabScope: (s: TabScope) => void
+  /** Export / import connections dialog (null = closed). Opened from the dashboard and sidebar. */
+  transferModal: TransferModalState | null
+  setTransferModal: (s: TransferModalState | null) => void
   /** Ids of SSM tunnels whose process is running (kept live by the ssm:status subscription). */
   runningSsm: string[]
   toggleSsm: () => void
@@ -182,7 +193,6 @@ interface AppState {
   dashboardOpen: boolean
 
   // ── LLM assistant ─────────────────────────────────────────────────────────
-  assistantOpen: boolean
   activeConversationId: string | null
   modelManagerOpen: boolean
 
@@ -308,7 +318,7 @@ interface AppState {
 
 /** Apply a pane-aware bulk close and drop a commit modal whose tab no longer survives. */
 function closeTabsResult(s: AppState, mode: CloseMode, targetId: string) {
-  const r = applyPaneClose(s.tabs, s.activeTabByPane, s.focusedPane, mode, targetId)
+  const r = applyPaneClose(s.tabs, s.activeTabByPane, s.focusedPane, mode, targetId, s.tabScope)
   // Each pane's active connection follows its (possibly new) active tab.
   const connFor = (id: string | null): string | null =>
     id ? (r.tabs.find((t) => t.id === id)?.connectionId ?? null) : null
@@ -382,12 +392,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   paletteOpen: false,
   saveQueryModal: null,
   commitModal: null,
-  ssmOpen: false,
+  dock: null,
+  tabScope: loadTabScope(),
+  transferModal: null,
   runningSsm: [],
   sideOpen: loadSideOpen(),
   sideSection: loadSideSection(),
   dashboardOpen: false,
-  assistantOpen: false,
   activeConversationId: null,
   modelManagerOpen: false,
   tabs: [],
@@ -434,7 +445,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   openCommitModal: (tabId) => set({ commitModal: { tabId } }),
   closeCommitModal: () => set({ commitModal: null }),
 
-  toggleSsm: () => set((s) => ({ ssmOpen: !s.ssmOpen })),
+  toggleSsm: () => set((s) => ({ dock: toggleDock(s.dock, 'tunnels') })),
+  closeDock: () => set({ dock: null }),
+  setTabScope: (tabScope) => {
+    saveTabScope(tabScope)
+    set({ tabScope })
+  },
+  setTransferModal: (transferModal) => set({ transferModal }),
   setSsmRunning: (ids) => set({ runningSsm: ids }),
   markSsm: (id, running) =>
     set((s) => ({
@@ -459,7 +476,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       return { sideOpen: true, sideSection: section }
     }),
 
-  toggleAssistant: () => set((s) => ({ assistantOpen: !s.assistantOpen })),
+  toggleAssistant: () => set((s) => ({ dock: toggleDock(s.dock, 'assistant') })),
   setActiveConversation: (id) => set({ activeConversationId: id }),
   openModelManager: () => set({ modelManagerOpen: true }),
   closeModelManager: () => set({ modelManagerOpen: false }),

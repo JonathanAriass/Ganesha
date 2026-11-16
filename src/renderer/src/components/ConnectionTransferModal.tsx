@@ -1,13 +1,10 @@
 import { useState, type FormEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import type { ConnectionConfig } from '@shared/domain'
-import { MIN_PASSPHRASE_LENGTH, type ImportPreview } from '@shared/transfer'
+import { MIN_PASSPHRASE_LENGTH } from '@shared/transfer'
 import { unwrap } from '../lib/result'
 import { useRestoreFocus } from '../lib/use-restore-focus'
+import type { TransferModalState } from '../lib/transfer-actions'
 
-export type TransferModalState =
-  | { mode: 'export'; connections: ConnectionConfig[] }
-  | { mode: 'import'; preview: ImportPreview }
 
 const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`
 

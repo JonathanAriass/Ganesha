@@ -8,7 +8,7 @@ import type { SsmTunnel } from '@shared/domain'
  *  selected tunnel's live output, and an add/edit form. Running state comes from the store (kept
  *  live app-wide by the ssm:status subscription); output is buffered while the panel is open. */
 export default function SsmPanel(): JSX.Element | null {
-  const open = useAppStore((s) => s.ssmOpen)
+  const open = useAppStore((s) => s.dock === 'tunnels')
   const toggle = useAppStore((s) => s.toggleSsm)
   const running = useAppStore((s) => s.runningSsm)
   const { data: tunnels } = useSsmTunnels()

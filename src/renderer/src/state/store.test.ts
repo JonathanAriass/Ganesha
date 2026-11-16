@@ -1009,3 +1009,33 @@ describe('connections dashboard', () => {
     expect(useAppStore.getState().dashboardOpen).toBe(false)
   })
 })
+
+describe('dock and tab scope state', () => {
+  afterEach(() => {
+    useAppStore.setState({ dock: null, tabScope: 'connection' })
+  })
+
+  it('toggleAssistant then toggleSsm leaves the tunnels dock', () => {
+    useAppStore.getState().toggleAssistant()
+    expect(useAppStore.getState().dock).toBe('assistant')
+    useAppStore.getState().toggleSsm()
+    expect(useAppStore.getState().dock).toBe('tunnels')
+  })
+
+  it('toggleAssistant twice closes the dock', () => {
+    useAppStore.getState().toggleAssistant()
+    useAppStore.getState().toggleAssistant()
+    expect(useAppStore.getState().dock).toBeNull()
+  })
+
+  it('closeDock sets null', () => {
+    useAppStore.setState({ dock: 'tunnels' })
+    useAppStore.getState().closeDock()
+    expect(useAppStore.getState().dock).toBeNull()
+  })
+
+  it('setTabScope updates tabScope', () => {
+    useAppStore.getState().setTabScope('all')
+    expect(useAppStore.getState().tabScope).toBe('all')
+  })
+})

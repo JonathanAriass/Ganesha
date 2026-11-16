@@ -13,9 +13,9 @@ function mkMsg(conversationId: string, role: 'user' | 'assistant', content: stri
 }
 
 export default function AssistantPanel(): JSX.Element {
-  const open = useAppStore((s) => s.assistantOpen)
+  const open = useAppStore((s) => s.dock === 'assistant')
   const toggle = useAppStore((s) => s.toggleAssistant)
-  const ssmOpen = useAppStore((s) => s.ssmOpen)
+  const ssmOpen = useAppStore((s) => s.dock === 'tunnels')
   const openModelManager = useAppStore((s) => s.openModelManager)
   const connectionId = useAppStore((s) => s.activeConnectionId)
   const convId = useAppStore((s) => s.activeConversationId)

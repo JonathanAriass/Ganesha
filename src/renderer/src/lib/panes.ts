@@ -1,4 +1,5 @@
 import { applyTabClose, type CloseMode } from './tab-close'
+import type { TabScope } from './shell-prefs'
 
 /** Which side of a split a tab lives in. A string (not a union of more) only by
  *  YAGNI — widening to more panes later needs no structural change here. */
@@ -60,18 +61,20 @@ export function applyPaneClose<T extends { id: string; connectionId: string; pan
   activeByPane: Record<PaneId, string | null>,
   focusedPane: PaneId,
   mode: CloseMode,
-  targetId: string
+  targetId: string,
+  tabScope: TabScope = 'connection'
 ): { tabs: T[]; activeByPane: Record<PaneId, string | null>; focusedPane: PaneId } {
   const target = tabs.find((t) => t.id === targetId)
   if (!target) return { tabs, activeByPane, focusedPane } // unknown target → no-op
   const tp = target.pane
   const conn = target.connectionId
 
-  // Scope = the target pane's visible subtabs (pane + connection), in order.
-  const scope = tabs.filter((t) => t.pane === tp && t.connectionId === conn)
+  // Scope = the target pane's tabs, narrowed to the target's connection unless tabScope is 'all'.
+  const inScope = (t: T): boolean => t.pane === tp && (tabScope === 'all' || t.connectionId === conn)
+  const scope = tabs.filter(inScope)
   const kept = applyTabClose(scope, activeByPane[tp], mode, targetId).tabs
   const keptIds = new Set(kept.map((t) => t.id))
-  const nextTabs = tabs.filter((t) => !(t.pane === tp && t.connectionId === conn) || keptIds.has(t.id))
+  const nextTabs = tabs.filter((t) => !inScope(t) || keptIds.has(t.id))
 
   // Reselect the closed pane's active tab.
   const tpTabs = nextTabs.filter((t) => t.pane === tp)

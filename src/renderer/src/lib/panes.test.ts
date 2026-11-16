@@ -118,4 +118,33 @@ describe('applyPaneClose', () => {
     expect(r.activeByPane).toEqual({ left: null, right: null })
     expect(r.focusedPane).toBe('left')
   })
+
+  describe('tabScope', () => {
+    // left: a1,a2 (A), b1 (B); right: a3 (A), c1 (C)
+    const mk = () => [t('a1', 'left', 'A'), t('a2', 'left', 'A'), t('b1', 'left', 'B'), t('a3', 'right', 'A'), t('c1', 'right', 'C')]
+    const ids = (r: { tabs: T[] }) => r.tabs.map((x) => x.id)
+
+    it("'others' with scope 'all' keeps only the target in its pane", () => {
+      const r = applyPaneClose(mk(), active('a1', 'a3'), 'left', 'others', 'a1', 'all')
+      expect(ids(r)).toEqual(['a1', 'a3', 'c1'])
+    })
+
+    it("'all' with scope 'all' closes the whole pane, the other pane survives", () => {
+      const r = applyPaneClose(mk(), active('a1', 'a3'), 'left', 'all', 'a1', 'all')
+      for (const gone of ['a1', 'a2', 'b1']) expect(ids(r)).not.toContain(gone)
+      expect(ids(r)).toContain('a3')
+      expect(ids(r)).toContain('c1')
+    })
+
+    it("'others' with scope 'connection' keeps other connections (default)", () => {
+      const r = applyPaneClose(mk(), active('a1', 'a3'), 'left', 'others', 'a1', 'connection')
+      expect(ids(r)).toEqual(['a1', 'b1', 'a3', 'c1'])
+      expect(ids(applyPaneClose(mk(), active('a1', 'a3'), 'left', 'others', 'a1'))).toEqual(['a1', 'b1', 'a3', 'c1'])
+    })
+
+    it("'right' with scope 'all' closes everything right of the target in its pane", () => {
+      const r = applyPaneClose(mk(), active('a1', 'a3'), 'left', 'right', 'a1', 'all')
+      expect(ids(r)).toEqual(['a1', 'a3', 'c1'])
+    })
+  })
 })

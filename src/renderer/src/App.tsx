@@ -18,6 +18,7 @@ import SaveQueryModal from './components/SaveQueryModal'
 import CommitChangesModal from './components/CommitChangesModal'
 import AssistantPanel from './components/AssistantPanel'
 import ModelManagerModal from './components/ModelManagerModal'
+import ConnectionTransferModal from './components/ConnectionTransferModal'
 import UpdateBanner from './components/UpdateBanner'
 import { useSettings } from './lib/hooks'
 import { applyTheme } from './lib/theme'
@@ -39,6 +40,8 @@ function AppShell(): JSX.Element {
   const paletteOpen = useAppStore((s) => s.paletteOpen)
   const saveQueryModal = useAppStore((s) => s.saveQueryModal)
   const commitModal = useAppStore((s) => s.commitModal)
+  const transferModal = useAppStore((s) => s.transferModal)
+  const setTransferModal = useAppStore((s) => s.setTransferModal)
   const tabs = useAppStore((s) => s.tabs)
   const splitView = useAppStore((s) => s.tabs.some((t) => t.pane === 'right'))
   const dashboardOpen = useAppStore((s) => s.dashboardOpen)
@@ -121,6 +124,7 @@ function AppShell(): JSX.Element {
       {paletteOpen && <CommandPalette />}
       {saveQueryModal && <SaveQueryModal />}
       {commitModal && <CommitChangesModal />}
+      {transferModal && <ConnectionTransferModal state={transferModal} onClose={() => setTransferModal(null)} />}
       <ModelManagerModal />
     </div>
   )
