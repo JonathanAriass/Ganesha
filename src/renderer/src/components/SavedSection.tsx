@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAppStore } from '../state/store'
 import { useSavedQueries, useDeleteSavedQuery } from '../lib/hooks'
+import { Icon } from './icons'
 
 export default function SavedSection(): JSX.Element | null {
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
@@ -9,7 +10,7 @@ export default function SavedSection(): JSX.Element | null {
 
   const { data: snippets, isLoading, isError } = useSavedQueries(activeConnectionId)
   const del = useDeleteSavedQuery()
-  // Two-step delete: × arms the row, the second click fires. Hover-out disarms.
+  // Two-step delete: the close button arms the row, the second click fires. Hover-out disarms.
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
 
   if (!activeConnectionId) return null
@@ -23,7 +24,9 @@ export default function SavedSection(): JSX.Element | null {
         </div>
       )}
       {!isLoading && snippets && snippets.length === 0 && (
-        <div className="h-empty">Nothing saved yet — ☆ Save in the command bar</div>
+        <div className="h-empty">
+          Nothing saved yet — <Icon name="star" size={12} /> Save in the bar above the editor
+        </div>
       )}
       {snippets &&
         snippets.map((q) => (
@@ -54,7 +57,7 @@ export default function SavedSection(): JSX.Element | null {
               title="Rename"
               onClick={() => openSaveQueryModal({ mode: 'rename', id: q.id, name: q.name })}
             >
-              ✎
+              <Icon name="pencil" size={12} />
             </button>
             {confirmingId === q.id ? (
               <button
@@ -74,7 +77,7 @@ export default function SavedSection(): JSX.Element | null {
                 title="Delete"
                 onClick={() => setConfirmingId(q.id)}
               >
-                ×
+                <Icon name="close" size={12} />
               </button>
             )}
           </div>

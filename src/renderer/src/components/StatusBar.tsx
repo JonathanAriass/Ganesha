@@ -1,6 +1,7 @@
 import { useAppStore } from '../state/store'
 import { useConnections } from '../lib/hooks'
 import { rowCountLabel, affectedRowsLabel } from '../lib/result-label'
+import { Icon } from './icons'
 
 /** Focus Mode footer: the focused tab's run status + connection identity.
  *  Logic moved from QueryTab's old qt-toolbar statusEl. */
@@ -54,7 +55,11 @@ export default function StatusBar(): JSX.Element {
         <span className="sb-conn">
           <span className="conn-dot" style={{ background: conn.color }} aria-hidden="true" />
           {conn.name}
-          {conn.readOnly && <span title="Read-only connection"> 🔒</span>}
+          {conn.readOnly && (
+            <span className="sb-lock" role="img" aria-label="Read-only connection" title="Read-only connection">
+              <Icon name="lock" size={12} />
+            </span>
+          )}
         </span>
       )}
     </footer>

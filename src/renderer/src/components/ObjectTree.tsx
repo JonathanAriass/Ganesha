@@ -5,6 +5,7 @@ import { useObjects, useColumns, useConnections } from '../lib/hooks'
 import { defaultTableQuery } from '../lib/tabquery'
 import { filterObjects, substringMatch } from '../lib/object-filter'
 import { sortObjects, loadSortMode, saveSortMode, type SortMode } from '../lib/object-sort'
+import { Icon } from './icons'
 
 // ── ObjectNode ────────────────────────────────────────────────────────────────
 
@@ -45,7 +46,7 @@ function ObjectNode({ connectionId, obj, query, expanded, onDoubleClick, onConte
         aria-expanded={expanded}
       >
         <span className={`tree-caret${expanded ? ' open' : ''}`} aria-hidden="true">
-          ▶
+          <Icon name="chevron-right" size={12} />
         </span>
         <span className={`obj-icon ${obj.kind}`} aria-hidden="true">
           {kindLabel}
@@ -247,7 +248,7 @@ export default function ObjectTree(): JSX.Element {
       />
       {query && (
         <button className="tree-filter-clear" onClick={() => setQuery('')} aria-label="Clear filter">
-          ×
+          <Icon name="close" size={14} />
         </button>
       )}
       <select

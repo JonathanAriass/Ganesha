@@ -31,9 +31,7 @@
   --obj-view: #67e8f9;
   --obj-coll: #86efac;
   --radius: 7px;
-  --topbar-h: 46px;
   --sidebar-collapsed-w: 52px;
-  --statusbar-h: 26px;
   --chat-user-bg: #2b3160;
   --chat-user-text: #e3e7f0;
   --chat-user-border: #3a4080;
@@ -51,6 +49,19 @@
   --radius-md: 9px;
   --radius-lg: 14px;
   --grid-row-h: 40px;
+  --topbar-h: 60px;
+  --statusbar-h: 32px;
+  /* Explorer rows (object tree, saved, history) — a min-height, so compact keeps their natural height. */
+  --tree-row-h: 36px;
+  /* Results grid: horizontal cell padding, header-cell vertical padding, toolbar padding. */
+  --cell-pad-x: 20px;
+  --grid-head-pad-y: 10px;
+  --results-pad-x: 20px;
+  /* Results surface: raised and rounded inside the content margin, no zebra striping. */
+  --results-inset: var(--pad-x);
+  --results-radius: var(--radius-lg);
+  --results-bg: var(--bg-2);
+  --grid-zebra: transparent;
 }
 :root[data-density='compact'] {
   --fs-base: 13px;
@@ -63,6 +74,17 @@
   --radius-md: 7px;
   --radius-lg: 9px;
   --grid-row-h: 26px;
+  --topbar-h: 46px;
+  --statusbar-h: 26px;
+  --tree-row-h: 24px;
+  --cell-pad-x: 8px;
+  --grid-head-pad-y: 4px;
+  --results-pad-x: 10px;
+  /* Edge to edge and striped, as before. */
+  --results-inset: 0px;
+  --results-radius: 0px;
+  --results-bg: transparent;
+  --grid-zebra: var(--row-odd);
 }
 
 /* ── Light theme overrides ── */
@@ -308,16 +330,22 @@ button, input, select, textarea {
 }
 
 /* ── Top bar ── */
+/* No bottom rule: the change of surface (--bg-2 over the editor's --bg) separates it. */
 .topbar {
   display: flex;
   align-items: center;
   height: var(--topbar-h);
-  padding: 0 12px;
+  padding: 0 var(--pad-x);
   gap: 8px;
   background: var(--bg-2);
-  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
   user-select: none;
+}
+/* Control-sized, but never below the 30px the bar has always used (compact). */
+.topbar .icon-btn {
+  width: max(var(--control-h), 30px);
+  height: max(var(--control-h), 30px);
+  border-radius: var(--radius-md);
 }
 
 /* Compact brand mark (the app icon) instead of a wordmark. */
@@ -586,9 +614,10 @@ button, input, select, textarea {
 }
 
 /* ── Connection sidebar: Connections zone over the Explorer zone; badges when collapsed ── */
+/* No right rule: --bg-2 against the editor's --bg separates them. */
 .sidebar {
   position: relative; flex-shrink: 0;
-  background: var(--bg-2); border-right: 1px solid var(--border);
+  background: var(--bg-2);
   display: flex; flex-direction: column; min-height: 0; overflow: hidden;
   /* The two zones are separated by space, not a rule. */
   gap: calc(var(--gap) * 2);
@@ -649,7 +678,7 @@ button, input, select, textarea {
 /* Collapsed: a narrow column — Expand, Home, one badge per connection with open tabs, + */
 .sidebar-badges {
   width: var(--sidebar-collapsed-w); flex-shrink: 0;
-  background: var(--bg-2); border-right: 1px solid var(--border);
+  background: var(--bg-2);
   display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 0;
 }
 .sidebar-badges .icon-btn { width: 38px; height: 38px; }
@@ -667,10 +696,10 @@ button, input, select, textarea {
 .sidebar-badge.active { background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .sidebar-badge:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .sidebar-badge-bar { width: 18px; height: 3px; border-radius: 2px; }
+/* Invisible at rest (no rule between sidebar and editor); the accent line shows on hover / focus. */
 .side-resizer {
   position: absolute; right: 0; top: 0; bottom: 0; width: 6px; z-index: 2;
   cursor: col-resize; touch-action: none;
-  background: linear-gradient(var(--border), var(--border)) right / 1px 100% no-repeat;
 }
 .side-resizer:hover, .side-resizer:focus-visible {
   background: linear-gradient(var(--accent), var(--accent)) right / 2px 100% no-repeat; outline: none;
@@ -773,17 +802,20 @@ button, input, select, textarea {
 /* subtle focused-pane cue: shortcuts drive THIS pane */
 .editor-pane.focused { box-shadow: inset 0 2px 0 var(--accent); }
 
+/* No top rule: --bg-2 under the editor's --bg separates it. The font sits half a pixel above
+   --fs-xs, which keeps the 11.5px it has always had in compact. */
 .statusbar {
   height: var(--statusbar-h);
-  display: flex; align-items: center; gap: 12px;
-  padding: 0 12px;
-  background: var(--bg-2); border-top: 1px solid var(--border);
-  flex-shrink: 0; font-size: 11.5px; color: var(--text-2); user-select: none;
+  display: flex; align-items: center; gap: calc(var(--gap) * 2);
+  padding: 0 var(--pad-x);
+  background: var(--bg-2);
+  flex-shrink: 0; font-size: calc(var(--fs-xs) + 0.5px); color: var(--text-2); user-select: none;
 }
 .sb-status { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .sb-status.err { color: var(--danger-text); }
 .sb-ok { color: var(--ok); }
 .sb-conn { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.sb-lock { display: inline-flex; }
 
 .pane-divider {
   flex: 0 0 6px;
@@ -1038,22 +1070,25 @@ input[type="password"]::placeholder {
   background: var(--bg-2);
   border-bottom: 1px solid var(--border);
 }
+/* Filled, borderless fields; the border shows only on focus. Heights are 26px / 22px in compact. */
 .tree-filter input[type="text"] {
   flex: 1;
   min-width: 0;
-  height: 26px;
+  height: calc(var(--control-h) - 2px);
   padding: 4px 8px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
+  border-color: transparent;
+}
+.tree-filter input[type="text"]:focus {
+  border-color: var(--accent);
 }
 .tree-filter-clear {
   flex: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
-  font-size: 15px;
-  line-height: 1;
+  width: calc(var(--control-h) - 6px);
+  height: calc(var(--control-h) - 6px);
   color: var(--text-2);
   background: transparent;
   border: none;
@@ -1066,13 +1101,13 @@ input[type="password"]::placeholder {
 }
 .tree-sort {
   flex: none;
-  height: 26px;
+  height: calc(var(--control-h) - 2px);
   max-width: 96px;
   padding: 2px 4px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text);
   background: var(--bg-3);
-  border: 1px solid var(--border);
+  border: 1px solid transparent;
   border-radius: var(--radius);
   cursor: pointer;
 }
@@ -1081,9 +1116,10 @@ input[type="password"]::placeholder {
   font-weight: 700;
 }
 
+/* One pixel under --fs-xs: 10px in compact, as before. */
 .tree-schema {
   padding: 8px 12px 2px;
-  font-size: 10px;
+  font-size: calc(var(--fs-xs) - 1px);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -1097,6 +1133,7 @@ input[type="password"]::placeholder {
   align-items: center;
   gap: 4px;
   width: 100%;
+  min-height: var(--tree-row-h);
   background: transparent;
   border: none;
   padding: 3px 10px;
@@ -1104,7 +1141,7 @@ input[type="password"]::placeholder {
   text-align: left;
   border-radius: 0;
   color: var(--text);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   transition: background 0.08s;
 }
 
@@ -1123,7 +1160,6 @@ input[type="password"]::placeholder {
   height: 14px;
   flex-shrink: 0;
   color: var(--text-2);
-  font-size: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1170,7 +1206,7 @@ input[type="password"]::placeholder {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 
 /* Hover-reveal "Table info" icon at the right of a tree row. */
@@ -1210,7 +1246,7 @@ input[type="password"]::placeholder {
   justify-content: space-between;
   padding: 2px 10px 2px 4px;
   font-family: 'SF Mono', 'Fira Mono', 'Consolas', monospace;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text);
 }
 
@@ -1221,7 +1257,7 @@ input[type="password"]::placeholder {
 
 .col-type {
   color: var(--text-2);
-  font-size: 10px;
+  font-size: calc(var(--fs-xs) - 1px);
   margin-left: 6px;
   flex-shrink: 0;
 }
@@ -1232,11 +1268,15 @@ input[type="password"]::placeholder {
   font-size: 11px;
   font-style: italic;
 }
+/* Scoped: ModelManagerModal reuses .tree-muted, and modals keep their sizes. */
+.tree .tree-muted {
+  font-size: var(--fs-xs);
+}
 
 .tree-error {
   padding: 6px 12px;
   color: var(--danger-text);
-  font-size: 11px;
+  font-size: var(--fs-xs);
 }
 
 .sidebar-empty {
@@ -1248,7 +1288,7 @@ input[type="password"]::placeholder {
   padding: 24px 16px;
   text-align: center;
   color: var(--text-2);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   gap: 8px;
 }
 
@@ -1265,14 +1305,14 @@ input[type="password"]::placeholder {
   padding-top: 4px;
 }
 
+/* Pills sit on the editor's --bg: no strip surface or bottom rule, so the strip does not run
+   into the sidebar (also --bg-2) now that the sidebar has no right rule. */
 .tabbar {
   display: flex;
   flex-direction: row;
   align-items: center;
   gap: var(--gap);
   padding: 2px var(--pad-x);
-  background: var(--bg-2);
-  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
   overflow-x: auto;
   overflow-y: hidden;
@@ -1467,7 +1507,7 @@ input[type="password"]::placeholder {
   flex: 0 0 auto;
   padding: 5px 10px;
   text-align: center;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-2);
   border-top: 1px solid var(--border);
 }
@@ -1486,10 +1526,12 @@ input[type="password"]::placeholder {
   flex: 0 0 30%;
   min-height: 80px;
   /* Hard guard regardless of the stored fraction: leave ~100px of results
-     visible under the toolbar (~37px) and divider (6px) even on short windows.
+     visible under the toolbar and divider (6px) even on short windows — the
+     toolbar grows with --control-h and the results surface adds its bottom
+     inset (150px in total in compact, as before).
      When the window is so short the two constraints cross, min-height wins —
      the editor floor holds and .results scrolls. */
-  max-height: calc(100% - 150px);
+  max-height: calc(100% - 122px - var(--control-h) - var(--results-inset));
 }
 
 .editor-host {
@@ -1510,10 +1552,15 @@ input[type="password"]::placeholder {
   outline: none; /* the thicker accent line IS the focus indicator */
 }
 
+/* Comfortable: a raised, rounded --bg-2 surface inside the content margin. Compact: the
+   tokens collapse it back to edge to edge on the editor's --bg, as before. */
 .results {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  margin: 0 var(--results-inset) var(--results-inset);
+  background: var(--results-bg);
+  border-radius: var(--results-radius);
 }
 
 .results-empty {
@@ -1523,7 +1570,7 @@ input[type="password"]::placeholder {
   height: 100%;
   min-height: 80px;
   color: var(--text-2);
-  font-size: 13px;
+  font-size: var(--fs-base);
 }
 /* Write/command success (UPDATE/INSERT/DELETE/DDL): a two-line affirmation. */
 .results-empty.done {
@@ -1552,10 +1599,15 @@ input[type="password"]::placeholder {
   flex-direction: row;
   align-items: center;
   gap: 8px;
-  padding: 6px 10px;
+  padding: var(--gap) var(--results-pad-x);
   border-bottom: 1px solid var(--border);
   background: var(--bg-2);
   flex-shrink: 0;
+}
+.results-toolbar .btn {
+  height: var(--control-h);
+  font-size: var(--fs-sm);
+  border-radius: var(--radius-md);
 }
 
 .seg {
@@ -1567,10 +1619,11 @@ input[type="password"]::placeholder {
   border-radius: 7px;
 }
 
+/* 24px in compact, as before. */
 .seg-btn {
   padding: 0 14px;
-  height: 24px;
-  font-size: 12px;
+  height: calc(var(--control-h) - 4px);
+  font-size: var(--fs-sm);
   color: var(--text-2);
   background: transparent;
   border: none;
@@ -1601,7 +1654,7 @@ input[type="password"]::placeholder {
 
 /* Match count beside the filter box (searches the whole result). */
 .filter-count {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-2);
   white-space: nowrap;
 }
@@ -1609,15 +1662,17 @@ input[type="password"]::placeholder {
   color: var(--danger-text);
 }
 
-/* Filter mode toggles: Aa (case), \b (whole word), .* (regex). */
+/* Filter mode toggles: Aa (case), \b (whole word), .* (regex). The 24px floors are what
+   compact has always had (its natural height is a touch above). */
 .filter-toggles {
   display: flex;
   gap: 2px;
 }
 .ft-toggle {
-  min-width: 24px;
+  min-width: calc(var(--control-h) - 4px);
+  min-height: calc(var(--control-h) - 4px);
   padding: 3px 5px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-family: ui-monospace, 'SF Mono', monospace;
   background: var(--bg-3);
   border: 1px solid var(--border);
@@ -1638,12 +1693,23 @@ input[type="password"]::placeholder {
   border-color: var(--accent);
 }
 
+/* The results filter: a filled, borderless field (border on focus only). Scoped — the
+   dashboard, sidebar and diagram reuse .filter-input. */
+.results-toolbar .filter-input {
+  min-height: var(--control-h);
+  font-size: var(--fs-sm);
+  border-color: transparent;
+}
+.results-toolbar .filter-input:focus {
+  border-color: var(--accent);
+}
+
 .chip-warn {
   color: var(--warn);
   border: 1px solid var(--warn-border);
   border-radius: 999px;
   padding: 2px 8px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
 }
 
 /* ── Results grid ── */
@@ -1666,7 +1732,7 @@ input[type="password"]::placeholder {
   min-width: var(--grid-min);
   background: var(--bg-2);
   border-bottom: 1px solid var(--border);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-2);
 }
 .grid-filter-row {
@@ -1676,17 +1742,19 @@ input[type="password"]::placeholder {
   background: var(--bg-2);
   border-bottom: 1px solid var(--border);
 }
+/* 4px in compact; the field's text then sits near the header text in comfortable. */
 .grid-filter-row .grid-cell {
-  padding: 2px 4px;
+  padding: 2px calc(var(--cell-pad-x) - 4px);
 }
+/* Filled, borderless; the border shows on focus. */
 .col-filter-input {
   width: 100%;
   box-sizing: border-box;
   background: var(--bg-3);
-  border: 1px solid var(--border);
+  border: 1px solid transparent;
   border-radius: 3px;
   padding: 2px 5px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text);
   outline: none;
 }
@@ -1708,7 +1776,7 @@ mark.hl {
 }
 
 .grid-head .grid-cell {
-  padding: 4px 8px;
+  padding: var(--grid-head-pad-y) var(--cell-pad-x);
   cursor: pointer;
   user-select: none;
   position: relative;
@@ -1742,6 +1810,10 @@ mark.hl {
   background: var(--accent);
 }
 
+/* The height must equal DENSITY_METRICS[density].gridRowHeight (the virtualizer's row size).
+   The text is centred in it, so the row height — not vertical padding — gives the cell its air.
+   The font sits half a pixel above --fs-sm: 12.5px in compact, as before. The hairline
+   between rows stays; the zebra striping is compact-only (--grid-zebra). */
 .grid-row {
   display: grid;
   grid-template-columns: var(--grid-cols);
@@ -1750,16 +1822,16 @@ mark.hl {
   right: 0;
   height: var(--grid-row-h);
   align-items: center;
-  font-size: 12.5px;
+  font-size: calc(var(--fs-sm) + 0.5px);
   border-bottom: 1px solid var(--border);
 }
 
 .grid-row.odd {
-  background: var(--row-odd);
+  background: var(--grid-zebra);
 }
 
 .grid-cell {
-  padding: 0 8px;
+  padding: 0 var(--cell-pad-x);
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -1832,8 +1904,9 @@ mark.hl {
   background: var(--bg);
   color: var(--text);
   font: inherit;
-  font-size: 12.5px;
-  padding: 0 6px;
+  /* Matches the cell text it replaces: same size, about the same left edge. */
+  font-size: calc(var(--fs-sm) + 0.5px);
+  padding: 0 calc(var(--cell-pad-x) - 2px);
   outline: none;
 }
 .cell-null-btn {
@@ -1854,10 +1927,10 @@ mark.hl {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 10px;
+  padding: var(--gap) var(--results-pad-x);
   border-top: 1px solid var(--border);
   background: var(--bg-2);
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 .edit-bar .btn {
   height: 24px;
@@ -2192,9 +2265,10 @@ mark.hl {
   gap: 6px;
   align-items: center;
   width: 100%;
+  min-height: var(--tree-row-h);
   text-align: left;
   padding: 4px 10px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-2);
   background: transparent;
   border: 0;
@@ -2230,15 +2304,18 @@ mark.hl {
 }
 
 .h-time {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-2);
   flex-shrink: 0;
 }
 
 .h-empty {
   padding: 8px 10px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-2);
+}
+.h-empty svg {
+  vertical-align: -2px;
 }
 
 /* ── Run-all script results ── */
@@ -2320,6 +2397,7 @@ mark.hl {
   display: flex;
   align-items: center;
   width: 100%;
+  min-height: var(--tree-row-h);
   padding-right: 6px;
 }
 
@@ -2327,13 +2405,16 @@ mark.hl {
   background: var(--bg-3);
 }
 
+/* Stretches to the row so the whole row height opens the query. */
 .s-open {
   flex: 1;
   min-width: 0;
   display: flex;
+  align-self: stretch;
+  align-items: center;
   text-align: left;
   padding: 4px 0 4px 10px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   background: transparent;
   border: 0;
   cursor: pointer;
@@ -2350,12 +2431,14 @@ mark.hl {
 /* Row actions: hidden until the row is hovered, but opacity (not visibility)
    so they stay tabbable and reappear on keyboard focus. */
 .s-act {
+  display: inline-flex;
+  align-items: center;
   opacity: 0;
   background: transparent;
   border: 0;
   color: var(--text-2);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   line-height: 1;
   padding: 4px 5px;
   border-radius: 4px;
@@ -3328,8 +3411,9 @@ mark.hl {
   height: var(--control-h);
   padding: 0 var(--pad-x);
   color: var(--text-2);
-  background: var(--bg);
-  border: 1px solid var(--border);
+  /* A filled, borderless field: --bg-3 reads on the --bg-2 bar in light themes too. */
+  background: var(--bg-3);
+  border: 1px solid transparent;
   border-radius: var(--radius-md);
   font-size: var(--fs-sm);
   cursor: pointer;

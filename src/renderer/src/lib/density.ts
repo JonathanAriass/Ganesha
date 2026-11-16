@@ -11,7 +11,11 @@ type ReadStore = Pick<Storage, 'getItem'>
 type WriteStore = Pick<Storage, 'setItem'>
 
 function safeLocal(): (ReadStore & WriteStore) | null {
-  return typeof localStorage === 'undefined' ? null : localStorage
+  try {
+    return typeof localStorage === 'undefined' ? null : localStorage
+  } catch {
+    return null // the accessor itself throws when storage is blocked
+  }
 }
 
 /** The two metrics JS needs (everything else is CSS tokens). */
@@ -24,8 +28,13 @@ export function parseDensity(raw: unknown): Density {
   return DENSITIES.find((d) => d === raw) ?? 'comfortable'
 }
 
+/** Never throws: useDensity calls this during render while the settings load. */
 export function densityHint(storage: ReadStore | null = safeLocal()): Density {
-  return parseDensity(storage?.getItem(DENSITY_HINT_KEY))
+  try {
+    return parseDensity(storage?.getItem(DENSITY_HINT_KEY))
+  } catch {
+    return parseDensity(null)
+  }
 }
 
 export function applyDensity(d: Density, storage: WriteStore | null = safeLocal()): void {

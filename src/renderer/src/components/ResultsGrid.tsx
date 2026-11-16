@@ -298,9 +298,13 @@ export default function ResultsGrid({
     const ctx = measureRef.current
     if (!ctx) return
     const sample = parentRef.current?.querySelector('.grid-cell') as HTMLElement | null
-    ctx.font = (sample && getComputedStyle(sample).font) || '12.5px sans-serif'
+    const sampleStyle = sample ? getComputedStyle(sample) : null
+    ctx.font = sampleStyle?.font || '12.5px sans-serif'
+    // Cell padding follows the density (--cell-pad-x); keep 8px of slack on top, as before.
+    const padX = sampleStyle ? parseFloat(sampleStyle.paddingLeft) + parseFloat(sampleStyle.paddingRight) : NaN
+    const padding = Number.isFinite(padX) ? padX + 8 : undefined
     const texts = table.getRowModel().rows.map((r) => displayCellText((r.original as unknown[])[colIndex], kindOf(colIndex)))
-    const w = autoFitWidth(columns[colIndex].name, texts, (s) => ctx.measureText(s).width)
+    const w = autoFitWidth(columns[colIndex].name, texts, (s) => ctx.measureText(s).width, padding)
     setWidths((prev) => ({ ...prev, [colIndex]: w }))
   }
 

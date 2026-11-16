@@ -13,6 +13,29 @@ describe('density', () => {
     expect(densityHint({ getItem: () => 'garbage' })).toBe('comfortable')
     expect(densityHint(null)).toBe('comfortable')
   })
+  it('densityHint falls back to comfortable when storage throws', () => {
+    const throwing = {
+      getItem: (): string | null => {
+        throw new Error('SecurityError')
+      }
+    }
+    expect(densityHint(throwing)).toBe('comfortable')
+  })
+  it('densityHint falls back to comfortable when localStorage itself cannot be accessed', () => {
+    const original = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      get() {
+        throw new Error('SecurityError')
+      }
+    })
+    try {
+      expect(densityHint()).toBe('comfortable')
+    } finally {
+      if (original) Object.defineProperty(globalThis, 'localStorage', original)
+      else delete (globalThis as { localStorage?: unknown }).localStorage
+    }
+  })
   it('exposes the JS-side metrics', () => {
     expect(DENSITY_METRICS.compact).toEqual({ editorFontSize: 13, gridRowHeight: 26 })
     expect(DENSITY_METRICS.comfortable).toEqual({ editorFontSize: 14, gridRowHeight: 40 })

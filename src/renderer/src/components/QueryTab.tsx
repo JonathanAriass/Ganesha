@@ -160,17 +160,17 @@ export default function QueryTab({ tab }: Props): JSX.Element {
       .catch((e) => finishRun(tab.id, { error: e instanceof Error ? e.message : String(e) }))
   }
 
-  /** Re-run the exact query behind the current results — the ↻ Refresh button. Uses
+  /** Re-run the exact query behind the current results — the environment bar's Refresh button. Uses
    *  lastRunText (not the live editor text), so it reloads the shown rows even if the
    *  editor has since been edited or the cursor moved. */
   function refresh(): void {
     if (tab.lastRunText && !tab.running) run(tab.lastRunText)
   }
 
-  // Expose run handlers to the global command bar (TopBar). Ref-thunk so the
+  // Expose run handlers to the pane's environment bar (EnvBar). Ref-thunk so the
   // registry always sees this render's closures; registered once per mount.
   // useLayoutEffect (not useEffect): registration must precede the first paint
-  // so a command-bar click can never land in an unregistered window.
+  // so a run-button click can never land in an unregistered window.
   const actionsRef = useRef({ run: () => run(), runAll: () => void runAll(), refresh })
   actionsRef.current = { run: () => run(), runAll: () => void runAll(), refresh }
   useLayoutEffect(() => {

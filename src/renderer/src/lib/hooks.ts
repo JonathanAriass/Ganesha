@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query'
-import { parseDensity } from './density'
+import { densityHint, parseDensity } from './density'
 import type { Density, ConnectionInput, SavedQueryInput, SavedQueryPatch, SsmTunnelInput } from '@shared/domain'
 import type { TelescopeFilter, TelescopeEntry } from '@shared/telescope'
 import type { ObjectRef } from '@shared/schema'
@@ -364,9 +364,11 @@ export function useSettings() {
   })
 }
 
+/** While the settings load, follow the first-paint hint main.tsx put on <html>, so the JS
+ *  metrics (editor font, grid row height) never disagree with the CSS tokens for a frame. */
 export function useDensity(): Density {
   const { data } = useSettings()
-  return parseDensity(data?.density)
+  return data ? parseDensity(data.density) : densityHint()
 }
 
 export function useSetSetting() {
