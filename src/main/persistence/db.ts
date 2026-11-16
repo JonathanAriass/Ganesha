@@ -30,6 +30,7 @@ export function migrate(db: DB): void {
       auth_source TEXT NOT NULL DEFAULT '',
       replica_set TEXT NOT NULL DEFAULT '',
       ssh_json    TEXT,
+      environment TEXT NOT NULL DEFAULT '',
       created_at  INTEGER NOT NULL,
       updated_at  INTEGER NOT NULL
     );
@@ -120,6 +121,8 @@ export function migrate(db: DB): void {
   addColumnIfMissing(db, 'connections', 'group_id', 'TEXT REFERENCES connection_groups(id) ON DELETE SET NULL')
   // Subgroups (added later): nullable parent; deleting a parent promotes its children to root via FK.
   addColumnIfMissing(db, 'connection_groups', 'parent_id', 'TEXT REFERENCES connection_groups(id) ON DELETE SET NULL')
+  // Optional display-only environment label (e.g. PROD).
+  addColumnIfMissing(db, 'connections', 'environment', "TEXT NOT NULL DEFAULT ''")
   migrateSecretsCompositeKey(db)
 }
 

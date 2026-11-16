@@ -11,7 +11,7 @@ const input: SsmTunnelInput = {
 }
 const conn: ConnectionInput = {
   type: 'mysql', name: 'c', color: '#000', host: 'h', port: 1, username: 'u', database: 'd',
-  ssl: false, readOnly: false, requireCommit: true, authSource: '', replicaSet: '', ssh: null, repoPath: null
+  ssl: false, readOnly: false, requireCommit: true, authSource: '', replicaSet: '', ssh: null, repoPath: null, environment: ''
 }
 
 let db: DB

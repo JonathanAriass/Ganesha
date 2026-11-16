@@ -2,6 +2,7 @@ import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypt
 import type { DB } from './db'
 import type { makeSecretStore } from './secrets'
 import type { ConnectionInput, ConnectionType, SshConfig, SshHop } from '../../shared/domain'
+import { cleanEnvironment } from '../../shared/environment'
 import { MIN_PASSPHRASE_LENGTH, type ImportResult } from '../../shared/transfer'
 import { listConnections, createConnection, setConnectionGroup } from './connections'
 import { listGroups, createGroup } from './groups'
@@ -159,7 +160,8 @@ export function parseTransferFile(text: string): TransferFile {
       ssl: c.ssl === true, readOnly: c.readOnly === true, requireCommit: c.requireCommit === true,
       authSource: str(c.authSource), replicaSet: str(c.replicaSet), ssh: parseSsh(c.ssh),
       repoPath: typeof c.repoPath === 'string' ? c.repoPath : null,
-      groupId: typeof c.groupId === 'string' ? c.groupId : null
+      groupId: typeof c.groupId === 'string' ? c.groupId : null,
+      environment: cleanEnvironment(c.environment)
     }
   })
 

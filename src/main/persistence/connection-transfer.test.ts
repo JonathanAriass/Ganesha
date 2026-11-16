@@ -14,7 +14,7 @@ const fake: Encryptor = {
 const base: ConnectionInput = {
   type: 'postgres', name: 'prod', color: '#000', host: 'db.internal', port: 5432,
   username: 'app', database: 'main', ssl: true, readOnly: true, requireCommit: true,
-  authSource: '', replicaSet: '', ssh: null, repoPath: '/repos/app'
+  authSource: '', replicaSet: '', ssh: null, repoPath: '/repos/app', environment: 'PROD'
 }
 const withSsh: ConnectionInput = {
   ...base, type: 'mysql', name: 'tunnelled', port: 3306, repoPath: null,
@@ -48,6 +48,22 @@ function roundTrip(passphrase: string | null, ids: string[] | null = null): Retu
 }
 
 describe('connection transfer', () => {
+  it('round-trips the environment label', () => {
+    applyImport(dst.db, dst.secrets, roundTrip(null), null, 200)
+    expect(listConnections(dst.db).find((c) => c.name === 'prod')!.environment).toBe('PROD')
+  })
+
+  it.each([
+    ['missing', undefined, ''],
+    ['non-string', 123, ''],
+    ['too long', 'x'.repeat(40), 'x'.repeat(12)]
+  ])('imports a %s environment as cleaned', (_n, value, expected) => {
+    const file = JSON.parse(JSON.stringify(buildExport(src.db, src.secrets, { connectionIds: null, passphrase: null }, 100)))
+    for (const c of file.connections) { if (value === undefined) delete c.environment; else c.environment = value }
+    const parsed = parseTransferFile(JSON.stringify(file))
+    expect(parsed.connections.every((c) => c.environment === expected)).toBe(true)
+  })
+
   it('round-trips connections, groups and secrets with a passphrase', () => {
     const res = applyImport(dst.db, dst.secrets, roundTrip(PASS), PASS, 200)
     expect(res).toEqual({ imported: 2, skipped: 0, groupsCreated: 2, withSecrets: true })

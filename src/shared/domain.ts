@@ -41,6 +41,8 @@ export interface ConnectionInput {
   ssh: SshConfig | null
   /** Absolute path to a local code repo the assistant reads for context; null = not linked. */
   repoPath: string | null
+  /** Optional display-only label such as "PROD"; '' = none. Max 12 chars (see shared/environment). */
+  environment: string
 }
 
 /** A stored connection (input + identity + timestamps), password excluded. */

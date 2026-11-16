@@ -7,7 +7,7 @@ import type { ConnectionInput, SshConfig } from '../../shared/domain'
 const input: ConnectionInput = {
   type: 'postgres', name: 'prod', color: '#6366f1', host: 'localhost',
   port: 5432, username: 'admin', database: 'app', ssl: true, readOnly: false,
-  requireCommit: true, authSource: '', replicaSet: '', ssh: null, repoPath: null
+  requireCommit: true, authSource: '', replicaSet: '', ssh: null, repoPath: null, environment: ''
 }
 
 const ssh: SshConfig = {
@@ -19,6 +19,14 @@ let db: DB
 beforeEach(() => { db = new Database(':memory:'); migrate(db) })
 
 describe('connections service', () => {
+  it('stores a cleaned environment label on create and update', () => {
+    const c = createConnection(db, { ...input, environment: '  PROD  ' }, 1)
+    expect(c.environment).toBe('PROD')
+    expect(getConnection(db, c.id)!.environment).toBe('PROD')
+    expect(updateConnection(db, c.id, { environment: 'a-very-long-environment' }, 2).environment).toBe('a-very-long-')
+    expect(createConnection(db, input, 3).environment).toBe('')
+  })
+
   it('creates and reads back a connection with an id and timestamps', () => {
     const c = createConnection(db, input, 1000)
     expect(c.id).toMatch(/.+/)

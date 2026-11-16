@@ -45,6 +45,7 @@ const DEFAULT_INPUT: ConnectionInput = {
   replicaSet: '',
   ssh: null,
   repoPath: null,
+  environment: '',
 }
 
 // ── Test status ──────────────────────────────────────────────────────────────
@@ -94,6 +95,7 @@ export default function ConnectionModal(): JSX.Element {
         replicaSet: existingConn.replicaSet,
         ssh: existingConn.ssh,
         repoPath: existingConn.repoPath,
+        environment: existingConn.environment,
       })
       setPassword('') // blank = keep current on edit
     } else if (!isEdit) {
