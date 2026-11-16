@@ -968,7 +968,7 @@ describe('openTelescopeTab', () => {
 describe('side panel state', () => {
   // Restore rather than seed: a beforeEach would blind the defaults test to
   // import-time hydration, while afterEach still leaves no state behind for
-  // later blocks (the last test here ends at sideOpen:false/history).
+  // later blocks (the last test here ends on the history section).
   afterEach(() => {
     useAppStore.setState({ sideOpen: true, sideSection: 'schema' })
   })
@@ -987,14 +987,14 @@ describe('side panel state', () => {
     expect(useAppStore.getState().sideOpen).toBe(before)
   })
 
-  it('selectSideSection: opens when closed, switches when different, collapses on re-click', () => {
+  it('selectSideSection: opens when closed, switches when different, stays open on re-click', () => {
     useAppStore.setState({ sideOpen: false, sideSection: 'schema' })
     useAppStore.getState().selectSideSection('saved') // closed → open + switch
     expect(useAppStore.getState()).toMatchObject({ sideOpen: true, sideSection: 'saved' })
     useAppStore.getState().selectSideSection('history') // open, different → switch
     expect(useAppStore.getState()).toMatchObject({ sideOpen: true, sideSection: 'history' })
-    useAppStore.getState().selectSideSection('history') // open, same → collapse
-    expect(useAppStore.getState()).toMatchObject({ sideOpen: false, sideSection: 'history' })
+    useAppStore.getState().selectSideSection('history') // open, same → still open (select-only)
+    expect(useAppStore.getState()).toMatchObject({ sideOpen: true, sideSection: 'history' })
   })
 })
 

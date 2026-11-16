@@ -1,21 +1,25 @@
 import { useRef, useState } from 'react'
 import { useAppStore } from '../state/store'
-import ObjectTree from './ObjectTree'
-import SavedSection from './SavedSection'
-import HistorySection from './HistorySection'
+import { mod } from '../lib/platform'
+import SidebarConnections from './SidebarConnections'
+import SidebarExplorer from './SidebarExplorer'
+import SidebarBadges from './SidebarBadges'
+import { Icon } from './icons'
 import {
   clampSideWidth, dragSideWidth, loadSideWidth, saveSideWidth,
   SIDE_DEFAULT_WIDTH, SIDE_MIN_WIDTH, SIDE_MAX_WIDTH
 } from '../lib/side-panel'
 
-const TITLES = { schema: 'Schema', saved: 'Saved queries', history: 'History' } as const
-
-/** Rail-opened panel: one section at a time, right-edge drag to resize.
- *  Resize mirrors AssistantPanel: DOM write during drag, commit on release. */
-export default function SidePanel(): JSX.Element | null {
+/** The connection sidebar: Connections above the per-connection Explorer, right-edge
+ *  drag to resize; collapsed (⌘B) it becomes a narrow column of badges. While the
+ *  dashboard shows (or there are no tabs) the Connections zone hides — the dashboard
+ *  already lists them. Resize mirrors AssistantPanel: DOM write during drag, commit on release. */
+export default function Sidebar(): JSX.Element {
   const open = useAppStore((s) => s.sideOpen)
-  const section = useAppStore((s) => s.sideSection)
-  const activeConnectionId = useAppStore((s) => s.activeConnectionId)
+  const toggleSide = useAppStore((s) => s.toggleSide)
+  const dashboardOpen = useAppStore((s) => s.dashboardOpen)
+  const toggleDashboard = useAppStore((s) => s.toggleDashboard)
+  const hideConnections = useAppStore((s) => s.tabs.length === 0 || s.dashboardOpen)
 
   const panelRef = useRef<HTMLElement>(null)
   const [width, setWidth] = useState(() => loadSideWidth())
@@ -46,10 +50,36 @@ export default function SidePanel(): JSX.Element | null {
     commitWidth(clampSideWidth(widthRef.current + step))
   }
 
-  if (!open) return null
+  if (!open) return <SidebarBadges />
+
+  // The sidebar header's Home and Collapse: shown in the Connections zone, or in the
+  // Explorer header while that zone is hidden, so both stay reachable.
+  const home = (
+    <button
+      className={`icon-btn${dashboardOpen ? ' active' : ''}`}
+      onClick={toggleDashboard}
+      aria-label="Connections dashboard"
+      aria-pressed={dashboardOpen}
+      data-tooltip="Connections dashboard"
+      data-tip="right"
+    >
+      <Icon name="home" />
+    </button>
+  )
+  const collapse = (
+    <button
+      className="icon-btn"
+      onClick={toggleSide}
+      aria-label="Collapse sidebar"
+      data-tooltip={`Collapse sidebar (${mod}B)`}
+      data-tip="right"
+    >
+      <Icon name="sidebar" />
+    </button>
+  )
 
   return (
-    <aside className="side-panel" ref={panelRef} style={{ width }} aria-label={TITLES[section]}>
+    <aside className="sidebar" ref={panelRef} style={{ width }} aria-label="Sidebar">
       {/* Resizer first (position: absolute → visually unchanged) so keyboard users
           reach it without tabbing through the whole tree; matches AssistantPanel. */}
       <div
@@ -69,14 +99,9 @@ export default function SidePanel(): JSX.Element | null {
         onDoubleClick={() => commitWidth(SIDE_DEFAULT_WIDTH)}
         onKeyDown={onResizeKeyDown}
       />
-      <div className="side-head">{TITLES[section]}</div>
-      <div className="side-body">
-        {section === 'schema' && <ObjectTree />}
-        {section === 'saved' &&
-          (activeConnectionId ? <SavedSection /> : <div className="sidebar-empty"><p>No connection selected.</p></div>)}
-        {section === 'history' &&
-          (activeConnectionId ? <HistorySection /> : <div className="sidebar-empty"><p>No connection selected.</p></div>)}
-      </div>
+      {!hideConnections && <SidebarConnections home={home} collapse={collapse} />}
+      {/* Same slot either way, so toggling the dashboard never remounts the tree (filter, expansion). */}
+      <SidebarExplorer headerEnd={hideConnections ? <>{home}{collapse}</> : undefined} />
     </aside>
   )
 }

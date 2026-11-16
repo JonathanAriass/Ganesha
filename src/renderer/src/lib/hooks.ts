@@ -227,6 +227,50 @@ export function useDuplicateConnection() {
   })
 }
 
+function errorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e)
+}
+
+/** Delete / duplicate as the connection modal's footer and the sidebar's context menu
+ *  both offer them. `remove` confirms first and clears the active connection only if
+ *  the deleted one is still active; `duplicate` opens the copy in the edit modal. The
+ *  optional callbacks let a caller add its own follow-up (the modal closes itself after
+ *  a delete) or show a failure its own way. Promise-based rather than per-call mutate
+ *  callbacks so the follow-up still runs if the caller unmounts mid-flight. */
+export function useConnectionActions(): {
+  remove(c: { id: string; name: string }, opts?: { onSuccess?: () => void; onError?: (message: string) => void }): void
+  duplicate(id: string, opts?: { onError?: (message: string) => void }): void
+  removing: boolean
+  duplicating: boolean
+} {
+  const del = useDeleteConnection()
+  const dup = useDuplicateConnection()
+  return {
+    remove(c, opts) {
+      if (!window.confirm(`Delete connection "${c.name}"? This cannot be undone.`)) return
+      del.mutateAsync(c.id).then(
+        () => {
+          // Read fresh: closeTabsForConnection (the delete hook) may have already handed the
+          // active connection to a remaining group; only clear it if the deleted one is still active.
+          const s = useAppStore.getState()
+          if (s.activeConnectionId === c.id) s.setActiveConnection(null)
+          opts?.onSuccess?.()
+        },
+        (e: unknown) => opts?.onError?.(errorMessage(e))
+      )
+    },
+    duplicate(id, opts) {
+      dup.mutateAsync(id).then(
+        // Copied in main (incl. password + SSH secrets) — open the copy so the user only tweaks what differs.
+        (copy) => useAppStore.getState().openModal({ mode: 'edit', id: copy.id }),
+        (e: unknown) => opts?.onError?.(errorMessage(e))
+      )
+    },
+    removing: del.isPending,
+    duplicating: dup.isPending,
+  }
+}
+
 export function useTestConnection() {
   return useMutation({
     mutationFn: ({

@@ -184,11 +184,12 @@ interface AppState {
   setSsmRunning: (ids: string[]) => void
   markSsm: (id: string, running: boolean) => void
 
-  // ── Focus Mode side panel ─────────────────────────────────────────────────
-  /** Focus Mode side panel (rail-opened schema/saved/history). Persisted to localStorage. */
+  // ── Connection sidebar ────────────────────────────────────────────────────
+  /** Connection sidebar: expanded (vs collapsed to badges) and the explorer's
+   *  Schema / Saved / History section. Persisted to localStorage. */
   sideOpen: boolean
   sideSection: SideSection
-  /** The connections dashboard shown over the workspace (rail Home button).
+  /** The connections dashboard shown over the workspace (sidebar Home button).
    *  Volatile — never persisted; any tab activation closes it (App effect). */
   dashboardOpen: boolean
 
@@ -220,7 +221,8 @@ interface AppState {
   closeCommitModal: () => void
 
   toggleSide: () => void
-  /** Rail click: closed → open on that section; open+different → switch; open+same → collapse. */
+  /** Explorer segmented control: select the section, opening the sidebar if it was closed.
+   *  Never collapses — the Collapse button and ⌘B (`toggleSide`) are the only collapse paths. */
   selectSideSection: (section: SideSection) => void
   setDashboardOpen: (open: boolean) => void
   toggleDashboard: () => void
@@ -465,16 +467,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     }),
   setDashboardOpen: (open) => set({ dashboardOpen: open }),
   toggleDashboard: () => set((s) => ({ dashboardOpen: !s.dashboardOpen })),
-  selectSideSection: (section) =>
-    set((s) => {
-      if (s.sideOpen && s.sideSection === section) {
-        saveSideOpen(false)
-        return { sideOpen: false }
-      }
-      saveSideOpen(true)
-      saveSideSection(section)
-      return { sideOpen: true, sideSection: section }
-    }),
+  selectSideSection: (section) => {
+    saveSideOpen(true)
+    saveSideSection(section)
+    set({ sideOpen: true, sideSection: section })
+  },
 
   toggleAssistant: () => set((s) => ({ dock: toggleDock(s.dock, 'assistant') })),
   setActiveConversation: (id) => set({ activeConversationId: id }),

@@ -1,4 +1,4 @@
-/** Side-panel (rail-opened schema/saved/history panel) UI preferences.
+/** Connection sidebar UI preferences (width, expanded, explorer section).
  *  Same precedent as assistant-width.ts: localStorage is the source of truth,
  *  every function takes an injectable storage so tests (and the node-env store
  *  module) never touch the real localStorage. */
@@ -26,7 +26,7 @@ export function clampSideWidth(w: number): number {
   return Math.round(Math.min(SIDE_MAX_WIDTH, Math.max(SIDE_MIN_WIDTH, w)))
 }
 
-/** Left-docked panel: its LEFT edge (after the rail) is fixed during a drag,
+/** Left-docked panel: its LEFT edge is fixed during a drag,
  *  so width = pointer distance past that edge. */
 export function dragSideWidth(clientX: number, panelLeft: number): number {
   return clampSideWidth(clientX - panelLeft)

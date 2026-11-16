@@ -5,8 +5,7 @@ import { useAppStore } from './state/store'
 import TopBar from './components/TopBar'
 import StatusBar from './components/StatusBar'
 import Welcome from './components/Welcome'
-import Rail from './components/Rail'
-import SidePanel from './components/SidePanel'
+import Sidebar from './components/Sidebar'
 import ConnectionModal from './components/ConnectionModal'
 import SettingsModal from './components/SettingsModal'
 import CommandPalette from './components/CommandPalette'
@@ -96,8 +95,7 @@ function AppShell(): JSX.Element {
       <TopBar />
       <UpdateBanner />
       <div className="app-body">
-        <Rail />
-        <SidePanel />
+        <Sidebar />
         <main className="main">
           {tabs.length === 0 || dashboardOpen ? (
             <Welcome />

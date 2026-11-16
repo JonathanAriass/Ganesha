@@ -1,4 +1,4 @@
-/** Small monochrome line icons (inherit currentColor) for the compact top-bar toolbar. */
+/** Small monochrome line icons (inherit currentColor) for the shell's toolbars and sidebar. */
 const ICONS = {
   home: (
     <>
@@ -48,10 +48,53 @@ const ICONS = {
       <path d="M12 7.5V12l3.2 2" />
     </>
   ),
-  panel: (
+  /** Sidebar collapse / expand toggle. */
+  sidebar: (
     <>
       <rect x="3" y="4" width="18" height="16" rx="2" />
       <path d="M9.5 4v16" />
+    </>
+  ),
+  more: (
+    <>
+      <circle cx="5" cy="12" r="1" />
+      <circle cx="12" cy="12" r="1" />
+      <circle cx="19" cy="12" r="1" />
+    </>
+  ),
+  'chevron-down': <path d="m6 9 6 6 6-6" />,
+  'chevron-right': <path d="m9 18 6-6-6-6" />,
+  import: (
+    <>
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <path d="m7 10 5 5 5-5M12 15V3" />
+    </>
+  ),
+  export: (
+    <>
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <path d="m17 8-5-5-5 5M12 3v12" />
+    </>
+  ),
+  lock: (
+    <>
+      <rect x="4" y="11" width="16" height="10" rx="2" />
+      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+    </>
+  ),
+  refresh: (
+    <>
+      <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+      <path d="M21 3v5h-5" />
+    </>
+  ),
+  star: <path d="M12 2.5l2.94 5.96 6.56.95-4.75 4.63 1.12 6.54L12 17.5l-5.87 3.08 1.12-6.54L2.5 9.41l6.56-.95z" />,
+  play: <path d="M7 4.5v15l12-7.5z" />,
+  close: <path d="M18 6 6 18M6 6l12 12" />,
+  search: (
+    <>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-4.2-4.2" />
     </>
   )
 } as const

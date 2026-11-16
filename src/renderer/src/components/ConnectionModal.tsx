@@ -4,8 +4,7 @@ import { useAppStore } from '../state/store'
 import {
   useConnections,
   useSaveConnection,
-  useDeleteConnection,
-  useDuplicateConnection,
+  useConnectionActions,
   useTestConnection,
 } from '../lib/hooks'
 import SshHopEditor from './SshHopEditor'
@@ -62,7 +61,6 @@ type TestStatus =
 export default function ConnectionModal(): JSX.Element {
   const modal = useAppStore((s) => s.connectionModal)
   const closeModal = useAppStore((s) => s.closeModal)
-  const openModal = useAppStore((s) => s.openModal)
   const setActiveConnection = useAppStore((s) => s.setActiveConnection)
 
   const isEdit = modal?.mode === 'edit'
@@ -109,8 +107,7 @@ export default function ConnectionModal(): JSX.Element {
   }, [isEdit, existingConn])
 
   const save = useSaveConnection()
-  const del = useDeleteConnection()
-  const dup = useDuplicateConnection()
+  const actions = useConnectionActions()
   const test = useTestConnection()
 
   function setField<K extends keyof ConnectionInput>(key: K, value: ConnectionInput[K]) {
@@ -190,26 +187,14 @@ export default function ConnectionModal(): JSX.Element {
 
   function handleDelete() {
     if (!editId) return
-    if (!window.confirm(`Delete connection "${form.name}"? This cannot be undone.`)) return
-    del.mutate(editId, {
-      onSuccess: () => {
-        // Read fresh: closeTabsForConnection (the delete hook) may have already handed the active
-        // connection to a remaining group; only clear it if the deleted one is still active.
-        if (useAppStore.getState().activeConnectionId === editId) setActiveConnection(null)
-        closeModal()
-      },
-    })
+    actions.remove({ id: editId, name: form.name }, { onSuccess: closeModal })
   }
 
-  // Copy this connection (incl. password + SSH secrets, in main) and reopen the editor on the copy
-  // so the user only tweaks what differs.
+  // The hook reopens the editor on the copy; a failure shows in the modal's own error line.
   function handleDuplicate() {
     if (!editId) return
     setSaveError(null)
-    dup.mutate(editId, {
-      onSuccess: (copy) => openModal({ mode: 'edit', id: copy.id }),
-      onError: (e) => setSaveError(e instanceof Error ? e.message : String(e)),
-    })
+    actions.duplicate(editId, { onError: setSaveError })
   }
 
   const canSave =
@@ -482,9 +467,9 @@ export default function ConnectionModal(): JSX.Element {
             <button
               className="btn danger"
               onClick={handleDelete}
-              disabled={del.isPending}
+              disabled={actions.removing}
             >
-              {del.isPending ? 'Deleting…' : 'Delete'}
+              {actions.removing ? 'Deleting…' : 'Delete'}
             </button>
           )}
 
@@ -492,10 +477,10 @@ export default function ConnectionModal(): JSX.Element {
             <button
               className="btn ghost"
               onClick={handleDuplicate}
-              disabled={dup.isPending}
+              disabled={actions.duplicating}
               title="Create a copy of this connection (keeps the password) and edit it"
             >
-              {dup.isPending ? 'Duplicating…' : 'Duplicate'}
+              {actions.duplicating ? 'Duplicating…' : 'Duplicate'}
             </button>
           )}
 
