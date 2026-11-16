@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { groupTabs } from './tab-groups'
+import { groupTabs, visibleTabs, showScopeSwitch } from './tab-groups'
 
 type T = { id: string; connectionId: string }
 const tab = (id: string, c: string): T => ({ id, connectionId: c })
@@ -14,5 +14,21 @@ describe('groupTabs', () => {
   })
   it('empty → no groups', () => {
     expect(groupTabs([])).toEqual([])
+  })
+})
+
+describe('visibleTabs / showScopeSwitch', () => {
+  const tabs = [tab('a1', 'A'), tab('a2', 'A'), tab('b1', 'B')]
+  it('all scope shows every tab', () => {
+    expect(visibleTabs(tabs, 'all', 'A').map((t) => t.id)).toEqual(['a1', 'a2', 'b1'])
+  })
+  it('connection scope shows only the active connection', () => {
+    expect(visibleTabs(tabs, 'connection', 'A').map((t) => t.id)).toEqual(['a1', 'a2'])
+    expect(visibleTabs(tabs, 'connection', null)).toEqual([])
+  })
+  it('switch shows only with tabs from 2+ connections', () => {
+    expect(showScopeSwitch(tabs)).toBe(true)
+    expect(showScopeSwitch(tabs.slice(0, 2))).toBe(false)
+    expect(showScopeSwitch([])).toBe(false)
   })
 })

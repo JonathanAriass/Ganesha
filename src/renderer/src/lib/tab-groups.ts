@@ -1,6 +1,8 @@
 /** Query tabs grouped by the connection (server) they belong to. Groups are a derived view over
  *  the flat tabs array — there is no parallel data structure. Pure helpers; the store wraps them. */
 
+import type { TabScope } from './shell-prefs'
+
 export interface TabGroup<T> {
   connectionId: string
   tabs: T[]
@@ -20,4 +22,20 @@ export function groupTabs<T extends { connectionId: string }>(tabs: T[]): TabGro
     bucket.push(t)
   }
   return order.map((connectionId) => ({ connectionId, tabs: byConn.get(connectionId)! }))
+}
+
+/** Tabs the strip shows: every tab, or only the active connection's. */
+export function visibleTabs<T extends { connectionId: string }>(
+  paneTabs: T[],
+  scope: TabScope,
+  activeConnectionId: string | null
+): T[] {
+  if (scope === 'all') return paneTabs
+  if (activeConnectionId == null) return []
+  return paneTabs.filter((t) => t.connectionId === activeConnectionId)
+}
+
+/** The scope switch only matters when the pane holds tabs from 2+ connections. */
+export function showScopeSwitch(paneTabs: { connectionId: string }[]): boolean {
+  return new Set(paneTabs.map((t) => t.connectionId)).size > 1
 }

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { ConnectionConfig, ConnectionGroup } from '@shared/domain'
-import { groupSections } from './connection-groups'
+import { groupSections, sidebarRows } from './connection-groups'
 
 const group = (id: string, position: number, createdAt = 0, parentId: string | null = null): ConnectionGroup => ({
   id,
@@ -128,5 +128,54 @@ describe('order independence', () => {
     const out = groupSections([parent, child], [])
     expect(out.map((s) => s.group?.id ?? null)).toEqual(['p', null])
     expect(out[0].sub.map((s) => s.group?.id)).toEqual(['c'])
+  })
+})
+
+describe('sidebarRows', () => {
+  const groups = [group('work', 0), group('staging', 0, 1, 'work')]
+  const conns = [conn('p', 'work'), conn('s', 'staging'), conn('l')]
+  const rows = (collapsed: string[] = [], g = groups, c = conns) =>
+    sidebarRows(groupSections(g, c), new Set(collapsed))
+
+  it('nothing collapsed: headers, indented connections, ungrouped last', () => {
+    const r = rows()
+    expect(r.map((x) => x.kind)).toEqual(['group', 'connection', 'group', 'connection', 'connection'])
+    expect(r.map((x) => x.depth)).toEqual([0, 1, 1, 2, 0])
+    const [work, p, staging, s, l] = r
+    expect(work).toMatchObject({ kind: 'group', collapsed: false, count: 2 })
+    expect(work.kind === 'group' && work.group.id).toBe('work')
+    expect(p.kind === 'connection' && p.connection.id).toBe('p')
+    expect(staging).toMatchObject({ kind: 'group', collapsed: false, count: 1 })
+    expect(staging.kind === 'group' && staging.group.id).toBe('staging')
+    expect(s.kind === 'connection' && s.connection.id).toBe('s')
+    expect(l.kind === 'connection' && l.connection.id).toBe('l')
+  })
+
+  it('collapsed root hides its connections and subgroups', () => {
+    const r = rows(['work'])
+    expect(r.map((x) => x.kind)).toEqual(['group', 'connection'])
+    expect(r[0]).toMatchObject({ kind: 'group', depth: 0, collapsed: true, count: 2 })
+    expect(r[1]).toMatchObject({ kind: 'connection', depth: 0 })
+    expect(r[1].kind === 'connection' && r[1].connection.id).toBe('l')
+  })
+
+  it('collapsed subgroup keeps its header but hides its connections', () => {
+    const r = rows(['staging'])
+    expect(r.map((x) => x.kind)).toEqual(['group', 'connection', 'group', 'connection'])
+    expect(r[2]).toMatchObject({ kind: 'group', depth: 1, collapsed: true, count: 1 })
+    expect(r[2].kind === 'group' && r[2].group.id).toBe('staging')
+    expect(r[3].kind === 'connection' && r[3].connection.id).toBe('l')
+  })
+
+  it('no groups: just the connections at depth 0, no header row', () => {
+    const r = rows([], [], conns)
+    expect(r.every((x) => x.kind === 'connection' && x.depth === 0)).toBe(true)
+    expect(r.map((x) => x.kind === 'connection' && x.connection.id)).toEqual(['p', 's', 'l'])
+  })
+
+  it('an empty group still yields its header with count 0', () => {
+    const r = rows([], [group('empty', 0)], [])
+    expect(r).toHaveLength(1)
+    expect(r[0]).toMatchObject({ kind: 'group', depth: 0, collapsed: false, count: 0 })
   })
 })

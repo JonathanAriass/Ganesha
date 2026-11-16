@@ -65,3 +65,39 @@ export function groupSections(
   sections.push({ group: null, connections: ungrouped, sub: [] })
   return sections
 }
+
+export type SidebarRow =
+  | { kind: 'group'; group: ConnectionGroup; depth: 0 | 1; collapsed: boolean; count: number }
+  | { kind: 'connection'; connection: ConnectionConfig; depth: 0 | 1 | 2 }
+
+/** Flatten the group sections into the sidebar's row list. A group row's `count` is
+ *  its own connections plus its subgroups'. Collapsed groups keep their header but
+ *  hide everything beneath. The ungrouped section (`group: null`) has no header; its
+ *  connections sit at depth 0. */
+export function sidebarRows(sections: GroupSection[], collapsed: ReadonlySet<string>): SidebarRow[] {
+  const rows: SidebarRow[] = []
+  for (const s of sections) {
+    if (s.group === null) {
+      for (const c of s.connections) rows.push({ kind: 'connection', connection: c, depth: 0 })
+      continue
+    }
+    const count = s.connections.length + s.sub.reduce((n, x) => n + x.connections.length, 0)
+    const isCollapsed = collapsed.has(s.group.id)
+    rows.push({ kind: 'group', group: s.group, depth: 0, collapsed: isCollapsed, count })
+    if (isCollapsed) continue
+    for (const c of s.connections) rows.push({ kind: 'connection', connection: c, depth: 1 })
+    for (const sub of s.sub) {
+      const subCollapsed = collapsed.has(sub.group!.id)
+      rows.push({
+        kind: 'group',
+        group: sub.group!,
+        depth: 1,
+        collapsed: subCollapsed,
+        count: sub.connections.length
+      })
+      if (subCollapsed) continue
+      for (const c of sub.connections) rows.push({ kind: 'connection', connection: c, depth: 2 })
+    }
+  }
+  return rows
+}
