@@ -1,7 +1,8 @@
 import { useState, type DragEvent } from 'react'
 import { useAppStore } from '../state/store'
 import { useConnections } from '../lib/hooks'
-import { groupTabs } from '../lib/tab-groups'
+import { visibleTabs, showScopeSwitch } from '../lib/tab-groups'
+import { Icon } from './icons'
 import TabContextMenu, { type TabCloseAction } from './TabContextMenu'
 import { type PaneId, paneTabs } from '../lib/panes'
 import { TAB_MIME } from '../lib/tab-reorder'
@@ -12,7 +13,8 @@ export default function TabBar({ pane }: { pane: PaneId }): JSX.Element {
   const activeConnectionId = useAppStore((s) => s.activeConnByPane[pane])
   const focusPane = useAppStore((s) => s.focusPane)
   const setActiveTab = useAppStore((s) => s.setActiveTab)
-  const setActiveConnection = useAppStore((s) => s.setActiveConnection)
+  const tabScope = useAppStore((s) => s.tabScope)
+  const setTabScope = useAppStore((s) => s.setTabScope)
   const renameTab = useAppStore((s) => s.renameTab)
   const closeTab = useAppStore((s) => s.closeTab)
   const closeOtherTabs = useAppStore((s) => s.closeOtherTabs)
@@ -73,7 +75,7 @@ export default function TabBar({ pane }: { pane: PaneId }): JSX.Element {
     setEditing(null)
   }
 
-  // Menu actions close within the target's group (the visible subtabs).
+  // Menu actions close within the tabs the strip is showing (scope handled by the store).
   const runMenu = (action: TabCloseAction): void => {
     if (!menu) return
     const id = menu.tabId
@@ -87,42 +89,13 @@ export default function TabBar({ pane }: { pane: PaneId }): JSX.Element {
 
   const { data: connections = [] } = useConnections()
 
-  // Groups (top level) are a view over the flat tabs; the active group is the active connection.
+  // One strip: every tab of the pane, or only the pane's active connection's, per the scope switch.
   const paneAllTabs = paneTabs(tabs, pane)
-  const groups = groupTabs(paneAllTabs)
-  const subtabs = paneAllTabs.filter((t) => t.connectionId === activeConnectionId)
+  const subtabs = visibleTabs(paneAllTabs, tabScope, activeConnectionId ?? null)
   const menuIdx = menu ? subtabs.findIndex((t) => t.id === menu.tabId) : -1
 
   return (
     <div className="tabbar-wrap">
-      {groups.length >= 2 && (
-        <div className="tab-groups" role="tablist" aria-label="Server groups">
-          {groups.map((g) => {
-            const conn = connections.find((c) => c.id === g.connectionId)
-            const active = g.connectionId === activeConnectionId
-            return (
-              <button
-                key={g.connectionId}
-                role="tab"
-                aria-selected={active}
-                className={`tab-group${active ? ' active' : ''}`}
-                onClick={() => { focusPane(pane); setActiveConnection(g.connectionId) }}
-              >
-                {conn && (
-                  <span
-                    className="conn-dot"
-                    style={{ background: conn.color, width: 8, height: 8 }}
-                    aria-hidden="true"
-                  />
-                )}
-                <span>{conn?.name ?? 'Connection'}</span>
-                <span className="tab-group-count">{g.tabs.length}</span>
-              </button>
-            )
-          })}
-        </div>
-      )}
-
       <div
         className="tabbar"
         role="tablist"
@@ -204,7 +177,7 @@ export default function TabBar({ pane }: { pane: PaneId }): JSX.Element {
                   closeTab(tab.id)
                 }}
               >
-                ×
+                <Icon name="close" size={12} />
               </span>
             </button>
           )
@@ -216,8 +189,23 @@ export default function TabBar({ pane }: { pane: PaneId }): JSX.Element {
           title={activeConnectionId ? 'New query tab' : 'Connect first'}
           onClick={() => { focusPane(pane); if (activeConnectionId) openQueryTab({ connectionId: activeConnectionId }) }}
         >
-          +
+          <Icon name="plus" size={14} />
         </button>
+        {showScopeSwitch(paneAllTabs) && (
+          <div className="tab-scope" role="group" aria-label="Tab scope">
+            {(['all', 'connection'] as const).map((sc) => (
+              <button
+                key={sc}
+                type="button"
+                className="tab-scope-btn"
+                aria-pressed={tabScope === sc}
+                onClick={() => setTabScope(sc)}
+              >
+                {sc === 'all' ? 'All tabs' : 'This connection'}
+              </button>
+            ))}
+          </div>
+        )}
         <button
           className="tab-split btn ghost"
           aria-label="Split — open this tab on the other side"

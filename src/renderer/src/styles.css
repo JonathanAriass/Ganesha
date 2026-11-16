@@ -1254,60 +1254,20 @@ input[type="password"]::placeholder {
 }
 
 /* ── Tab bar ── */
-/* ── Two-level tabs: server groups (top) over query subtabs ── */
+/* ── Single pill strip ── */
 .tabbar-wrap {
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
   padding-top: 4px;
-  /* Breathing room between the server-group row and the query-subtab row. */
-  gap: 6px;
-}
-.tab-groups {
-  display: flex;
-  flex-direction: row;
-  background: var(--bg-3);
-  border-bottom: 1px solid var(--border);
-  overflow-x: auto;
-  overflow-y: hidden;
-}
-.tab-group {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 12px;
-  border: none;
-  border-right: 1px solid var(--border);
-  background: transparent;
-  cursor: pointer;
-  color: var(--text-2);
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-  flex-shrink: 0;
-  transition: background 0.08s, color 0.08s;
-}
-.tab-group:hover {
-  background: var(--bg-2);
-  color: var(--text);
-}
-.tab-group.active {
-  background: var(--bg-2);
-  color: var(--text);
-  box-shadow: inset 0 -2px 0 var(--accent);
-}
-.tab-group-count {
-  font-size: 10px;
-  line-height: 1;
-  color: var(--text-2);
-  background: var(--bg);
-  border-radius: 8px;
-  padding: 2px 6px;
 }
 
 .tabbar {
   display: flex;
   flex-direction: row;
+  align-items: center;
+  gap: var(--gap);
+  padding: 2px var(--pad-x);
   background: var(--bg-2);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
@@ -1320,13 +1280,14 @@ input[type="password"]::placeholder {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 10px;
+  height: var(--control-h);
+  padding: 0 10px;
   border: none;
-  border-right: 1px solid var(--border);
+  border-radius: var(--radius-md);
   background: transparent;
   cursor: pointer;
   color: var(--text-2);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   white-space: nowrap;
   flex-shrink: 0;
   transition: background 0.08s, color 0.08s;
@@ -1347,9 +1308,9 @@ input[type="password"]::placeholder {
 .tab-add.drop-before::before {
   content: '';
   position: absolute;
-  left: -1px;
-  top: 4px;
-  bottom: 4px;
+  left: calc(var(--gap) / -2 - 1px);
+  top: 2px;
+  bottom: 2px;
   width: 2px;
   border-radius: 1px;
   background: var(--accent);
@@ -1362,7 +1323,7 @@ input[type="password"]::placeholder {
 }
 
 .tab.active {
-  background: color-mix(in srgb, var(--accent) 20%, var(--bg-2));
+  background: var(--bg-3);
   color: var(--text);
   font-weight: 600;
 }
@@ -1373,10 +1334,8 @@ input[type="password"]::placeholder {
   justify-content: center;
   width: 16px;
   height: 16px;
-  border-radius: 3px;
+  border-radius: var(--radius-md);
   color: var(--text-2);
-  font-size: 14px;
-  line-height: 1;
   cursor: pointer;
 }
 
@@ -1401,15 +1360,54 @@ input[type="password"]::placeholder {
 }
 
 .tab-add {
-  width: 32px;
+  width: var(--control-h);
+  height: var(--control-h);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
-  border-radius: 0;
+  border-radius: var(--radius-md);
   border-right: none;
+}
+
+.tab-scope {
+  display: flex;
+  flex-shrink: 0;
+  margin-left: auto;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.tab-scope-btn {
+  height: calc(var(--control-h) - 8px);
+  padding: 0 8px;
+  border: none;
+  border-radius: calc(var(--radius-md) - 2px);
+  background: transparent;
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tab-scope-btn:hover {
+  color: var(--text);
+}
+.tab-scope-btn[aria-pressed='true'] {
+  background: var(--bg-3);
+  color: var(--text);
+  font-weight: 600;
 }
 
 .tab-split {
   font-size: 13px;
   line-height: 1;
+  flex-shrink: 0;
+  margin-left: auto; /* right end; when the scope switch shows it takes the auto margin instead */
+}
+.tab-scope ~ .tab-split {
+  margin-left: 0;
 }
 
 /* ── Tab right-click menu ── */
