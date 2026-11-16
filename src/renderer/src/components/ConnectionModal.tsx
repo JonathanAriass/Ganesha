@@ -185,9 +185,11 @@ export default function ConnectionModal(): JSX.Element {
     )
   }, [editId, form, password, sshSecrets, save, setActiveConnection, closeModal])
 
+  // A failed delete shows in the modal's own error line, like a failed duplicate.
   function handleDelete() {
     if (!editId) return
-    actions.remove({ id: editId, name: form.name }, { onSuccess: closeModal })
+    setSaveError(null)
+    actions.remove({ id: editId, name: form.name }, { onSuccess: closeModal, onError: setSaveError })
   }
 
   // The hook reopens the editor on the copy; a failure shows in the modal's own error line.

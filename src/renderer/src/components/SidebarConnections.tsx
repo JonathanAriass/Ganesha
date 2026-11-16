@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { ConnectionConfig } from '@shared/domain'
 import { useAppStore } from '../state/store'
 import { useConnections, useGroups, useCreateGroup, useConnectionActions } from '../lib/hooks'
@@ -8,11 +8,24 @@ import { startImport } from '../lib/transfer-actions'
 import EnvTag from './EnvTag'
 import { Icon } from './icons'
 
-/** A popup menu at a fixed point, closed by any click or right-click outside it. */
+/** A popup menu at a fixed point, closed by any click or right-click outside it or by Escape
+ *  (as TabContextMenu); focus moves to its first item when it opens. */
 function MenuAt({ x, y, onClose, children }: { x: number; y: number; onClose: () => void; children: ReactNode }): JSX.Element {
+  const menuRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+  useEffect(() => {
+    menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]:not(:disabled)')?.focus()
+  }, [])
+
   return (
     <div className="tab-menu-backdrop" onMouseDown={onClose} onContextMenu={(e) => { e.preventDefault(); onClose() }}>
-      <div className="tab-menu" role="menu" style={{ left: x, top: y }} onMouseDown={(e) => e.stopPropagation()}>
+      <div ref={menuRef} className="tab-menu" role="menu" style={{ left: x, top: y }} onMouseDown={(e) => e.stopPropagation()}>
         {children}
       </div>
     </div>

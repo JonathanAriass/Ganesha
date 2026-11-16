@@ -248,23 +248,22 @@ export function useConnectionActions(): {
   return {
     remove(c, opts) {
       if (!window.confirm(`Delete connection "${c.name}"? This cannot be undone.`)) return
-      del.mutateAsync(c.id).then(
-        () => {
+      // .catch after .then, so a throw in the follow-up is reported too, not left unhandled.
+      del.mutateAsync(c.id)
+        .then(() => {
           // Read fresh: closeTabsForConnection (the delete hook) may have already handed the
           // active connection to a remaining group; only clear it if the deleted one is still active.
           const s = useAppStore.getState()
           if (s.activeConnectionId === c.id) s.setActiveConnection(null)
           opts?.onSuccess?.()
-        },
-        (e: unknown) => opts?.onError?.(errorMessage(e))
-      )
+        })
+        .catch((e: unknown) => opts?.onError?.(errorMessage(e)))
     },
     duplicate(id, opts) {
-      dup.mutateAsync(id).then(
+      dup.mutateAsync(id)
         // Copied in main (incl. password + SSH secrets) — open the copy so the user only tweaks what differs.
-        (copy) => useAppStore.getState().openModal({ mode: 'edit', id: copy.id }),
-        (e: unknown) => opts?.onError?.(errorMessage(e))
-      )
+        .then((copy) => useAppStore.getState().openModal({ mode: 'edit', id: copy.id }))
+        .catch((e: unknown) => opts?.onError?.(errorMessage(e)))
     },
     removing: del.isPending,
     duplicating: dup.isPending,
