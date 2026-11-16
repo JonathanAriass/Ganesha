@@ -2519,33 +2519,23 @@ mark.hl {
 .btn.ghost.active { background: var(--btn-hover-bg); border-color: var(--accent); }
 .link-btn { background: none; border: none; color: var(--accent); cursor: pointer; padding: 0; font: inherit; text-decoration: underline; }
 
-/* width comes inline from React (the persisted, drag-set value). The max-width
-   guard keeps a wide saved width from clipping the panel / starving the editor
-   on a narrow window (leaves room for the sidebar + a usable main area). */
-/* Accepted overlap: while open, the overlay may cover transient banners
-   (Update/SSM) and the docked SSM panel — by design. */
-.assistant-panel {
-  position: fixed; top: var(--topbar-h); right: 0; bottom: var(--statusbar-h);
-  z-index: 900; /* below modals (1000) and the palette (1100) */
-  display: flex; flex-direction: column; min-height: 0;
+/* ── Right dock (assistant + tunnels) ── */
+/* width comes inline from React (the persisted, drag-set value). max-width keeps the editor
+   area at 480px or more on a narrow window. */
+.right-dock {
+  position: relative; flex-shrink: 0; display: flex; flex-direction: column; min-height: 0;
   max-width: calc(100vw - 480px);
   border-left: 1px solid var(--border); background: var(--bg-2);
-  box-shadow: -14px 0 44px -18px rgba(0, 0, 0, 0.5);
-  transform: translateX(calc(100% + 16px)); /* +16 hides the shadow too */
-  /* visibility keeps the closed panel out of tab order / AT (React 18 has no
-     inert prop); the 0.25s delay lets the slide-out finish before it hides. */
-  visibility: hidden;
-  transition: transform 0.25s cubic-bezier(0.32, 0.72, 0, 1), visibility 0s linear 0.25s;
+  font-size: var(--fs-base);
 }
-.assistant-panel.open {
-  transform: none;
-  visibility: visible; /* immediately on open — only the close is delayed */
-  transition: transform 0.25s cubic-bezier(0.32, 0.72, 0, 1);
-}
-@media (prefers-reduced-motion: reduce) {
-  /* both states: .open's own transition outweighs the bare class */
-  .assistant-panel, .assistant-panel.open { transition: none; }
-}
+.dock-head { display: flex; align-items: center; gap: var(--gap); padding: 0 var(--pad-x); height: calc(var(--control-h) + 8px); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.dock-tabs { display: flex; gap: 2px; flex: 1; min-width: 0; }
+.dock-tab { height: var(--control-h); padding: 0 var(--pad-x); border: none; border-radius: var(--radius-md); background: none; color: var(--text-2); font: inherit; font-size: var(--fs-sm); font-weight: 600; cursor: pointer; }
+.dock-tab:hover { background: var(--hover-overlay); color: var(--text); }
+.dock-tab.active { background: var(--bg-3); color: var(--text); }
+.dock-tab:focus-visible, .dock-close:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.dock-content { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.dock-content[hidden] { display: none; }
 .assistant-peek {
   position: fixed; right: 0; top: calc(var(--topbar-h) + 56px); z-index: 899;
   padding: 12px 6px; background: var(--bg-2); color: var(--accent);
@@ -2695,7 +2685,6 @@ mark.hl {
 .dm-row.active { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--text); }
 
 /* ── SSM tunnels panel ── */
-.ssm-panel { width: 360px; flex-shrink: 0; display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--border); background: var(--bg-2); }
 .ssm-head { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--border); }
 .ssm-list { flex: 0 0 auto; max-height: 45%; overflow-y: auto; padding: 6px; border-bottom: 1px solid var(--border); }
 .ssm-empty { padding: 12px; color: var(--text-2); font-size: 12px; }

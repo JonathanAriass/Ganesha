@@ -12,10 +12,9 @@ import CommandPalette from './components/CommandPalette'
 import EditorPane from './components/EditorPane'
 import PaneDivider from './components/PaneDivider'
 import { loadPaneFraction } from './lib/pane-split'
-import SsmPanel from './components/SsmPanel'
 import SaveQueryModal from './components/SaveQueryModal'
 import CommitChangesModal from './components/CommitChangesModal'
-import AssistantPanel from './components/AssistantPanel'
+import RightDock from './components/RightDock'
 import ModelManagerModal from './components/ModelManagerModal'
 import ConnectionTransferModal from './components/ConnectionTransferModal'
 import UpdateBanner from './components/UpdateBanner'
@@ -113,8 +112,7 @@ function AppShell(): JSX.Element {
             <EditorPane paneId="left" />
           )}
         </main>
-        <AssistantPanel />
-        <SsmPanel />
+        <RightDock />
       </div>
       <StatusBar />
       {connectionModal && <ConnectionModal />}

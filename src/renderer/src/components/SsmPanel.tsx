@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAppStore } from '../state/store'
 import { useSsmTunnels, useDeleteSsmTunnel } from '../lib/hooks'
+import { Icon } from './icons'
 import SsmTunnelModal from './SsmTunnelModal'
 import type { SsmTunnel } from '@shared/domain'
 
-/** Dockable panel managing AWS SSM port-forwarding tunnels: list with status + Start/Stop, the
+/** Content of the dock's Tunnels tab (RightDock owns the aside and close). Managing AWS SSM port-forwarding tunnels: list with status + Start/Stop, the
  *  selected tunnel's live output, and an add/edit form. Running state comes from the store (kept
- *  live app-wide by the ssm:status subscription); output is buffered while the panel is open. */
-export default function SsmPanel(): JSX.Element | null {
-  const open = useAppStore((s) => s.dock === 'tunnels')
-  const toggle = useAppStore((s) => s.toggleSsm)
+ *  live app-wide by the ssm:status subscription); output is buffered while the panel is mounted (RightDock keeps it mounted, hidden, while the dock
+ *  shows Assistant). */
+export default function SsmPanel({ hidden }: { hidden: boolean }): JSX.Element {
   const running = useAppStore((s) => s.runningSsm)
   const { data: tunnels } = useSsmTunnels()
   const del = useDeleteSsmTunnel()
@@ -25,19 +25,15 @@ export default function SsmPanel(): JSX.Element | null {
   )
   useEffect(() => { outRef.current?.scrollTo(0, outRef.current.scrollHeight) }, [outputs, selectedId])
 
-  if (!open) return null
-
   const list = tunnels ?? []
   const isRunning = (id: string): boolean => running.includes(id)
   const start = (id: string): void => { setSelectedId(id); void window.api.ssm.start(id) }
 
   return (
-    <aside className="ssm-panel">
+    <div className="dock-content" hidden={hidden}>
       <div className="ssm-head">
         <strong>SSM Tunnels</strong>
-        <span className="spacer" style={{ marginLeft: 'auto' }} />
-        <button className="btn ghost xs" onClick={() => setEditing('new')} title="Add tunnel" aria-label="Add tunnel">＋</button>
-        <button className="btn ghost xs" onClick={toggle} aria-label="Close SSM panel">✕</button>
+        <button className="btn ghost xs" style={{ marginLeft: 'auto' }} onClick={() => setEditing('new')} title="Add tunnel" aria-label="Add tunnel"><Icon name="plus" size={14} /></button>
       </div>
 
       <div className="ssm-list">
@@ -60,14 +56,14 @@ export default function SsmPanel(): JSX.Element | null {
             ) : (
               <button className="btn xs primary" onClick={(e) => { e.stopPropagation(); start(t.id) }}>Start</button>
             )}
-            <button className="btn ghost xs" onClick={(e) => { e.stopPropagation(); setEditing(t) }} title="Edit" aria-label="Edit">✎</button>
+            <button className="btn ghost xs" onClick={(e) => { e.stopPropagation(); setEditing(t) }} title="Edit" aria-label="Edit"><Icon name="pencil" size={14} /></button>
             <button
               className="btn ghost xs"
               onClick={(e) => { e.stopPropagation(); if (window.confirm(`Delete tunnel "${t.name}"?`)) del.mutate(t.id) }}
               title="Delete"
               aria-label="Delete"
             >
-              ✕
+              <Icon name="close" size={14} />
             </button>
           </div>
         ))}
@@ -81,6 +77,6 @@ export default function SsmPanel(): JSX.Element | null {
       </div>
 
       {editing && <SsmTunnelModal tunnel={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
-    </aside>
+    </div>
   )
 }

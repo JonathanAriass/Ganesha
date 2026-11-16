@@ -3,7 +3,6 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useAppStore } from '../state/store'
 import { useLlmModels, useLlmConversations, useLlmMessages, useEngineStatus } from '../lib/hooks'
 import { extractCodeBlocks } from '../lib/llm-blocks'
-import { clampWidth, dragWidth, loadWidth, saveWidth, DEFAULT_WIDTH, MIN_WIDTH, MAX_WIDTH } from '../lib/assistant-width'
 import type { LlmMessage } from '@shared/domain'
 import type { LlmContextFile } from '@shared/ipc'
 
@@ -12,10 +11,10 @@ function mkMsg(conversationId: string, role: 'user' | 'assistant', content: stri
   return { id: `live-${liveSeq++}`, conversationId, role, content, createdAt: 0 }
 }
 
-export default function AssistantPanel(): JSX.Element {
+/** Content of the dock's Assistant tab. RightDock owns the aside, resizer and close; `hidden`
+ *  keeps this mounted (so a streaming answer survives a tab switch) while the other tab shows. */
+export default function AssistantPanel({ hidden }: { hidden: boolean }): JSX.Element {
   const open = useAppStore((s) => s.dock === 'assistant')
-  const toggle = useAppStore((s) => s.toggleAssistant)
-  const ssmOpen = useAppStore((s) => s.dock === 'tunnels')
   const openModelManager = useAppStore((s) => s.openModelManager)
   const connectionId = useAppStore((s) => s.activeConnectionId)
   const convId = useAppStore((s) => s.activeConversationId)
@@ -43,41 +42,10 @@ export default function AssistantPanel(): JSX.Element {
   const cidRef = useRef<string | null>(null)
   const threadRef = useRef<HTMLDivElement>(null)
 
-  // ── Horizontal resize (drag the left edge) ──
-  const panelRef = useRef<HTMLElement>(null)
-  const [width, setWidth] = useState(() => loadWidth())
-  const widthRef = useRef(width) // leads every commit so same-tick key repeats accumulate
-  function commitWidth(w: number): void {
-    widthRef.current = w
-    setWidth(w)
-    saveWidth(w)
-  }
-  function onResizePointerDown(e: React.PointerEvent<HTMLDivElement>): void {
-    if (e.button !== 0) return
-    e.preventDefault()
-    e.currentTarget.setPointerCapture(e.pointerId)
-  }
-  function onResizePointerMove(e: React.PointerEvent<HTMLDivElement>): void {
-    if (!e.currentTarget.hasPointerCapture(e.pointerId) || !panelRef.current) return
-    // Direct DOM write during the drag; commit to state + localStorage on pointerup
-    // (a re-render per move would re-render the streaming thread).
-    panelRef.current.style.width = `${dragWidth(e.clientX, panelRef.current.getBoundingClientRect().right)}px`
-  }
-  function onResizePointerEnd(e: React.PointerEvent<HTMLDivElement>): void {
-    if (!e.currentTarget.hasPointerCapture(e.pointerId) || !panelRef.current) return
-    commitWidth(clampWidth(panelRef.current.getBoundingClientRect().width))
-  }
-  function onResizeKeyDown(e: React.KeyboardEvent<HTMLDivElement>): void {
-    // Left edge of a right-docked panel: ArrowLeft widens, ArrowRight narrows.
-    const step = e.key === 'ArrowLeft' ? 24 : e.key === 'ArrowRight' ? -24 : null
-    if (step === null) return
-    e.preventDefault()
-    commitWidth(clampWidth(widthRef.current + step))
-  }
-
   const messages: LlmMessage[] = [...(persisted ?? []), ...live]
 
-  useEffect(() => { threadRef.current?.scrollTo(0, threadRef.current.scrollHeight) }, [messages.length, live])
+  // Hidden panels have no layout (scrollHeight 0), so re-pin to the bottom when the tab is shown.
+  useEffect(() => { if (open) threadRef.current?.scrollTo(0, threadRef.current.scrollHeight) }, [messages.length, live, open])
 
   // Subscribe once; route token events by the live requestId.
   useEffect(() => {
@@ -142,40 +110,8 @@ export default function AssistantPanel(): JSX.Element {
   const ready = hasModel && engineReady
 
   return (
-    <>
-      {/* Peek hides while the SSM panel is open — it floated over the SSM list.
-          The TopBar toggle still opens the assistant regardless. */}
-      {!open && !ssmOpen && (
-        <button className="assistant-peek" onClick={toggle} aria-label="Open assistant">
-          <span className="assistant-peek-label">✦ Assistant</span>
-        </button>
-      )}
-      <aside
-        className={`assistant-panel${open ? ' open' : ''}`}
-        ref={panelRef}
-        style={{ width }}
-        aria-hidden={!open}
-      >
-      <div
-        className="assistant-resizer"
-        role="separator"
-        aria-orientation="vertical"
-        aria-label="Resize assistant panel"
-        aria-valuemin={MIN_WIDTH}
-        aria-valuemax={MAX_WIDTH}
-        aria-valuenow={Math.round(width)}
-        tabIndex={0}
-        title="Drag to resize · double-click to reset · ←/→ to adjust"
-        onPointerDown={onResizePointerDown}
-        onPointerMove={onResizePointerMove}
-        onPointerUp={onResizePointerEnd}
-        onPointerCancel={onResizePointerEnd}
-        onDoubleClick={() => commitWidth(DEFAULT_WIDTH)}
-        onKeyDown={onResizeKeyDown}
-      />
+    <div className="dock-content" hidden={hidden}>
       <div className="assistant-head">
-        <strong>Assistant</strong>
-        <span className="spacer" />
         <select
           value={convId ?? ''}
           onChange={(e) => {
@@ -188,19 +124,6 @@ export default function AssistantPanel(): JSX.Element {
           {(conversations ?? []).map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
         </select>
         <button className="btn ghost xs" onClick={openModelManager} title="Manage models">⚙</button>
-        <button
-          className="btn ghost xs"
-          onClick={() => {
-            // Focus can't stay inside an aria-hidden subtree (the ✕ itself holds it post-click).
-            ;(document.activeElement as HTMLElement | null)?.blur()
-            toggle()
-            // Hand focus to the peek once React has rendered it (it appears on close).
-            requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('.assistant-peek')?.focus())
-          }}
-          aria-label="Close assistant"
-        >
-          ✕
-        </button>
       </div>
 
       {!connectionId && <div className="assistant-empty">Select a connection to get schema-aware suggestions.</div>}
@@ -273,7 +196,6 @@ export default function AssistantPanel(): JSX.Element {
           ? <button className="btn" onClick={stop}>Stop</button>
           : <button className="btn primary" onClick={() => void send()} disabled={!connectionId || !ready || !draft.trim()}>Send</button>}
       </div>
-      </aside>
-    </>
+    </div>
   )
 }
