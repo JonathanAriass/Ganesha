@@ -6,7 +6,8 @@ import AssistantPanel from './AssistantPanel'
 import SsmPanel from './SsmPanel'
 
 /** One dock at the right of the app body holding the assistant and the SSM tunnels panel. Both
- *  panels stay mounted while the dock is open (the inactive one is `hidden`) so SSM output keeps
+ *  panels stay mounted always (the aside is `hidden` when the dock is closed, and the inactive
+ *  panel is `hidden` when it is open) so SSM output keeps
  *  buffering and an assistant generation keeps streaming while the other tab is showing. */
 export default function RightDock(): JSX.Element {
   const dock = useAppStore((s) => s.dock)
@@ -46,16 +47,14 @@ export default function RightDock(): JSX.Element {
     commitWidth(clampWidth(widthRef.current + step))
   }
 
-  if (dock === null) {
-    return (
-      <button className="assistant-peek" onClick={toggleAssistant} aria-label="Open assistant">
-        <span className="assistant-peek-label">✦ Assistant</span>
-      </button>
-    )
-  }
-
   return (
-    <aside className="right-dock" ref={panelRef} style={{ width }} aria-label="Side panel">
+    <>
+      {dock === null && (
+        <button className="assistant-peek" onClick={toggleAssistant} aria-label="Open assistant">
+          <span className="assistant-peek-label">✦ Assistant</span>
+        </button>
+      )}
+    <aside className="right-dock" ref={panelRef} style={{ width }} aria-label="Side panel" hidden={dock === null}>
       <div
         className="assistant-resizer"
         role="separator"
@@ -97,5 +96,6 @@ export default function RightDock(): JSX.Element {
       <AssistantPanel hidden={dock !== 'assistant'} />
       <SsmPanel hidden={dock !== 'tunnels'} />
     </aside>
+    </>
   )
 }

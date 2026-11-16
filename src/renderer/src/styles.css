@@ -2528,6 +2528,7 @@ mark.hl {
   border-left: 1px solid var(--border); background: var(--bg-2);
   font-size: var(--fs-base);
 }
+.right-dock[hidden] { display: none; }
 .dock-head { display: flex; align-items: center; gap: var(--gap); padding: 0 var(--pad-x); height: calc(var(--control-h) + 8px); border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .dock-tabs { display: flex; gap: 2px; flex: 1; min-width: 0; }
 .dock-tab { height: var(--control-h); padding: 0 var(--pad-x); border: none; border-radius: var(--radius-md); background: none; color: var(--text-2); font: inherit; font-size: var(--fs-sm); font-weight: 600; cursor: pointer; }
