@@ -7,7 +7,8 @@ import QueryTab from './QueryTab'
 import DiagramView from './DiagramView'
 import TableInfoView from './TableInfoView'
 import TelescopeView from './TelescopeView'
-import Welcome from './Welcome'
+import EnvBar from './EnvBar'
+import PaneEmpty from './PaneEmpty'
 
 type DropSide = 'left' | 'right' | 'whole'
 
@@ -22,6 +23,7 @@ export default function EditorPane({ paneId }: { paneId: PaneId }): JSX.Element 
     const id = s.activeTabByPane[paneId]
     return id ? s.tabs.find((t) => t.id === id) ?? null : null
   })
+  const paneConnId = useAppStore((s) => s.activeConnByPane[paneId])
   const splitView = useAppStore((s) => s.tabs.some((t) => t.pane === 'right'))
   const tabDragging = useAppStore((s) => s.tabDragging)
   const focusPane = useAppStore((s) => s.focusPane)
@@ -65,6 +67,7 @@ export default function EditorPane({ paneId }: { paneId: PaneId }): JSX.Element 
       onMouseDownCapture={() => focusPane(paneId)}
     >
       <TabBar pane={paneId} />
+      {tab && <EnvBar paneId={paneId} />}
       <div className="editor-pane-body">
         {tab ? (
           tab.kind === 'diagram' ? (
@@ -77,7 +80,7 @@ export default function EditorPane({ paneId }: { paneId: PaneId }): JSX.Element 
             <QueryTab key={tab.id} tab={tab} />
           )
         ) : (
-          <Welcome />
+          <PaneEmpty connectionId={paneConnId} />
         )}
         {tabDragging && (
           <div

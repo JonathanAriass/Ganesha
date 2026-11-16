@@ -368,75 +368,6 @@ button, input, select, textarea {
   border: 1px solid rgba(255,255,255,0.1);
 }
 
-/* ── Connection menu (TopBar picker) ──
-   Replaces the old native .conn-select, which cramped long connection lists. */
-.connmenu { position: relative; }
-.connmenu-trigger {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  height: 26px;
-  padding: 0 9px;
-  min-width: 150px;
-  max-width: 280px;
-  background: var(--bg-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text);
-  cursor: pointer;
-  font-size: 12px;
-}
-.connmenu-trigger:hover { background: var(--btn-hover-bg); border-color: var(--btn-hover-border); }
-.connmenu-trigger:focus-visible {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
-}
-.cm-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cm-name.muted { color: var(--text-2); }
-.cm-type { color: var(--text-2); font-size: 11px; flex-shrink: 0; }
-.connmenu-caret { color: var(--text-2); font-size: 9px; margin-left: auto; }
-
-.connmenu-panel {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 960; /* above the assistant overlay (900) and tooltips (950), below modals (1000) */
-  width: 320px;
-  max-height: min(480px, 70vh);
-  display: flex;
-  flex-direction: column;
-  background: var(--bg-2);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: var(--modal-shadow);
-  overflow: hidden;
-}
-.connmenu-filter { padding: 8px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
-.connmenu-filter .filter-input { width: 100%; }
-.connmenu-list { flex: 1; min-height: 0; overflow-y: auto; padding: 4px; }
-.connmenu-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  text-align: left;
-  padding: 7px 9px;
-  background: none;
-  border: none;
-  border-radius: var(--radius);
-  color: var(--text);
-  cursor: pointer;
-  font-size: 12.5px;
-}
-.connmenu-row:hover, .connmenu-row:focus-visible { background: var(--hover-overlay); outline: none; }
-.connmenu-row.active { background: color-mix(in srgb, var(--accent) 16%, transparent); }
-.connmenu-row .cm-type { margin-left: auto; }
-.connmenu-check { color: var(--accent); flex-shrink: 0; }
-.connmenu-plus { color: var(--text-2); }
-.connmenu-empty { padding: 10px 12px; color: var(--text-2); font-size: 12px; }
-.connmenu-footer { border-top: 1px solid var(--border); padding: 4px; flex-shrink: 0; }
-
 /* ── Connections dashboard (the empty-pane Welcome view) ──
    Cards per connection; --card-accent is set inline from the connection color. */
 .dash { flex: 1; min-height: 0; width: 100%; overflow-y: auto; padding: 28px 32px; }
@@ -836,9 +767,7 @@ button, input, select, textarea {
   flex: 1 1 0; /* right slot takes the remainder */
 }
 
-.cmd-cluster { display: flex; align-items: center; gap: 6px; margin-right: 4px; }
-.cmd-divider { width: 1px; height: 20px; background: var(--border); }
-/* subtle focused-pane cue: the command bar drives THIS pane */
+/* subtle focused-pane cue: shortcuts drive THIS pane */
 .editor-pane.focused { box-shadow: inset 0 2px 0 var(--accent); }
 
 .statusbar {
@@ -3398,3 +3327,60 @@ mark.hl {
   height: 6px;
   border-radius: 50%;
 }
+
+/* ── Top bar search field (opens the command palette) ── */
+.topbar-search {
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+  width: min(460px, 100%);
+  height: var(--control-h);
+  padding: 0 var(--pad-x);
+  color: var(--text-2);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  text-align: left;
+}
+.topbar-search:hover { border-color: var(--text-2); }
+.topbar-search:focus-visible { outline: none; border-color: var(--accent); }
+.topbar-search-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topbar-search-hint { font-size: var(--fs-xs); color: var(--text-2); }
+.topbar-center { flex: 1; display: flex; justify-content: center; min-width: 0; }
+
+/* ── Environment bar (per editor pane) ── */
+.env-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+  min-height: var(--control-h);
+  margin: 0 var(--pad-x) var(--gap);
+  padding: 4px var(--pad-x);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  font-size: var(--fs-sm);
+  color: var(--text);
+  flex-shrink: 0;
+}
+.env-bar-mode { color: var(--text); }
+.env-bar-host { color: var(--text-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.env-bar-actions { display: flex; align-items: center; gap: var(--gap); margin-left: auto; }
+.env-bar-actions .btn { display: inline-flex; align-items: center; gap: 4px; }
+.env-bar-hint { font-size: var(--fs-xs); opacity: 0.75; }
+
+/* ── Pane empty state ── */
+.pane-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: var(--gap);
+  padding: 40px;
+  text-align: center;
+  color: var(--text-2);
+  font-size: var(--fs-base);
+}
+.pane-empty-head { display: flex; align-items: center; gap: var(--gap); color: var(--text); font-size: 16px; font-weight: 600; }

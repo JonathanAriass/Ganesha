@@ -1,40 +1,21 @@
 import { useAppStore } from '../state/store'
-import { useConnections, useSsmTunnels, useObjects, useCancelQuery } from '../lib/hooks'
+import { useSsmTunnels } from '../lib/hooks'
 import { mod } from '../lib/platform'
-import { getTabActions } from '../lib/tab-actions'
-import ConnectionMenu from './ConnectionMenu'
 import { Icon } from './icons'
 import logo from '../assets/logo.png'
 
 export default function TopBar(): JSX.Element {
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
-  const openModal = useAppStore((s) => s.openModal)
   const openSettings = useAppStore((s) => s.openSettings)
+  const setPaletteOpen = useAppStore((s) => s.setPaletteOpen)
   const toggleAssistant = useAppStore((s) => s.toggleAssistant)
   const assistantOpen = useAppStore((s) => s.dock === 'assistant')
   const toggleSsm = useAppStore((s) => s.toggleSsm)
   const ssmOpen = useAppStore((s) => s.dock === 'tunnels')
   const runningSsm = useAppStore((s) => s.runningSsm)
-  const openDiagramTab = useAppStore((s) => s.openDiagramTab)
-  const openTelescopeTab = useAppStore((s) => s.openTelescopeTab)
-  const openSaveQueryModal = useAppStore((s) => s.openSaveQueryModal)
-  const requestScriptStop = useAppStore((s) => s.requestScriptStop)
-  const setCancelError = useAppStore((s) => s.setCancelError)
-  // The tab the command bar drives: the focused pane's active QUERY tab.
-  const tab = useAppStore((s) => {
-    const id = s.activeTabByPane[s.focusedPane]
-    const t = id ? s.tabs.find((x) => x.id === id) ?? null : null
-    return t && (t.kind ?? 'query') === 'query' ? t : null
-  })
-  const cancelQuery = useCancelQuery()
 
-  const { data: connections = [] } = useConnections()
   const { data: tunnels = [] } = useSsmTunnels()
-  const { data: objects = [] } = useObjects(activeConnectionId)
 
-  const activeConn = connections.find((c) => c.id === activeConnectionId) ?? null
-  // Show the Telescope button only when the active connection has Laravel Telescope tables.
-  const hasTelescope = objects.some((o) => o.name === 'telescope_entries')
   // Tunnels linked to the active connection that aren't currently running → offer to start.
   const downLinked = activeConnectionId
     ? tunnels.filter((t) => t.connectionId === activeConnectionId && !runningSsm.includes(t.id))
@@ -45,108 +26,17 @@ export default function TopBar(): JSX.Element {
     <header className="topbar">
       <img className="brand-logo" src={logo} alt="Ganesha" title="Ganesha" />
 
-      <ConnectionMenu />
-
-      {activeConn && (
+      <div className="topbar-center">
         <button
-          className="icon-btn"
-          onClick={() => openModal({ mode: 'edit', id: activeConn.id })}
-          aria-label="Edit active connection"
-          data-tooltip="Edit connection"
+          className="topbar-search"
+          onClick={() => setPaletteOpen(true)}
+          aria-label="Search connections, tables, queries"
         >
-          <Icon name="pencil" />
+          <Icon name="search" />
+          <span className="topbar-search-label">Search connections, tables, queries</span>
+          <span className="topbar-search-hint" aria-hidden="true">{mod}K</span>
         </button>
-      )}
-
-      {activeConn && (
-        <button
-          className="icon-btn"
-          onClick={() => openDiagramTab(activeConn.id)}
-          aria-label="Schema diagram"
-          data-tooltip="Schema diagram"
-        >
-          <Icon name="diagram" />
-        </button>
-      )}
-
-      {activeConn && hasTelescope && (
-        <button
-          className="icon-btn"
-          onClick={() => openTelescopeTab(activeConn.id)}
-          aria-label="Telescope inspector"
-          data-tooltip="Telescope inspector"
-        >
-          <Icon name="telescope" />
-        </button>
-      )}
-
-      <span className="spacer" />
-
-      {/* Always rendered — buttons disable (not hide) without a focused query tab,
-          so the right-side icons never shift when focus crosses tab kinds. */}
-      <div className="cmd-cluster">
-        <button
-          className="btn xs"
-          disabled={!tab || tab.running || !tab.lastRunText}
-          onClick={() => tab && getTabActions(tab.id)?.refresh()}
-          title="Refresh — re-run the current query"
-          aria-label="Refresh query"
-        >
-          ↻
-        </button>
-        <button
-          className="btn xs"
-          disabled={!tab || !tab.text.trim()}
-          onClick={() =>
-            tab &&
-            openSaveQueryModal({ mode: 'create', connectionId: tab.connectionId, query: tab.text })
-          }
-          title="Save query to favourites"
-          aria-label="Save query to favourites"
-        >
-          ☆
-        </button>
-        <button
-          className="btn xs"
-          disabled={!tab || tab.running || !tab.text.trim()}
-          onClick={() => tab && getTabActions(tab.id)?.runAll()}
-          title={`Run all statements (${mod}⇧↵)`}
-          aria-label="Run all statements"
-        >
-          ▶▶
-        </button>
-        <div className="cmd-divider" aria-hidden="true" />
-        {tab?.running && tab.queryId ? (
-          <button
-            className="btn xs"
-            onClick={() => {
-              const tabId = tab.id // capture: the error must land on the clicked tab, not the focus at rejection time
-              if (tab.scriptRun) requestScriptStop(tabId)
-              cancelQuery.mutate(
-                { connectionId: tab.connectionId, queryId: tab.queryId! },
-                { onError: (e) => setCancelError(tabId, e instanceof Error ? e.message : String(e)) }
-              )
-            }}
-            aria-label="Cancel query"
-          >
-            Cancel
-          </button>
-        ) : (
-          <button
-            className="btn xs primary"
-            disabled={!tab || tab.running || !tab.text.trim()}
-            onClick={() => tab && getTabActions(tab.id)?.run()}
-            title={`Run (${mod}↵) — selection, else statement at cursor`}
-            aria-label="Run query"
-          >
-            ▶ Run
-          </button>
-        )}
       </div>
-
-      <button className="icon-btn" onClick={() => openModal({ mode: 'create' })} aria-label="New connection" data-tooltip="New connection" data-tip="right">
-        <Icon name="plus" />
-      </button>
 
       <button
         className={`icon-btn${assistantOpen ? ' active' : ''}`}
