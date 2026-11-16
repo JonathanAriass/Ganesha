@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query'
-import type { ConnectionInput, SavedQueryInput, SavedQueryPatch, SsmTunnelInput } from '@shared/domain'
+import { parseDensity } from './density'
+import type { Density, ConnectionInput, SavedQueryInput, SavedQueryPatch, SsmTunnelInput } from '@shared/domain'
 import type { TelescopeFilter, TelescopeEntry } from '@shared/telescope'
 import type { ObjectRef } from '@shared/schema'
 import { unwrap } from './result'
@@ -317,6 +318,11 @@ export function useSettings() {
     queryFn: () => window.api.settings.get().then(unwrap),
     retry: false,
   })
+}
+
+export function useDensity(): Density {
+  const { data } = useSettings()
+  return parseDensity(data?.density)
 }
 
 export function useSetSetting() {

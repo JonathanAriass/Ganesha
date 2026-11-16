@@ -8,7 +8,7 @@ beforeEach(() => { db = new Database(':memory:'); migrate(db) })
 
 describe('settings service', () => {
   it('returns defaults when nothing is stored', () => {
-    expect(getSettings(db)).toEqual({ theme: 'midnight' })
+    expect(getSettings(db)).toEqual({ theme: 'midnight', density: 'comfortable' })
   })
   it('persists and reads back an overridden setting', () => {
     setSetting(db, 'theme', 'light')
@@ -16,7 +16,7 @@ describe('settings service', () => {
   })
   it('ignores unknown keys when building typed settings', () => {
     setSetting(db, 'bogus', 'x')
-    expect(getSettings(db)).toEqual({ theme: 'midnight' })
+    expect(getSettings(db)).toEqual({ theme: 'midnight', density: 'comfortable' })
   })
   it('preserves any known theme id (not just light)', () => {
     setSetting(db, 'theme', 'dracula')
@@ -25,5 +25,14 @@ describe('settings service', () => {
   it('falls back to the default for an unknown theme value', () => {
     setSetting(db, 'theme', 'not-a-theme')
     expect(getSettings(db).theme).toBe('midnight')
+  })
+  it('defaults density to comfortable and persists compact', () => {
+    expect(getSettings(db).density).toBe('comfortable')
+    setSetting(db, 'density', 'compact')
+    expect(getSettings(db).density).toBe('compact')
+  })
+  it('falls back to comfortable for an unknown density value', () => {
+    setSetting(db, 'density', 'huge')
+    expect(getSettings(db).density).toBe('comfortable')
   })
 })

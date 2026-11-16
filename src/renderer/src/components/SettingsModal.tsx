@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { THEMES, type ThemeMeta } from '@shared/domain'
+import { DENSITIES, THEMES, type Density, type ThemeMeta } from '@shared/domain'
 import { useAppStore } from '../state/store'
-import { useSettings, useSetSetting, useDataDir, useSetDataDir } from '../lib/hooks'
+import { useSettings, useDensity, useSetSetting, useDataDir, useSetDataDir } from '../lib/hooks'
 import { unwrap } from '../lib/result'
 import { useRestoreFocus } from '../lib/use-restore-focus'
 
@@ -17,6 +17,7 @@ export default function SettingsModal(): JSX.Element {
   useRestoreFocus()
 
   const theme = settings?.theme ?? 'midnight'
+  const density = useDensity()
 
   const renderTheme = (t: ThemeMeta): JSX.Element => (
     <button
@@ -71,6 +72,23 @@ export default function SettingsModal(): JSX.Element {
                 <div className="theme-list">
                   {THEMES.filter((t) => t.mode === 'light').map(renderTheme)}
                 </div>
+              </div>
+            </div>
+
+            <div className="form-row">
+              <label>Density</label>
+              <div className="theme-list" role="radiogroup" aria-label="Density">
+                {DENSITIES.map((d: Density) => (
+                  <button
+                    key={d}
+                    role="radio"
+                    aria-checked={density === d}
+                    className={`theme-opt${density === d ? ' active' : ''}`}
+                    onClick={() => setSetting.mutate({ key: 'density', value: d })}
+                  >
+                    {d === 'comfortable' ? 'Comfortable' : 'Compact'}
+                  </button>
+                ))}
               </div>
             </div>
 

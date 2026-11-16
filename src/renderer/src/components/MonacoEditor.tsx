@@ -1,5 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import { monaco } from '../lib/monaco'
+import { DENSITY_METRICS } from '../lib/density'
+import { useDensity } from '../lib/hooks'
 import { setCompletionCtx, clearCompletionCtx, type CompletionCtx } from '../lib/monaco-completions'
 
 interface Props {
@@ -53,6 +55,9 @@ const MonacoEditor = forwardRef<MonacoEditorHandle, Props>(function MonacoEditor
   onChangeRef.current = onChange
   const completionsRef = useRef(completions)
   completionsRef.current = completions
+  const density = useDensity()
+  const densityRef = useRef(density)
+  densityRef.current = density
 
   useImperativeHandle(ref, () => ({
     selectionText() {
@@ -72,6 +77,10 @@ const MonacoEditor = forwardRef<MonacoEditorHandle, Props>(function MonacoEditor
   }))
 
   useEffect(() => {
+    editorRef.current?.updateOptions({ fontSize: DENSITY_METRICS[density].editorFontSize })
+  }, [density])
+
+  useEffect(() => {
     const host = hostRef.current
     if (!host) return
     const editor = monaco.editor.create(host, {
@@ -80,7 +89,7 @@ const MonacoEditor = forwardRef<MonacoEditorHandle, Props>(function MonacoEditor
       // No theme here: monaco themes are global, and passing one at create()
       // would reset the app-wide choice every time a tab mounts.
       minimap: { enabled: false },
-      fontSize: 13,
+      fontSize: DENSITY_METRICS[densityRef.current].editorFontSize,
       // Installs a per-editor resize watcher — deliberate while editor instances are few; revisit if tab counts grow.
       automaticLayout: true,
       scrollBeyondLastLine: false,

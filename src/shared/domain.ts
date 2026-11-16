@@ -176,11 +176,16 @@ export const THEMES: ThemeMeta[] = [
   { id: 'solarized-light', label: 'Solarized Light', mode: 'light', bg: '#fdf6e3', accent: '#268bd2' }
 ]
 
+/** UI density: spacing/type scale of the shell (CSS tokens) plus editor font and grid row height. */
+export const DENSITIES = ['comfortable', 'compact'] as const
+export type Density = (typeof DENSITIES)[number]
+
 export interface AppSettings {
   theme: ThemeId
+  density: Density
 }
 
-export const DEFAULT_SETTINGS: AppSettings = { theme: 'midnight' }
+export const DEFAULT_SETTINGS: AppSettings = { theme: 'midnight', density: 'comfortable' }
 
 // ── Local LLM assistant ──
 

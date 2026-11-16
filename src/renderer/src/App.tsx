@@ -21,6 +21,7 @@ import ModelManagerModal from './components/ModelManagerModal'
 import UpdateBanner from './components/UpdateBanner'
 import { useSettings } from './lib/hooks'
 import { applyTheme } from './lib/theme'
+import { applyDensity } from './lib/density'
 import { useGlobalShortcuts } from './lib/use-global-shortcuts'
 import { useSessionPersistence } from './lib/use-session-persistence'
 
@@ -61,7 +62,9 @@ function AppShell(): JSX.Element {
 
   const { data: settings } = useSettings()
   useEffect(() => {
-    if (settings) applyTheme(settings.theme)
+    if (!settings) return
+    applyTheme(settings.theme)
+    applyDensity(settings.density)
   }, [settings])
 
   // Keep the running-SSM-tunnel set live for the panel + the connect-time banner.

@@ -17,6 +17,8 @@ import { coerceMongoEditValue } from '../lib/mongo-edit-value'
 import { shouldLoadMore } from '../lib/load-more'
 import { highlightSegments } from '../lib/highlight'
 import { useAppStore } from '../state/store'
+import { useDensity } from '../lib/hooks'
+import { DENSITY_METRICS } from '../lib/density'
 import EditingCell from './EditingCell'
 import RowInspector from './RowInspector'
 
@@ -203,12 +205,19 @@ export default function ResultsGrid({
     if (!requireCommit) void store().commitEdits(tabId) // fast-commit: write immediately
   }
 
+  const density = useDensity()
+  const rowHeight = DENSITY_METRICS[density].gridRowHeight
   const virtualizer = useVirtualizer({
     count: tableRows.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 26,
+    estimateSize: () => rowHeight,
     overscan: 10,
   })
+  // estimateSize is captured at render; re-measure so cached sizes follow a density change.
+  useEffect(() => {
+    virtualizer.measure()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- virtualizer is a stable instance
+  }, [rowHeight])
 
   // Auto-load the next page when scrolled near the end. Skipped while a filter is active: the
   // filter only sees loaded rows, so paging to satisfy it would quietly pull the whole cap.
