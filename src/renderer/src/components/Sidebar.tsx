@@ -13,7 +13,7 @@ import {
 /** The connection sidebar: Connections above the per-connection Explorer, right-edge
  *  drag to resize; collapsed (⌘B) it becomes a narrow column of badges. While the
  *  dashboard shows (or there are no tabs) the Connections zone hides — the dashboard
- *  already lists them. Resize mirrors AssistantPanel: DOM write during drag, commit on release. */
+ *  already lists them. Resize mirrors the right dock: DOM write during drag, commit on release. */
 export default function Sidebar(): JSX.Element {
   const open = useAppStore((s) => s.sideOpen)
   const toggleSide = useAppStore((s) => s.toggleSide)

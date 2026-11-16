@@ -28,7 +28,7 @@ export default function SidebarExplorer({ headerEnd }: { headerEnd?: ReactNode }
   const { data: objects = [] } = useObjects(activeConnectionId)
 
   const conn = connections.find((c) => c.id === activeConnectionId) ?? null
-  // Same rule as the top bar: only when the connection has Laravel Telescope tables.
+  // Same rule as the command palette: only when the connection has Laravel Telescope tables.
   const hasTelescope = objects.some((o) => o.name === 'telescope_entries')
 
   return (

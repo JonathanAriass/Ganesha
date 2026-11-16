@@ -10,13 +10,12 @@ import { Icon } from './icons'
 import { mod } from '../lib/platform'
 import { startImport } from '../lib/transfer-actions'
 
-/** The empty-pane view, now a connections dashboard: every connection as a
- *  card (click = select, double-click = open a query tab, pencil = edit), arranged
- *  in group sections — root groups may nest one level of subgroups (indented
- *  sub-sections, each its own drop target) — under one action row (filter, import,
- *  export, new group, new connection). Drag a card onto any section to move it
- *  (not while a filter is active). The TopBar dropdown remains
- *  the quick picker; this is the visual overview. */
+/** The connections dashboard, shown in the main area when no tabs are open or from the
+ *  sidebar's Home button: every connection as a card (click = select, double-click = open
+ *  a query tab, pencil = edit), arranged in group sections — root groups may nest one
+ *  level of subgroups (indented sub-sections, each its own drop target) — under one
+ *  action row (filter, import, export, new group, new connection). Drag a card onto any
+ *  section to move it (not while a filter is active). */
 export default function Welcome(): JSX.Element {
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
   const setActiveConnection = useAppStore((s) => s.setActiveConnection)

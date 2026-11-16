@@ -168,7 +168,7 @@ interface AppState {
   /** Tab whose staged edits are pending a commit-confirmation review, or null. */
   commitModal: { tabId: string } | null
 
-  // ── SSM tunnels ───────────────────────────────────────────────────────────
+  // ── Right dock, tab scope, transfer dialog, SSM tunnels ───────────────────
   /** The single right-dock occupant (assistant or tunnels); null = dock closed. */
   dock: DockTab | null
   closeDock: () => void

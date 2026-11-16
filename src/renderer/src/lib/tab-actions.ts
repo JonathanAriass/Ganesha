@@ -1,6 +1,6 @@
 // src/renderer/src/lib/tab-actions.ts
-/** Imperative run handlers for each mounted QueryTab, so the global command bar
- *  can drive the focused tab. Same thunk-registry pattern as the Monaco
+/** Imperative run handlers for each mounted QueryTab, so each pane's environment
+ *  bar can drive that pane's tab. Same thunk-registry pattern as the Monaco
  *  completion ctxByModel map: QueryTab registers a getter that reads a ref, so
  *  the registry always sees the freshest closures without re-registering. */
 
