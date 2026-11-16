@@ -5,10 +5,9 @@ import { unwrap } from '../lib/result'
 import { useRestoreFocus } from '../lib/use-restore-focus'
 import type { TransferModalState } from '../lib/transfer-actions'
 
-
 const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`
 
-/** Export / import connections dialog. Rendered only while open (the dashboard gates it),
+/** Export / import connections dialog. Rendered only while open (`App` gates it),
  *  so its state resets per open. Passwords never reach this component: export sends ids
  *  + a passphrase to the main process, which reads, encrypts and writes the file itself. */
 export default function ConnectionTransferModal({ state, onClose }: { state: TransferModalState; onClose: () => void }): JSX.Element {

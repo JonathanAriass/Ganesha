@@ -42,18 +42,21 @@ Ganesha is a desktop client for the four databases people actually reach for, bu
 
 ### Connect
 
-- **Four engines, one app** — create, test, edit and color-code connections for PostgreSQL, MySQL, MariaDB and MongoDB, shown as cards on a connections dashboard you can organize into **groups and subgroups** by drag-and-drop. Passwords are encrypted with the OS keychain (Electron `safeStorage`) and are *write-only*: no IPC channel can read one back into the UI.
+- **Four engines, one app** — create, test, edit and color-code connections for PostgreSQL, MySQL, MariaDB and MongoDB, shown as cards on a connections dashboard you can organize into **groups and subgroups** by drag-and-drop. The dashboard has a **filter** (name, host or engine), richer cards and a single action row per card. Passwords are encrypted with the OS keychain (Electron `safeStorage`) and are *write-only*: no IPC channel can read one back into the UI.
 - **SSH tunnels** — reach a database through one or more SSH hops (a jump-server chain, e.g. bastion → private host), configured per connection. Each hop authenticates with a private key (+ optional passphrase) or a password; those secrets are keychain-encrypted and write-only too. The tunnel is opened in the main process and the drivers connect through it unchanged.
 - **Export & import** — move your setup to another machine or hand your connections to teammates: **Export…** on the dashboard writes the connections you pick (with their groups and subgroups) to a `.ganesha-connections` file, and **Import…** adds them to another install. Passwords and SSH secrets stay out of the file unless you opt in, in which case they're encrypted with a passphrase you choose (AES-256-GCM, scrypt-derived key) — share the passphrase separately. Importing never changes what you already have: connections you already have are skipped and groups are matched by name. Saved queries, history and SSM tunnels aren't included.
+- **Connection sidebar** — every open connection is one click away, no dashboard or dropdown: the sidebar's top zone lists your connections grouped as on the dashboard, and the explorer below follows the active one. ⌘B collapses the sidebar to a single badge per open connection (initials on the connection's colour; its accessible name carries the environment and read-only state).
+- **Environment label** — give a connection an optional free-text environment (up to 12 characters; suggestions PROD / STG / DEV / LOCAL). It shows as a tag in the sidebar, the environment bar and the dashboard, always as text rather than colour alone, and travels with export/import.
 - **Read-only enforcement, twice** — on connections marked read-only, SQL is statement-guarded (writes/DDL rejected, including `SELECT INTO`) *and* runs inside a server-side `READ ONLY` transaction; Mongo commands pass an allow-list that also blocks `$out`/`$merge` aggregations.
 
 ### Explore & query
 
-- **Schema browser** — tables, views and collections in a tree, hosted in a collapsible, resizable side panel switched from an icon rail (schema / saved queries / history — ⌘B toggles it); double-click to open a ready-made query tab that runs itself. Filter the tree by name with a substring search box (matches object or schema names, highlights the hit). Leave a Mongo connection's database blank to browse *all* databases, Compass-style.
-- **Query tabs** — Monaco editor with per-engine language (SQL or mongosh-style JavaScript), local workers, and custom Midnight/Daylight themes. Tab state (text, results, running query) survives switching — and the open tabs themselves survive an app restart (text only; nothing re-runs on launch). Double-click a tab to rename it; right-click for close actions (close others / to the right / to the left / all). With tabs open against more than one server they group into a two-level strip — pick a server, see its tabs.
+- **Schema browser** — tables, views and collections in a tree, in the sidebar's explorer zone, which has a Schema / Saved / History switch for the active connection; double-click to open a ready-made query tab that runs itself. Filter the tree by name with a substring search box (matches object or schema names, highlights the hit). Leave a Mongo connection's database blank to browse *all* databases, Compass-style.
+- **Query tabs** — Monaco editor with per-engine language (SQL or mongosh-style JavaScript), local workers, and custom Midnight/Daylight themes. Tab state (text, results, running query) survives switching — and the open tabs themselves survive an app restart (text only; nothing re-runs on launch). Double-click a tab to rename it; right-click for close actions (close others / to the right / to the left / all). Tabs sit in a single pill strip with an **All tabs / This connection** switch, so with several servers open you can see everything or just the active connection's tabs.
+- **Environment bar** — under the tab strip, each pane names its connection, its mode ("Read-only — writes are blocked" or "Edits stage until you commit") and host, and carries Refresh, Save, Run all, Run and Cancel.
 - **Schema-aware autocomplete** — SQL tables/views, database/schema names, and the in-scope FROM/JOIN tables' columns (unqualified inside a `WHERE`, or after `alias.`/`table.`); Mongo collections after `db.`, document fields inside a method's argument, database names inside `getSiblingDB("…")`, and operation snippets after `db.coll.`.
 - **Run exactly what you mean** — ⌘↵ runs the selection if there is one, else the statement under the cursor when the tab holds several, else the whole tab. ⌘⇧↵ runs *all* statements top-to-bottom as individual queries with per-statement collapsible results, stopping at the first error.
-- **Saved queries** — name a snippet with ⌘S (or ☆ in the command bar) and it lives in the side panel and the palette, per connection; click one to open it in a fresh tab and run it.
+- **Saved queries** — name a snippet with ⌘S (or ☆ in the environment bar) and it lives in the sidebar's Saved view and the palette, per connection; click one to open it in a fresh tab and run it.
 - **Two Mongo input modes** — raw EJSON commands (`{ "find": "users", … }`) or mongosh shell syntax (`db.users.find({…}).sort({…}).limit(5)`), parsed by a restricted AST evaluator — no code execution.
 - **Telescope inspector** — connect to a Laravel app's database with [Telescope](https://laravel.com/docs/telescope) installed and a 🔭 button (also in the ⌘K palette) opens a built-in inspector. Browse every entry type — requests, queries, exceptions, jobs, mail, logs and 11 more — in a virtualized list with per-type detail panes (request headers/payload/response, SQL + bindings, collapsible stack traces with vendor frames folded away), text search across all content, a tag filter, and a **Related** tab that follows a request's child entries by batch. New entries stream in live — a "*N* new entries" banner surfaces them without moving your scroll. Strictly read-only: only parameterized `SELECT`s inside a server-side `READ ONLY` transaction, the renderer never builds SQL, and Telescope tables are never editable. Auto-detected from the `telescope_entries` table (MySQL/MariaDB).
 
@@ -67,20 +70,20 @@ Ganesha is a desktop client for the four databases people actually reach for, bu
 
 ### Assist
 
-- **Local AI assistant** — a built-in chat powered by a GGUF model you download and run entirely on your machine (`node-llama-cpp`, no data leaves the app). It's grounded with the active connection's schema, so it recommends queries against your real tables; one click drops a suggestion into a new query tab. Manage models in-app (curated picks or any Hugging Face `hf:` URI); conversations are saved per connection. The inference engine runs in a **separate, crash-isolated process** — a native model/inference fault can never take down the app — and its ~2 MB native binaries are **downloaded on first use** rather than shipped inside the app (which also keeps macOS Gatekeeper/XProtect from flagging the unsigned bundle).
+- **Local AI assistant** — a built-in chat, in the right dock beside the Tunnels tab, powered by a GGUF model you download and run entirely on your machine (`node-llama-cpp`, no data leaves the app). It's grounded with the active connection's schema, so it recommends queries against your real tables; one click drops a suggestion into a new query tab. Manage models in-app (curated picks or any Hugging Face `hf:` URI); conversations are saved per connection. The inference engine runs in a **separate, crash-isolated process** — a native model/inference fault can never take down the app — and its ~2 MB native binaries are **downloaded on first use** rather than shipped inside the app (which also keeps macOS Gatekeeper/XProtect from flagging the unsigned bundle).
 - **Linked-repo context** *(optional)* — point a connection at a local code repo and the assistant pulls the relevant files (ORM models, migrations, entities) into its context for the tables you're asking about, so suggestions match your app's real relationships and conventions — not just the bare schema. Retrieval is question-driven (it matches your message and the open query against the connection's known tables), bounded, and local; a small **📎 context** line shows exactly which files were read. PHP/Laravel naming is tuned (`users` ↔ `User.php` ↔ `…_create_users_table.php`), with a generic fallback.
 
 ### Comfort
 
 - **⌘K palette** — fuzzy-jump to connections, tables/collections, saved queries and actions (cmdk).
-- **Settings** — Midnight ⇄ Light theme (flash-free on launch) and a relocatable data directory (your data is copied, never lost).
+- **Settings** — Midnight ⇄ Light theme (flash-free on launch), a **Comfortable / Compact** density (comfortable by default) and a relocatable data directory (your data is copied, never lost).
 
 ## Keyboard shortcuts
 
 | Chord | Action |
 |---|---|
 | ⌘K / Ctrl+K | Command palette |
-| ⌘B / Ctrl+B | Toggle the side panel |
+| ⌘B / Ctrl+B | Toggle the sidebar |
 | ⌘T / Ctrl+T | New query tab |
 | ⌘W / Ctrl+W | Close tab |
 | ⇧⌘W | Close window |
@@ -139,7 +142,7 @@ npm run dev        # launch the app with hot reload
 
 ```bash
 npm run typecheck && npm run lint
-npm test                  # 883 unit tests (Vitest, Node ABI)
+npm test                  # 948 unit tests (Vitest, Node ABI)
 npm run test:integration  # 47 tests vs real Postgres/MySQL/Mongo + an SSH tunnel (testcontainers, needs Docker)
 ```
 

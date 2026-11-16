@@ -35,19 +35,6 @@ const ICONS = {
       <circle cx="12" cy="12" r="3" />
     </>
   ),
-  db: (
-    <>
-      <ellipse cx="12" cy="5.5" rx="7" ry="2.8" />
-      <path d="M5 5.5v13c0 1.55 3.13 2.8 7 2.8s7-1.25 7-2.8v-13M5 12c0 1.55 3.13 2.8 7 2.8s7-1.25 7-2.8" />
-    </>
-  ),
-  bookmark: <path d="M6 3.5h12v17l-6-3.6-6 3.6v-17Z" />,
-  clock: (
-    <>
-      <circle cx="12" cy="12" r="8.5" />
-      <path d="M12 7.5V12l3.2 2" />
-    </>
-  ),
   /** Sidebar collapse / expand toggle. */
   sidebar: (
     <>
