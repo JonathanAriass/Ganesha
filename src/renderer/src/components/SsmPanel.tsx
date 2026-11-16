@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAppStore } from '../state/store'
 import { useSsmTunnels, useDeleteSsmTunnel } from '../lib/hooks'
+import { appendCapped, SSM_OUTPUT_MAX } from '../lib/ssm-output'
 import { Icon } from './icons'
 import SsmTunnelModal from './SsmTunnelModal'
 import type { SsmTunnel } from '@shared/domain'
@@ -8,7 +9,7 @@ import type { SsmTunnel } from '@shared/domain'
 /** Content of the dock's Tunnels tab (RightDock owns the aside and close). Managing AWS SSM port-forwarding tunnels: list with status + Start/Stop, the
  *  selected tunnel's live output, and an add/edit form. Running state comes from the store (kept
  *  live app-wide by the ssm:status subscription); output is buffered while the panel is mounted (RightDock keeps it mounted, hidden, while the dock
- *  shows Assistant). */
+ *  is closed or shows Assistant), keeping each tunnel's last SSM_OUTPUT_MAX characters. */
 export default function SsmPanel({ hidden }: { hidden: boolean }): JSX.Element {
   const running = useAppStore((s) => s.runningSsm)
   const { data: tunnels } = useSsmTunnels()
@@ -20,7 +21,10 @@ export default function SsmPanel({ hidden }: { hidden: boolean }): JSX.Element {
   const outRef = useRef<HTMLPreElement>(null)
 
   useEffect(
-    () => window.api.ssm.onOutput((e) => setOutputs((o) => ({ ...o, [e.id]: (o[e.id] ?? '') + e.chunk }))),
+    () =>
+      window.api.ssm.onOutput((e) =>
+        setOutputs((o) => ({ ...o, [e.id]: appendCapped(o[e.id] ?? '', e.chunk, SSM_OUTPUT_MAX) }))
+      ),
     []
   )
   useEffect(() => { outRef.current?.scrollTo(0, outRef.current.scrollHeight) }, [outputs, selectedId])

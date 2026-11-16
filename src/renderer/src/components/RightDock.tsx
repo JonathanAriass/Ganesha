@@ -15,6 +15,14 @@ export default function RightDock(): JSX.Element {
   const toggleSsm = useAppStore((s) => s.toggleSsm)
   const closeDock = useAppStore((s) => s.closeDock)
 
+  // Closing hides the aside, so focus (on the close button) would drop to <body>: hand it to
+  // the peek once React has rendered it (the peek only exists while the dock is closed).
+  const peekRef = useRef<HTMLButtonElement>(null)
+  function close(): void {
+    closeDock()
+    requestAnimationFrame(() => peekRef.current?.focus())
+  }
+
   // ── Horizontal resize (drag the left edge) ──
   const panelRef = useRef<HTMLElement>(null)
   const [width, setWidth] = useState(() => loadWidth())
@@ -50,52 +58,52 @@ export default function RightDock(): JSX.Element {
   return (
     <>
       {dock === null && (
-        <button className="assistant-peek" onClick={toggleAssistant} aria-label="Open assistant">
+        <button ref={peekRef} className="assistant-peek" onClick={toggleAssistant} aria-label="Open assistant">
           <span className="assistant-peek-label">✦ Assistant</span>
         </button>
       )}
-    <aside className="right-dock" ref={panelRef} style={{ width }} aria-label="Side panel" hidden={dock === null}>
-      <div
-        className="assistant-resizer"
-        role="separator"
-        aria-orientation="vertical"
-        aria-label="Resize side panel"
-        aria-valuemin={MIN_WIDTH}
-        aria-valuemax={MAX_WIDTH}
-        aria-valuenow={Math.round(width)}
-        tabIndex={0}
-        title="Drag to resize · double-click to reset · ←/→ to adjust"
-        onPointerDown={onResizePointerDown}
-        onPointerMove={onResizePointerMove}
-        onPointerUp={onResizePointerEnd}
-        onPointerCancel={onResizePointerEnd}
-        onDoubleClick={() => commitWidth(DEFAULT_WIDTH)}
-        onKeyDown={onResizeKeyDown}
-      />
-      <div className="dock-head">
-        <div className="dock-tabs">
-          <button
-            className={`dock-tab${dock === 'assistant' ? ' active' : ''}`}
-            aria-pressed={dock === 'assistant'}
-            onClick={() => { if (dock !== 'assistant') toggleAssistant() }}
-          >
-            Assistant
-          </button>
-          <button
-            className={`dock-tab${dock === 'tunnels' ? ' active' : ''}`}
-            aria-pressed={dock === 'tunnels'}
-            onClick={() => { if (dock !== 'tunnels') toggleSsm() }}
-          >
-            Tunnels
+      <aside className="right-dock" ref={panelRef} style={{ width }} aria-label="Side panel" hidden={dock === null}>
+        <div
+          className="assistant-resizer"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize side panel"
+          aria-valuemin={MIN_WIDTH}
+          aria-valuemax={MAX_WIDTH}
+          aria-valuenow={Math.round(width)}
+          tabIndex={0}
+          title="Drag to resize · double-click to reset · ←/→ to adjust"
+          onPointerDown={onResizePointerDown}
+          onPointerMove={onResizePointerMove}
+          onPointerUp={onResizePointerEnd}
+          onPointerCancel={onResizePointerEnd}
+          onDoubleClick={() => commitWidth(DEFAULT_WIDTH)}
+          onKeyDown={onResizeKeyDown}
+        />
+        <div className="dock-head">
+          <div className="dock-tabs">
+            <button
+              className={`dock-tab${dock === 'assistant' ? ' active' : ''}`}
+              aria-pressed={dock === 'assistant'}
+              onClick={() => { if (dock !== 'assistant') toggleAssistant() }}
+            >
+              Assistant
+            </button>
+            <button
+              className={`dock-tab${dock === 'tunnels' ? ' active' : ''}`}
+              aria-pressed={dock === 'tunnels'}
+              onClick={() => { if (dock !== 'tunnels') toggleSsm() }}
+            >
+              Tunnels
+            </button>
+          </div>
+          <button className="btn ghost xs dock-close" onClick={close} aria-label="Close panel" title="Close panel">
+            <Icon name="close" size={14} />
           </button>
         </div>
-        <button className="btn ghost xs dock-close" onClick={closeDock} aria-label="Close panel" title="Close panel">
-          <Icon name="close" size={14} />
-        </button>
-      </div>
-      <AssistantPanel hidden={dock !== 'assistant'} />
-      <SsmPanel hidden={dock !== 'tunnels'} />
-    </aside>
+        <AssistantPanel hidden={dock !== 'assistant'} />
+        <SsmPanel hidden={dock !== 'tunnels'} />
+      </aside>
     </>
   )
 }
