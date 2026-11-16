@@ -11,6 +11,7 @@ import {
 import SshHopEditor from './SshHopEditor'
 import { emptyHop, validateSshConfig } from '../lib/ssh-config'
 import { unwrap } from '../lib/result'
+import { ENVIRONMENT_MAX_LENGTH, ENVIRONMENT_SUGGESTIONS } from '@shared/environment'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -364,6 +365,28 @@ export default function ConnectionModal(): JSX.Element {
                   />
                 ))}
               </div>
+            </div>
+
+            {/* Environment */}
+            <div className="form-row">
+              <label htmlFor="conn-environment">
+                Environment{' '}
+                <span className="hint">Shown next to the connection&apos;s name. Optional.</span>
+              </label>
+              <input
+                id="conn-environment"
+                type="text"
+                list="conn-environment-options"
+                maxLength={ENVIRONMENT_MAX_LENGTH}
+                value={form.environment}
+                onChange={(e) => setField('environment', e.target.value)}
+                placeholder="PROD"
+              />
+              <datalist id="conn-environment-options">
+                {ENVIRONMENT_SUGGESTIONS.map((s) => (
+                  <option key={s} value={s} />
+                ))}
+              </datalist>
             </div>
 
             {/* SSL + Read-only */}

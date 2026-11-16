@@ -1907,6 +1907,14 @@ mark.hl {
   color: var(--text-2);
   font-size: 11px;
 }
+.env-tag {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
 
 /* ── Row inspector ── */
 /* Grid + docked inspector share the results area; .grid-wrap keeps flex: 1. */
