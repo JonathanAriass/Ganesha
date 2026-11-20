@@ -1,4 +1,4 @@
-import { useState, type DragEvent } from 'react'
+import { useEffect, useRef, useState, type DragEvent, type WheelEvent } from 'react'
 import { useAppStore } from '../state/store'
 import { useConnections } from '../lib/hooks'
 import { visibleTabs, showScopeSwitch, effectiveTabScope } from '../lib/tab-groups'
@@ -6,6 +6,7 @@ import { Icon } from './icons'
 import TabContextMenu, { type TabCloseAction } from './TabContextMenu'
 import { type PaneId, paneTabs } from '../lib/panes'
 import { TAB_MIME } from '../lib/tab-reorder'
+import { overflowEnds, scrollStep } from '../lib/scroll-hints'
 
 export default function TabBar({ pane }: { pane: PaneId }): JSX.Element {
   const tabs = useAppStore((s) => s.tabs)
@@ -95,11 +96,55 @@ export default function TabBar({ pane }: { pane: PaneId }): JSX.Element {
   const subtabs = visibleTabs(paneAllTabs, effectiveTabScope(paneAllTabs, tabScope), activeConnectionId ?? null)
   const menuIdx = menu ? subtabs.findIndex((t) => t.id === menu.tabId) : -1
 
+  // The strip has no scrollbar: an arrow appears on each side that has tabs out of view. A
+  // vertical wheel scrolls it sideways, and the active tab is brought into view when it changes.
+  const stripRef = useRef<HTMLDivElement>(null)
+  const [overflow, setOverflow] = useState({ left: false, right: false })
+  function measure(): void {
+    const el = stripRef.current
+    if (!el) return
+    const ends = overflowEnds({ pos: el.scrollLeft, size: el.scrollWidth, client: el.clientWidth })
+    const next = { left: ends.start, right: ends.end }
+    setOverflow((prev) => (prev.left === next.left && prev.right === next.right ? prev : next))
+  }
+  useEffect(() => {
+    stripRef.current?.querySelector('.tab.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    measure()
+  }, [activeTabId, subtabs.length])
+  useEffect(() => {
+    const el = stripRef.current
+    if (!el) return
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  function scrollStrip(dir: -1 | 1): void {
+    const el = stripRef.current
+    el?.scrollBy({ left: dir * scrollStep(el.clientWidth), behavior: 'smooth' })
+  }
+  function onStripWheel(e: WheelEvent<HTMLDivElement>): void {
+    if (e.deltaX !== 0 || e.deltaY === 0) return // a trackpad already scrolls sideways
+    e.currentTarget.scrollLeft += e.deltaY
+  }
+
   return (
     <div className="tabbar-wrap">
+      {overflow.left && (
+        <button className="tab-more tab-more-left" onClick={() => scrollStrip(-1)} aria-label="Show earlier tabs" title="Earlier tabs">
+          <Icon name="chevron-left" />
+        </button>
+      )}
+      {overflow.right && (
+        <button className="tab-more tab-more-right" onClick={() => scrollStrip(1)} aria-label="Show later tabs" title="Later tabs">
+          <Icon name="chevron-right" />
+        </button>
+      )}
       <div
         className="tabbar"
         role="tablist"
+        ref={stripRef}
+        onWheel={onStripWheel}
+        onScroll={measure}
         onDragOver={onStripDragOver}
         onDrop={onStripDrop}
         onDragLeave={onStripDragLeave}

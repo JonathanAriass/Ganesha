@@ -83,3 +83,25 @@ export function parseInstances(json: string): AwsInstance[] {
     ping: i.PingStatus ?? ''
   }))
 }
+
+/** The `--query` for `aws ec2 describe-instances` that yields `[{ id, name }]` (name = `Name` tag). */
+export const INSTANCE_NAMES_QUERY = 'Reservations[].Instances[].{id:InstanceId,name:Tags[?Key==`Name`]|[0].Value}'
+
+/** Instance id → `Name` tag, from `aws ec2 describe-instances --query INSTANCE_NAMES_QUERY --output json`. */
+export function parseInstanceNames(json: string): Record<string, string> {
+  const rows = JSON.parse(json) as { id?: string; name?: string | null }[] | null
+  const names: Record<string, string> = {}
+  for (const r of rows ?? []) if (r.id && r.name && r.name.trim()) names[r.id] = r.name.trim()
+  return names
+}
+
+/** Pure: put each instance's `Name` tag in front of its host name (kept as `host`, so both stay
+ *  searchable), and sort by name. Instances with no tag keep what SSM reported. */
+export function nameInstances(instances: AwsInstance[], names: Record<string, string>): AwsInstance[] {
+  return instances
+    .map((i) => {
+      const tag = names[i.instanceId]
+      return tag && tag !== i.name ? { ...i, name: tag, ...(i.name !== i.instanceId ? { host: i.name } : {}) } : i
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))
+}

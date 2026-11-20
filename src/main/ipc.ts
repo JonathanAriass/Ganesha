@@ -22,11 +22,15 @@ import { ResultCache } from './query-cache'
 import { SshTunnelManager } from './ssh/tunnel-manager'
 import { connectVia, disconnectVia, openTunnel } from './connection-runtime'
 import { buildConnectParams } from './drivers/params'
-import { readFileSync, writeFileSync, existsSync } from 'fs'
-import { basename } from 'path'
-import { buildExport, applyImport, parseTransferFile, type TransferFile } from './persistence/connection-transfer'
+import { readFileSync, writeFileSync, existsSync, readdirSync } from 'fs'
+import { basename, dirname, join } from 'path'
+import { buildExport, applyPlan, type ImportPlan } from './persistence/connection-transfer'
+import { parseImportFile } from './persistence/import-sources'
+import { detectImports, type DetectedPlan } from './persistence/import-detect'
+import type { ImportPreview } from '../shared/transfer'
 import { TRANSFER_EXTENSION } from '../shared/transfer'
 import { randomUUID } from 'crypto'
+import { execFile } from 'child_process'
 import { EngineHost } from './llm/engine-host'
 import { MODEL_CATALOG } from './llm/catalog'
 import { listLocalModels, deleteLocalModel, downloadModel } from './llm/models'
@@ -37,7 +41,7 @@ import { scanRepoFiles, readRepoFile } from './llm/repo-scan'
 import * as llm from './persistence/llm'
 import * as ssm from './persistence/ssm-tunnels'
 import { SsmRunner } from './ssm/runner'
-import { runAws, listAwsProfiles, parseArn, parseInstances } from './ssm/aws'
+import { runAws, listAwsProfiles, parseArn, parseInstances, parseInstanceNames, nameInstances, INSTANCE_NAMES_QUERY } from './ssm/aws'
 import { getModelsDir, getDataDir } from './persistence/paths'
 import { engineRootFor, engineBinsDir, isEngineInstalledAt, downloadAndExtractEngine, engineTarballUrl, ENGINE_NLC_VERSION, type FetchLike } from './llm/engine-install'
 import type { LlmTokenEvent, LlmDownloadEvent, LlmContextEvent, EngineDownloadEvent } from '../shared/ipc'
@@ -127,7 +131,30 @@ function connectStored(driver: ReturnType<DriverManager['get']>, config: Connect
 
 /** The file chosen via connections.importPick, held here (never sent to the renderer)
  *  until connections.import commits it. */
-let pendingImport: TransferFile | null = null
+let pendingImport: ImportPlan | null = null
+
+function importPreview(fileName: string, plan: ImportPlan): ImportPreview {
+  return {
+    fileName, connections: plan.connections.length, groups: plan.groups.length,
+    hasSecrets: plan.secrets.kind === 'encrypted', source: plan.source, keychainSecrets: plan.secrets.kind === 'keychain',
+    openSecrets: plan.secrets.kind === 'plain' ? Object.keys(plan.secrets.payload).length : 0,
+    skipped: plan.skipped, notes: plan.notes
+  }
+}
+
+/** Saved connections of other tools installed for this user, read fresh on every call. */
+function detectedImports(): DetectedPlan[] {
+  return detectImports(
+    {
+      platform: process.platform, home: app.getPath('home'), appData: process.env.APPDATA,
+      xdgData: process.env.XDG_DATA_HOME, xdgConfig: process.env.XDG_CONFIG_HOME
+    },
+    {
+      readdir: (dir) => { try { return readdirSync(dir) } catch { return [] } },
+      readFile: (path) => { try { return readFileSync(path) } catch { return null } }
+    }
+  )
+}
 
 type Handler<K extends ChannelName> = (req: Req<K>) => Result<Res<K>> | Promise<Result<Res<K>>>
 
@@ -253,22 +280,52 @@ export function registerIpcHandlers(): void {
     const win = BrowserWindow.getFocusedWindow()
     const opts = {
       title: 'Import connections',
-      properties: ['openFile'] as Array<'openFile'>,
-      filters: [{ name: 'Ganesha connections', extensions: [TRANSFER_EXTENSION, 'json'] }]
+      // DBeaver keeps its file in a hidden .dbeaver folder.
+      properties: ['openFile', 'showHiddenFiles'] as Array<'openFile' | 'showHiddenFiles'>,
+      message: 'A Ganesha export, a MongoDB Compass export, or DBeaver\'s data-sources.json (in the project\'s .dbeaver folder)',
+      filters: [{ name: 'Connections', extensions: [TRANSFER_EXTENSION, 'json'] }]
     }
     const r = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
     if (r.canceled || r.filePaths.length === 0) return ok(null)
-    const file = parseTransferFile(readFileSync(r.filePaths[0], 'utf8'))
-    pendingImport = file
-    return ok({
-      fileName: basename(r.filePaths[0]), connections: file.connections.length,
-      groups: file.groups.length, hasSecrets: file.secrets !== null
+    const picked = r.filePaths[0]
+    const plan = parseImportFile(readFileSync(picked, 'utf8'), () => {
+      // DBeaver keeps user names and passwords in a second file next to the one picked.
+      const creds = join(dirname(picked), 'credentials-config.json')
+      return existsSync(creds) ? readFileSync(creds) : null
     })
+    if (plan.connections.length === 0) {
+      throw new Error(plan.skipped.length > 0
+        ? `Nothing to import: ${plan.skipped.length} ${plan.skipped.length === 1 ? 'entry is' : 'entries are'} not supported (${plan.skipped[0].reason})`
+        : 'This file has no connections')
+    }
+    pendingImport = plan
+    return ok(importPreview(basename(picked), plan))
   })
-  handle('connections.import', ({ passphrase }) => {
+  handle('connections.importSources', () =>
+    ok(detectedImports().map((d) => ({ id: d.id, source: d.plan.source, label: d.label, connections: d.plan.connections.length })))
+  )
+  handle('connections.importDetected', (id) => {
+    const found = detectedImports().find((d) => d.id === id)
+    if (!found) throw new Error('Those connections are no longer there')
+    pendingImport = found.plan
+    return ok(importPreview(found.fileName, found.plan))
+  })
+  handle('connections.import', async ({ passphrase, includeSecrets }) => {
     if (!pendingImport) throw new Error('No file selected to import')
     const { db, secrets } = store()
-    const result = applyImport(db, secrets, pendingImport, passphrase, now(), (p) => existsSync(p))
+    // Another app's passwords: ask the keychain for its key. macOS shows its own permission
+    // prompt here; a refusal fails the import so the user can retry without passwords.
+    let keychainPassword: string | null = null
+    if (includeSecrets && pendingImport.secrets.kind === 'keychain') {
+      const { service, account } = pendingImport.secrets
+      keychainPassword = await new Promise<string>((resolve, reject) => {
+        execFile('/usr/bin/security', ['find-generic-password', '-s', service, '-a', account, '-w'], (e, stdout) => {
+          if (e) reject(new Error('macOS did not give access to those passwords. Untick the option to import without them.'))
+          else resolve(stdout.replace(/\n$/, ''))
+        })
+      })
+    }
+    const result = applyPlan(db, secrets, pendingImport, { passphrase, includeSecrets, keychainPassword }, now(), (p) => existsSync(p))
     pendingImport = null // kept on a thrown error (wrong passphrase) so the user can retry
     return ok(result)
   })
@@ -307,7 +364,7 @@ export function registerIpcHandlers(): void {
     // Throwaway pooled connection under a test id, brought up through the tunnel
     // (typed SSH secrets win; blank-on-edit falls back to the stored ones).
     const testId = `test:${id ?? 'new'}`
-    const config: ConnectionConfig = { ...input, id: testId, groupId: null, createdAt: 0, updatedAt: 0 }
+    const config: ConnectionConfig = { ...input, id: testId, groupId: null, importedFrom: null, createdAt: 0, updatedAt: 0 }
     try {
       // Open the tunnel (if any), then a REAL connectivity probe through it.
       // testConnection actually dials + runs SELECT 1 / ping — the lazy pooled
@@ -535,8 +592,16 @@ export function registerIpcHandlers(): void {
   handle('aws.identity', async ({ profile, region }) =>
     ok({ arn: parseArn(await runAws(['sts', 'get-caller-identity', '--profile', profile, '--region', region, '--output', 'json'])) }))
   handle('aws.login', async ({ profile }) => { await runAws(['sso', 'login', '--profile', profile], 180000); return ok(null) })
-  handle('aws.instances', async ({ profile, region }) =>
-    ok(parseInstances(await runAws(['ssm', 'describe-instance-information', '--profile', profile, '--region', region, '--output', 'json']))))
+  handle('aws.instances', async ({ profile, region }) => {
+    const at = ['--profile', profile, '--region', region, '--output', 'json']
+    // SSM only knows host names; the names people search by are EC2 `Name` tags. Reading them
+    // needs ec2:DescribeInstances — without it the list still works, under host names.
+    const [list, names] = await Promise.all([
+      runAws(['ssm', 'describe-instance-information', ...at]),
+      runAws(['ec2', 'describe-instances', '--query', INSTANCE_NAMES_QUERY, ...at]).then(parseInstanceNames, () => ({}))
+    ])
+    return ok(nameInstances(parseInstances(list), names))
+  })
 
   // Download streams progress to the renderer that asked — registered raw for event.sender.
   ipcMain.handle('llm.models.download', async (event, { uri }: { uri: string }) => {

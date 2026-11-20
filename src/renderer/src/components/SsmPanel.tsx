@@ -27,34 +27,30 @@ export default function SsmPanel({ hidden }: { hidden: boolean }): JSX.Element {
       ),
     []
   )
-  useEffect(() => { outRef.current?.scrollTo(0, outRef.current.scrollHeight) }, [outputs, selectedId])
+  useEffect(() => { outRef.current?.scrollTo(0, outRef.current.scrollHeight) }, [outputs, selectedId, tunnels])
 
   const list = tunnels ?? []
   const isRunning = (id: string): boolean => running.includes(id)
   const start = (id: string): void => { setSelectedId(id); void window.api.ssm.start(id) }
+  // With a single tunnel there is nothing to choose: its output shows without a click.
+  const shownId = selectedId ?? (list.length === 1 ? list[0].id : null)
+  const shown = shownId ? list.find((t) => t.id === shownId) ?? null : null
 
   return (
     <div className="dock-content" hidden={hidden}>
-      <div className="ssm-head">
-        <strong>SSM Tunnels</strong>
-        <button className="btn ghost xs" style={{ marginLeft: 'auto' }} onClick={() => setEditing('new')} title="Add tunnel" aria-label="Add tunnel"><Icon name="plus" size={14} /></button>
-      </div>
-
       <div className="ssm-list">
-        {list.length === 0 && (
-          <div className="ssm-empty">
-            No tunnels yet. <button className="link-btn" onClick={() => setEditing('new')}>Add one</button>.
-          </div>
-        )}
+        {list.length === 0 && <div className="ssm-empty">No tunnels yet.</div>}
         {list.map((t) => (
           <div
             key={t.id}
-            className={`ssm-row${selectedId === t.id ? ' selected' : ''}`}
+            className={`ssm-row${shownId === t.id ? ' selected' : ''}`}
             onClick={() => setSelectedId(t.id)}
           >
             <span className={`ssm-dot${isRunning(t.id) ? ' on' : ''}`} aria-hidden="true" />
-            <span className="ssm-name" title={`${t.instanceId} · ${t.region}`}>{t.name}</span>
-            <span className="ssm-port">127.0.0.1:{t.localPort}</span>
+            <span className="ssm-id">
+              <span className="ssm-name" title={`${t.instanceId} · ${t.region}`}>{t.name}</span>
+              <span className="ssm-port">127.0.0.1:{t.localPort} · {isRunning(t.id) ? 'running' : 'stopped'}</span>
+            </span>
             {isRunning(t.id) ? (
               <button className="btn xs" onClick={(e) => { e.stopPropagation(); void window.api.ssm.stop(t.id) }}>Stop</button>
             ) : (
@@ -71,13 +67,21 @@ export default function SsmPanel({ hidden }: { hidden: boolean }): JSX.Element {
             </button>
           </div>
         ))}
+        <button className="ssm-add" onClick={() => setEditing('new')}>
+          <Icon name="plus" size={14} />
+          Add tunnel
+        </button>
       </div>
 
       <div className="ssm-output">
-        <div className="ssm-output-head">{selectedId ? list.find((t) => t.id === selectedId)?.name ?? 'Output' : 'Output'}</div>
-        <pre ref={outRef} className="ssm-output-body">
-          {selectedId ? outputs[selectedId] ?? '(no output yet)' : 'Select a tunnel to see its output.'}
-        </pre>
+        <div className="ssm-output-head">{shown ? `Output · ${shown.name}` : 'Output'}</div>
+        {shownId && outputs[shownId] ? (
+          <pre ref={outRef} className="ssm-output-body">{outputs[shownId]}</pre>
+        ) : (
+          <div className="ssm-output-empty">
+            {shownId ? 'No output yet. Start the tunnel to see it here.' : 'Select a tunnel to see its output.'}
+          </div>
+        )}
       </div>
 
       {editing && <SsmTunnelModal tunnel={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}

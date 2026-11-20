@@ -2,12 +2,13 @@ import { randomUUID } from 'crypto'
 import type { DB } from './db'
 import { cleanEnvironment } from '../../shared/environment'
 import type { ConnectionConfig, ConnectionInput } from '../../shared/domain'
+import { IMPORT_SOURCES, type ImportSource } from '../../shared/transfer'
 
 interface Row {
   id: string; type: string; name: string; color: string; host: string; port: number
   username: string; db_name: string; ssl: number; read_only: number; require_commit: number
   auth_source: string; replica_set: string; ssh_json: string | null; repo_path: string | null
-  group_id: string | null; environment: string; created_at: number; updated_at: number
+  group_id: string | null; environment: string; imported_from: string | null; created_at: number; updated_at: number
 }
 
 function toConfig(r: Row): ConnectionConfig {
@@ -18,6 +19,7 @@ function toConfig(r: Row): ConnectionConfig {
     authSource: r.auth_source, replicaSet: r.replica_set,
     ssh: r.ssh_json ? (JSON.parse(r.ssh_json) as ConnectionConfig['ssh']) : null,
     repoPath: r.repo_path, groupId: r.group_id, environment: r.environment,
+    importedFrom: IMPORT_SOURCES.find((s) => s === r.imported_from) ?? null,
     createdAt: r.created_at, updatedAt: r.updated_at
   }
 }
@@ -52,6 +54,11 @@ export function updateConnection(db: DB, id: string, patch: Partial<ConnectionIn
     auth_source=@authSource,replica_set=@replicaSet,ssh_json=@ssh_json,repo_path=@repo_path,environment=@environment,updated_at=@now WHERE id=@id`)
     .run({ ...next, id, ssl: next.ssl ? 1 : 0, readOnly: next.readOnly ? 1 : 0, requireCommit: next.requireCommit ? 1 : 0, ssh_json: next.ssh ? JSON.stringify(next.ssh) : null, repo_path: next.repoPath ?? null, environment: cleanEnvironment(next.environment), now })
   return getConnection(db, id) as ConnectionConfig
+}
+
+/** Record where an imported connection came from (shown as a tag; never edited afterwards). */
+export function setConnectionImportedFrom(db: DB, id: string, source: ImportSource): void {
+  db.prepare('UPDATE connections SET imported_from = ? WHERE id = ?').run(source, id)
 }
 
 export function deleteConnection(db: DB, id: string): void {

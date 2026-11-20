@@ -6,6 +6,7 @@ import ObjectTree from './ObjectTree'
 import SavedSection from './SavedSection'
 import HistorySection from './HistorySection'
 import { Icon } from './icons'
+import ScrollArrows from './ScrollArrows'
 
 const SECTIONS: Array<{ id: SideSection; label: string }> = [
   { id: 'schema', label: 'Schema' },
@@ -33,6 +34,7 @@ export default function SidebarExplorer({ headerEnd }: { headerEnd?: ReactNode }
 
   return (
     <section className="sidebar-zone sidebar-explorer" aria-label="Explorer">
+      <ScrollArrows target=".side-body" />
       <div className="sidebar-head">
         {conn ? (
           <>

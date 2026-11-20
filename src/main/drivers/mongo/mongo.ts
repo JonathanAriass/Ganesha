@@ -26,7 +26,11 @@ export function buildMongoUri(p: ConnectParams): string {
   const opts = new URLSearchParams()
   if (p.ssl) opts.set('tls', 'true')
   if (p.authSource) opts.set('authSource', p.authSource)
-  if (p.replicaSet) opts.set('replicaSet', p.replicaSet)
+  // Through an SSH tunnel only the forwarded server is reachable. A replica-set member would
+  // otherwise hand the driver its other members' addresses, none of which answer from here,
+  // and server selection would time out: talk to this one server and nothing else.
+  if (p.tunneled) opts.set('directConnection', 'true')
+  else if (p.replicaSet) opts.set('replicaSet', p.replicaSet)
   const qs = opts.toString()
   // The connection-string grammar requires the `/` before `?options` even without a db.
   const path = p.database ? `/${encodeURIComponent(p.database)}` : qs ? '/' : ''

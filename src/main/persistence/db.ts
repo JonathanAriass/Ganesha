@@ -123,6 +123,8 @@ export function migrate(db: DB): void {
   addColumnIfMissing(db, 'connection_groups', 'parent_id', 'TEXT REFERENCES connection_groups(id) ON DELETE SET NULL')
   // Optional display-only environment label (e.g. PROD).
   addColumnIfMissing(db, 'connections', 'environment', "TEXT NOT NULL DEFAULT ''")
+  // Which tool a connection was imported from (ganesha / compass / dbeaver); NULL = created here.
+  addColumnIfMissing(db, 'connections', 'imported_from', 'TEXT')
   migrateSecretsCompositeKey(db)
 }
 

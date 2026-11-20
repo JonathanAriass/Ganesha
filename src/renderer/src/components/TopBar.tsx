@@ -1,15 +1,10 @@
 import { useAppStore } from '../state/store'
 import { useSsmTunnels } from '../lib/hooks'
-import { mod } from '../lib/platform'
-import { Icon } from './icons'
-import logo from '../assets/logo.png'
 
+/** There is no header any more (search is ⌘K, the panels open from the right edge): what is
+ *  left at the top is the warning for a linked tunnel that is not running. */
 export default function TopBar(): JSX.Element {
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
-  const openSettings = useAppStore((s) => s.openSettings)
-  const setPaletteOpen = useAppStore((s) => s.setPaletteOpen)
-  const toggleAssistant = useAppStore((s) => s.toggleAssistant)
-  const assistantOpen = useAppStore((s) => s.dock === 'assistant')
   const toggleSsm = useAppStore((s) => s.toggleSsm)
   const ssmOpen = useAppStore((s) => s.dock === 'tunnels')
   const runningSsm = useAppStore((s) => s.runningSsm)
@@ -23,47 +18,6 @@ export default function TopBar(): JSX.Element {
 
   return (
     <>
-    <header className="topbar">
-      <img className="brand-logo" src={logo} alt="Ganesha" title="Ganesha" />
-
-      <div className="topbar-center">
-        <button
-          className="topbar-search"
-          onClick={() => setPaletteOpen(true)}
-          aria-label="Search connections, tables, queries"
-        >
-          <Icon name="search" />
-          <span className="topbar-search-label">Search connections, tables, queries</span>
-          <span className="topbar-search-hint" aria-hidden="true">{mod}K</span>
-        </button>
-      </div>
-
-      <button
-        className={`icon-btn${assistantOpen ? ' active' : ''}`}
-        onClick={toggleAssistant}
-        aria-label="Toggle assistant"
-        aria-pressed={assistantOpen}
-        data-tooltip="Assistant"
-        data-tip="right"
-      >
-        <Icon name="chat" />
-      </button>
-
-      <button
-        className={`icon-btn${ssmOpen ? ' active' : ''}`}
-        onClick={toggleSsm}
-        aria-label="Toggle SSM tunnels"
-        aria-pressed={ssmOpen}
-        data-tooltip="SSM tunnels"
-        data-tip="right"
-      >
-        <Icon name="plug" />
-      </button>
-
-      <button className="icon-btn" onClick={openSettings} aria-label="Settings" data-tooltip={`Settings (${mod},)`} data-tip="right">
-        <Icon name="gear" />
-      </button>
-    </header>
 
     {downLinked.map((t) => (
       <div className="ssm-banner" key={t.id} role="status">

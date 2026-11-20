@@ -9,6 +9,14 @@ const params: ConnectParams = {
 }
 
 describe('buildMongoUri', () => {
+  it('talks only to the forwarded server when the connection goes through a tunnel', () => {
+    const viaTunnel = { ...params, host: '127.0.0.1', port: 50000, tunneled: true }
+    expect(buildMongoUri(viaTunnel)).toBe('mongodb://127.0.0.1:50000/?directConnection=true')
+    // A replica-set name would make the driver look for the other members, unreachable from here.
+    expect(buildMongoUri({ ...viaTunnel, replicaSet: 'rs0', authSource: 'admin' })).toBe('mongodb://127.0.0.1:50000/?authSource=admin&directConnection=true')
+    expect(buildMongoUri({ ...params, replicaSet: 'rs0' })).toBe('mongodb://localhost:27017/?replicaSet=rs0')
+  })
+
   it('builds a bare uri and a db path', () => {
     expect(buildMongoUri(params)).toBe('mongodb://localhost:27017')
     expect(buildMongoUri({ ...params, database: 'app' })).toBe('mongodb://localhost:27017/app')

@@ -27,6 +27,9 @@ export function useGlobalShortcuts(): void {
         } else if (s.settingsOpen) {
           e.preventDefault()
           s.closeSettings()
+        } else if (s.connectionModal) {
+          e.preventDefault()
+          s.closeModal()
         } else if (s.dashboardOpen) {
           e.preventDefault()
           s.setDashboardOpen(false)

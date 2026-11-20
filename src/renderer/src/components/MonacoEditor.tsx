@@ -1,4 +1,5 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import ScrollArrows, { type ScrollSource } from './ScrollArrows'
 import { monaco } from '../lib/monaco'
 import { DENSITY_METRICS } from '../lib/density'
 import { useDensity } from '../lib/hooks'
@@ -80,6 +81,7 @@ const MonacoEditor = forwardRef<MonacoEditorHandle, Props>(function MonacoEditor
     editorRef.current?.updateOptions({ fontSize: DENSITY_METRICS[density].editorFontSize })
   }, [density])
 
+  const [scrollSource, setScrollSource] = useState<ScrollSource | null>(null)
   useEffect(() => {
     const host = hostRef.current
     if (!host) return
@@ -93,6 +95,12 @@ const MonacoEditor = forwardRef<MonacoEditorHandle, Props>(function MonacoEditor
       // Installs a per-editor resize watcher — deliberate while editor instances are few; revisit if tab counts grow.
       automaticLayout: true,
       scrollBeyondLastLine: false,
+      // No scrollbars: like the rest of the app, arrows show where there is more (ScrollArrows
+      // below), and no overview-ruler rule runs down the side.
+      scrollbar: { vertical: 'hidden', horizontal: 'hidden', useShadows: false },
+      overviewRulerLanes: 0,
+      overviewRulerBorder: false,
+      hideCursorInOverviewRuler: true,
       padding: { top: 8 },
       tabSize: 2,
       // Auto-show suggestions while typing. Monaco's default already enables this, but we set
@@ -110,11 +118,37 @@ const MonacoEditor = forwardRef<MonacoEditorHandle, Props>(function MonacoEditor
     const model = editor.getModel()
     // Thunk, not value: completion props (objects load async) change across renders.
     if (model) setCompletionCtx(model.id, () => completionsRef.current ?? null)
-    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => onRunRef.current())
-    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.Enter, () =>
-      onRunAllRef.current?.()
-    )
+    // addAction, not addCommand: a command's keybinding is shared by every editor on the page,
+    // so in a split view ⌘↵ in one pane ran the other pane's query. An action is bound to this
+    // editor only.
+    editor.addAction({
+      id: 'ganesha.run', label: 'Run query',
+      keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
+      run: () => onRunRef.current()
+    })
+    editor.addAction({
+      id: 'ganesha.runAll', label: 'Run all statements',
+      keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.Enter],
+      run: () => onRunAllRef.current?.()
+    })
     const sub = editor.onDidChangeModelContent(() => onChangeRef.current(editor.getValue()))
+    // The editor scrolls on its own (not natively), so it reports its scroll state itself.
+    setScrollSource({
+      read: () => {
+        const l = editor.getLayoutInfo()
+        return {
+          x: { pos: editor.getScrollLeft(), size: editor.getScrollWidth(), client: l.width },
+          y: { pos: editor.getScrollTop(), size: editor.getScrollHeight(), client: l.height }
+        }
+      },
+      scrollBy: (dx, dy) => {
+        editor.setScrollPosition({ scrollLeft: editor.getScrollLeft() + dx, scrollTop: editor.getScrollTop() + dy })
+      },
+      subscribe: (cb) => {
+        const subs = [editor.onDidScrollChange(cb), editor.onDidContentSizeChange(cb), editor.onDidLayoutChange(cb)]
+        return () => subs.forEach((s) => s.dispose())
+      }
+    })
     editor.focus()
     return () => {
       sub.dispose()
@@ -125,7 +159,12 @@ const MonacoEditor = forwardRef<MonacoEditorHandle, Props>(function MonacoEditor
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-once by design (remount via key)
   }, [])
 
-  return <div className="editor-host" ref={hostRef} />
+  return (
+    <>
+      <div className="editor-host" ref={hostRef} />
+      <ScrollArrows source={scrollSource} axis="both" />
+    </>
+  )
 })
 
 export default MonacoEditor

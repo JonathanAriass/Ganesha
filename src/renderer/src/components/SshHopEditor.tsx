@@ -44,26 +44,28 @@ export default function SshHopEditor({ ssh, secrets, isEdit, onChange, onSecretC
             <button type="button" className="btn ghost xs" onClick={() => move(i, 1)} disabled={i === ssh.hops.length - 1} aria-label="Move hop down">↓</button>
             <button type="button" className="btn ghost xs" onClick={() => removeHop(i)} aria-label="Remove hop">✕</button>
           </div>
-          <div className="form-row-2">
+          <div className="conn-row-host">
             <div className="form-row">
               <label>Host</label>
               <input type="text" value={h.host} onChange={(e) => patchHop(i, { host: e.target.value })} placeholder="35.180.247.138" />
             </div>
-            <div className="form-row" style={{ maxWidth: 96 }}>
+            <div className="form-row">
               <label>Port</label>
               <input type="number" value={h.port} min={1} max={65535} onChange={(e) => patchHop(i, { port: Number(e.target.value) })} />
             </div>
           </div>
-          <div className="form-row">
-            <label>Username</label>
-            <input type="text" value={h.username} onChange={(e) => patchHop(i, { username: e.target.value })} placeholder="ec2-user" />
-          </div>
-          <div className="form-row">
-            <label>Auth</label>
-            <select value={h.auth} onChange={(e) => patchHop(i, { auth: e.target.value as SshHop['auth'] })}>
-              <option value="key">Private key</option>
-              <option value="password">Password</option>
-            </select>
+          <div className="form-row-2">
+            <div className="form-row">
+              <label>Username</label>
+              <input type="text" value={h.username} onChange={(e) => patchHop(i, { username: e.target.value })} placeholder="ec2-user" />
+            </div>
+            <div className="form-row">
+              <label>Sign in with</label>
+              <select value={h.auth} onChange={(e) => patchHop(i, { auth: e.target.value as SshHop['auth'] })}>
+                <option value="key">Private key</option>
+                <option value="password">Password</option>
+              </select>
+            </div>
           </div>
           {h.auth === 'key' ? (
             <>

@@ -18,7 +18,9 @@ export interface DbClientApi {
     setGroup(connectionId: string, groupId: string | null): Promise<IpcResult<'connections.setGroup'>>
     export(connectionIds: string[] | null, passphrase: string | null): Promise<IpcResult<'connections.export'>>
     importPick(): Promise<IpcResult<'connections.importPick'>>
-    import(passphrase: string | null): Promise<IpcResult<'connections.import'>>
+    importSources(): Promise<IpcResult<'connections.importSources'>>
+    importDetected(id: string): Promise<IpcResult<'connections.importDetected'>>
+    import(passphrase: string | null, includeSecrets: boolean): Promise<IpcResult<'connections.import'>>
   }
   groups: {
     list(): Promise<IpcResult<'groups.list'>>

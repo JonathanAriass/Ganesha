@@ -1,3 +1,4 @@
+import type { ImportSource } from './transfer'
 export type ConnectionType = 'postgres' | 'mysql' | 'mariadb' | 'mongodb'
 
 /** One SSH hop in a tunnel chain. hops[0] is the first server reached from this
@@ -50,6 +51,8 @@ export interface ConnectionConfig extends ConnectionInput {
   id: string
   /** Group this connection belongs to; null = ungrouped. Set via connections.setGroup, not the edit modal. */
   groupId: string | null
+  /** The tool this connection was imported from; null = created here. Set once, on import. */
+  importedFrom: ImportSource | null
   createdAt: number
   updatedAt: number
 }
@@ -90,8 +93,11 @@ export interface SsmTunnel extends SsmTunnelInput {
 /** An SSM-managed EC2 instance, for the tunnel form's instance picker. */
 export interface AwsInstance {
   instanceId: string
+  /** The EC2 `Name` tag when it could be read, else the host name, else the id. */
   name: string
   ping: string
+  /** The machine's host name, only when it differs from `name` (searchable too). */
+  host?: string
 }
 
 export interface HistoryEntryInput {

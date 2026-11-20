@@ -13,6 +13,7 @@ export function buildConnectParams(
     host: override?.host ?? config.host,
     port: override?.port ?? config.port,
     username: config.username, password, database: config.database, ssl: config.ssl,
-    authSource: config.authSource, replicaSet: config.replicaSet
+    authSource: config.authSource, replicaSet: config.replicaSet,
+    tunneled: override !== undefined
   }
 }

@@ -3,6 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import type { TelescopeEntry } from '@shared/telescope'
 import { entryIcon, entryMethod, entryPrimary, entrySecondary, entryBadge } from '../lib/telescope-present'
 import { Badge } from './telescope-ui'
+import ScrollArrows from './ScrollArrows'
 
 const ROW_H = 64
 
@@ -37,6 +38,7 @@ export default function TelescopeEntryList(props: Props): JSX.Element {
   if (entries.length === 0) return <div className="tele-list-state">{emptyLabel}</div>
 
   return (
+    <>
     <div className="tele-list" ref={parentRef}>
       <div style={{ height: virt.getTotalSize(), position: 'relative', width: '100%' }}>
         {items.map((vi) => {
@@ -49,6 +51,8 @@ export default function TelescopeEntryList(props: Props): JSX.Element {
         })}
       </div>
     </div>
+    <ScrollArrows target=".tele-list" />
+    </>
   )
 }
 

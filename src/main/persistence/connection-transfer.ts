@@ -3,8 +3,8 @@ import type { DB } from './db'
 import type { makeSecretStore } from './secrets'
 import type { ConnectionInput, ConnectionType, SshConfig, SshHop } from '../../shared/domain'
 import { cleanEnvironment } from '../../shared/environment'
-import { MIN_PASSPHRASE_LENGTH, type ImportResult } from '../../shared/transfer'
-import { listConnections, createConnection, setConnectionGroup } from './connections'
+import { MIN_PASSPHRASE_LENGTH, type ImportResult, type ImportSkip, type ImportSource } from '../../shared/transfer'
+import { listConnections, createConnection, setConnectionGroup, setConnectionImportedFrom } from './connections'
 import { listGroups, createGroup } from './groups'
 
 type SecretStore = ReturnType<typeof makeSecretStore>
@@ -16,14 +16,14 @@ const KDF = 'scrypt-n32768-r8-p1'
 const SCRYPT = { N: 32768, r: 8, p: 1, maxmem: 64 * 1024 * 1024 }
 const TYPES: ConnectionType[] = ['postgres', 'mysql', 'mariadb', 'mongodb']
 
-interface ExportedGroup { id: string; name: string; parentId: string | null }
-interface ExportedConnection extends ConnectionInput { id: string; groupId: string | null }
+export interface ExportedGroup { id: string; name: string; parentId: string | null }
+export interface ExportedConnection extends ConnectionInput { id: string; groupId: string | null }
 
 /** Passphrase-encrypted secrets block (AES-256-GCM, key from scrypt). All fields base64. */
 interface EncryptedSecrets { kdf: string; salt: string; iv: string; tag: string; data: string }
 
 /** Plaintext shape inside the encrypted block, keyed by the file's connection ids. */
-type SecretsPayload = Record<string, { db?: string; ssh?: Record<string, string> }>
+export type SecretsPayload = Record<string, { db?: string; ssh?: Record<string, string> }>
 
 export interface TransferFile {
   format: typeof FORMAT
@@ -33,6 +33,35 @@ export interface TransferFile {
   connections: ExportedConnection[]
   /** null = the file carries no passwords or SSH secrets. */
   secrets: EncryptedSecrets | null
+}
+
+/** What an import adds, whichever tool wrote the file (see import-sources.ts). Ids are the
+ *  file's own; they only tie connections to groups and secrets within the plan. */
+export interface ImportPlan {
+  source: ImportSource
+  groups: ExportedGroup[]
+  connections: ExportedConnection[]
+  secrets:
+    | { kind: 'none' }
+    /** Readable without a passphrase (they were in the clear, or behind a well-known key). */
+    | { kind: 'plain'; payload: SecretsPayload }
+    /** Needs the passphrase the file was exported with; throws 'Wrong passphrase'. */
+    | { kind: 'encrypted'; decrypt: (passphrase: string) => SecretsPayload }
+    /** Encrypted with a key another app keeps in the macOS keychain (item `service` /
+     *  `account`). The caller asks the keychain for it, which makes macOS ask the user. */
+    | { kind: 'keychain'; service: string; account: string; decrypt: (keychainPassword: string) => SecretsPayload }
+  /** Entries left out, with the reason. */
+  skipped: ImportSkip[]
+  /** Things the user should know before importing (e.g. credentials that could not be read). */
+  notes: string[]
+}
+
+export function planFromTransferFile(file: TransferFile): ImportPlan {
+  const block = file.secrets
+  return {
+    source: 'ganesha', groups: file.groups, connections: file.connections, skipped: [], notes: [],
+    secrets: block ? { kind: 'encrypted', decrypt: (passphrase) => decryptSecrets(block, passphrase) } : { kind: 'none' }
+  }
 }
 
 function deriveKey(passphrase: string, salt: Buffer): Buffer {
@@ -181,19 +210,25 @@ const connKey = (c: ConnectionInput): string =>
   [c.type, c.name, c.host, c.port, c.username, c.database].join('\u0000').toLowerCase()
 
 /**
- * Add a parsed file's connections to this installation. Nothing existing is modified:
+ * Add a plan's connections to this installation. Nothing existing is modified:
  * connections that already exist here (same type/name/host/port/user/database) are skipped,
  * and groups are matched by name (under the same parent) or created. All-or-nothing.
  *
- * passphrase null = import without secrets even if the file has them.
+ * includeSecrets false = leave the file's passwords behind. Encrypted secrets also need the
+ * passphrase (null = leave them behind).
  * repoPathExists decides whether a linked-repo path is kept (it is machine-specific).
  */
-export function applyImport(
-  db: DB, secrets: SecretStore, file: TransferFile, passphrase: string | null, now: number,
+export function applyPlan(
+  db: DB, secrets: SecretStore, file: ImportPlan,
+  opts: { passphrase: string | null; includeSecrets: boolean; keychainPassword?: string | null }, now: number,
   repoPathExists: (path: string) => boolean = () => false
 ): ImportResult {
   // Decrypt first: a wrong passphrase must fail before anything is written.
-  const payload = file.secrets && passphrase !== null ? decryptSecrets(file.secrets, passphrase) : null
+  const payload = !opts.includeSecrets ? null
+    : file.secrets.kind === 'plain' ? file.secrets.payload
+    : file.secrets.kind === 'encrypted' && opts.passphrase !== null ? file.secrets.decrypt(opts.passphrase)
+    : file.secrets.kind === 'keychain' && typeof opts.keychainPassword === 'string' ? file.secrets.decrypt(opts.keychainPassword)
+    : null
 
   const run = db.transaction((): ImportResult => {
     const existingGroups = new Map(listGroups(db).map((g) => [groupKey(g.name, g.parentId), g.id]))
@@ -229,6 +264,7 @@ export function applyImport(
       existing.add(connKey(input))
       const repoPath = input.repoPath && repoPathExists(input.repoPath) ? input.repoPath : null
       const created = createConnection(db, { ...input, repoPath }, now)
+      setConnectionImportedFrom(db, created.id, file.source)
       const localGroup = groupId ? groupMap.get(groupId) : undefined
       if (localGroup) setConnectionGroup(db, created.id, localGroup, now)
       const entry = payload?.[fileId]
@@ -244,4 +280,12 @@ export function applyImport(
     return { imported, skipped, groupsCreated, withSecrets: payload !== null }
   })
   return run()
+}
+
+/** applyPlan for a Ganesha export: passphrase null = import without secrets even if the file has them. */
+export function applyImport(
+  db: DB, secrets: SecretStore, file: TransferFile, passphrase: string | null, now: number,
+  repoPathExists: (path: string) => boolean = () => false
+): ImportResult {
+  return applyPlan(db, secrets, planFromTransferFile(file), { passphrase, includeSecrets: passphrase !== null }, now, repoPathExists)
 }

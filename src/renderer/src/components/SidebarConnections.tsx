@@ -7,6 +7,7 @@ import { loadCollapsedGroups, saveCollapsedGroups } from '../lib/shell-prefs'
 import { startImport } from '../lib/transfer-actions'
 import EnvTag from './EnvTag'
 import { Icon } from './icons'
+import ScrollArrows from './ScrollArrows'
 
 /** A popup menu at a fixed point, closed by any click or right-click outside it or by Escape
  *  (as TabContextMenu); focus moves to its first item when it opens. */
@@ -114,6 +115,7 @@ export default function SidebarConnections({ home, collapse }: { home: ReactNode
 
   return (
     <section className="sidebar-zone sidebar-connections" aria-label="Connections">
+      <ScrollArrows target=".sidebar-list" />
       <div className="sidebar-head">
         <span className="sidebar-label">Connections</span>
         <span className="spacer" />

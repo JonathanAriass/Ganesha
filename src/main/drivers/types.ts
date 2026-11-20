@@ -29,6 +29,8 @@ export interface ConnectParams {
   authSource?: string
   /** Mongo only: replica set name ('' / absent = direct connection). */
   replicaSet?: string
+  /** True when host/port are the local end of an SSH tunnel rather than the server itself. */
+  tunneled?: boolean
 }
 
 export interface RunOptions {

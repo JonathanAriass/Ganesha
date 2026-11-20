@@ -32,7 +32,7 @@ export default function EnvBar({ paneId }: { paneId: PaneId }): JSX.Element | nu
   return (
     <div
       className="env-bar"
-      style={{ background: `color-mix(in srgb, ${conn.color} 9%, transparent)` }}
+      style={{ background: `color-mix(in srgb, ${conn.color} 12%, var(--bg))` }}
     >
       <div className="env-bar-id">
         <span className="conn-dot" style={{ background: conn.color }} aria-hidden="true" />

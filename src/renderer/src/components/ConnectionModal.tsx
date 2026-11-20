@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, type FormEvent, type KeyboardEvent } from 'react'
 import type { ConnectionInput, ConnectionType, SshConfig } from '@shared/domain'
 import { useAppStore } from '../state/store'
 import {
@@ -11,15 +11,10 @@ import SshHopEditor from './SshHopEditor'
 import { emptyHop, validateSshConfig } from '../lib/ssh-config'
 import { unwrap } from '../lib/result'
 import { ENVIRONMENT_MAX_LENGTH, ENVIRONMENT_SUGGESTIONS } from '@shared/environment'
+import { ENGINES, portAfterEngineChange, connectionFormProblem } from '../lib/connection-form'
+import { Icon } from './icons'
 
 // ── Constants ────────────────────────────────────────────────────────────────
-
-const DEFAULT_PORTS: Record<ConnectionType, number> = {
-  postgres: 5432,
-  mysql: 3306,
-  mariadb: 3306,
-  mongodb: 27017,
-}
 
 const COLOR_SWATCHES = [
   '#6366f1', // indigo
@@ -50,6 +45,14 @@ const DEFAULT_INPUT: ConnectionInput = {
 
 // ── Test status ──────────────────────────────────────────────────────────────
 
+/** The form is split in three: what every connection needs, the SSH tunnel, and the rest. */
+type ConnTab = 'general' | 'ssh' | 'options'
+const TABS: { id: ConnTab; label: string }[] = [
+  { id: 'general', label: 'Connection' },
+  { id: 'ssh', label: 'SSH tunnel' },
+  { id: 'options', label: 'Options' },
+]
+
 type TestStatus =
   | { kind: 'idle' }
   | { kind: 'pending' }
@@ -75,6 +78,8 @@ export default function ConnectionModal(): JSX.Element {
   const [sshSecrets, setSshSecrets] = useState<Record<string, string>>({})
   const [testStatus, setTestStatus] = useState<TestStatus>({ kind: 'idle' })
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [showPassword, setShowPassword] = useState(false)
+  const [tab, setTab] = useState<ConnTab>('general')
 
   // Initialize form from existing connection on edit
   useEffect(() => {
@@ -102,6 +107,8 @@ export default function ConnectionModal(): JSX.Element {
       setPassword('')
     }
     setSshSecrets({}) // typed-this-session only; never preload stored secrets
+    setShowPassword(false)
+    setTab('general')
     setTestStatus({ kind: 'idle' })
     setSaveError(null)
   }, [isEdit, existingConn])
@@ -110,21 +117,21 @@ export default function ConnectionModal(): JSX.Element {
   const actions = useConnectionActions()
   const test = useTestConnection()
 
+  // Any edit makes the last test result stale: a "Connection OK" must describe what is on
+  // screen. (A test still running keeps its spinner; its answer is for the values it was sent.)
+  function touched(): void {
+    setSaveError(null)
+    setTestStatus((t) => (t.kind === 'pending' ? t : { kind: 'idle' }))
+  }
+
   function setField<K extends keyof ConnectionInput>(key: K, value: ConnectionInput[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
-    setSaveError(null)
+    touched()
   }
 
   function handleTypeChange(newType: ConnectionType) {
-    const prevDefault = DEFAULT_PORTS[form.type]
-    const nextDefault = DEFAULT_PORTS[newType]
-    setForm((prev) => ({
-      ...prev,
-      type: newType,
-      // Switch port only if it's still on the previous type's default
-      port: prev.port === prevDefault ? nextDefault : prev.port,
-    }))
-    setSaveError(null)
+    setForm((prev) => ({ ...prev, type: newType, port: portAfterEngineChange(prev.type, newType, prev.port) }))
+    touched()
   }
 
   function setSshEnabled(enabled: boolean) {
@@ -141,7 +148,7 @@ export default function ConnectionModal(): JSX.Element {
 
   function handleTest() {
     const sshErr = validateSshConfig(form.ssh)
-    if (sshErr) { setTestStatus({ kind: 'err', message: sshErr }); return }
+    if (sshErr) { setTab('ssh'); setTestStatus({ kind: 'err', message: sshErr }); return }
     setTestStatus({ kind: 'pending' })
     // Blank password on edit means "keep current" — send the id so main can
     // test with the stored secret (it never comes back to the renderer).
@@ -162,7 +169,7 @@ export default function ConnectionModal(): JSX.Element {
   const handleSave = useCallback(() => {
     setSaveError(null)
     const sshErr = validateSshConfig(form.ssh)
-    if (sshErr) { setSaveError(sshErr); return }
+    if (sshErr) { setTab('ssh'); setSaveError(sshErr); return }
     // password semantics:
     //   create → pass password || null
     //   edit   → blank string becomes undefined (keep), non-blank becomes value
@@ -199,10 +206,28 @@ export default function ConnectionModal(): JSX.Element {
     actions.duplicate(editId, { onError: setSaveError })
   }
 
-  const canSave =
-    form.name.trim().length > 0 &&
-    form.host.trim().length > 0 &&
-    form.port > 0
+  const problem = connectionFormProblem(form)
+  const canSave = problem === null
+  const isMongo = form.type === 'mongodb'
+  const testing = testStatus.kind === 'pending'
+  // What a tab holds while it is not the one showing, so nothing set there goes unseen.
+  const optionsOn = [form.ssl && 'SSL', form.readOnly && 'Read-only', form.repoPath && 'Repo'].filter(Boolean).join(' · ')
+  const tabNote: Record<ConnTab, string> = { general: '', ssh: form.ssh?.enabled ? 'On' : '', options: optionsOn }
+
+  function onTabKeyDown(e: KeyboardEvent<HTMLDivElement>): void {
+    const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0
+    if (step === 0) return
+    e.preventDefault()
+    const next = TABS[(TABS.findIndex((t) => t.id === tab) + step + TABS.length) % TABS.length].id
+    setTab(next)
+    document.getElementById(`conn-tab-${next}`)?.focus()
+  }
+
+  // Enter in any field saves, like the button.
+  function onSubmit(e: FormEvent): void {
+    e.preventDefault()
+    if (canSave && !save.isPending) handleSave()
+  }
 
   return (
     <div
@@ -214,14 +239,53 @@ export default function ConnectionModal(): JSX.Element {
       // to the overlay (common ancestor) and would dismiss the half-filled form.
       onMouseDown={(e) => { if (e.target === e.currentTarget) closeModal() }}
     >
-      <div className="modal">
+      <form className="modal conn-modal" onSubmit={onSubmit} noValidate>
         <div className="modal-header">
-          <h2>{isEdit ? 'Edit Connection' : 'New Connection'}</h2>
+          <span className="conn-dot" style={{ background: form.color }} aria-hidden="true" />
+          <h2>{isEdit ? 'Edit connection' : 'New connection'}</h2>
+          <button type="button" className="btn ghost xs modal-close" onClick={closeModal} aria-label="Close">
+            <Icon name="close" size={14} />
+          </button>
+        </div>
+
+        <div className="conn-tabs" role="tablist" aria-label="Connection settings" onKeyDown={onTabKeyDown}>
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              id={`conn-tab-${t.id}`}
+              aria-selected={tab === t.id}
+              aria-controls={`conn-panel-${t.id}`}
+              tabIndex={tab === t.id ? 0 : -1}
+              className={`conn-tab${tab === t.id ? ' active' : ''}`}
+              onClick={() => setTab(t.id)}
+            >
+              {t.label}
+              {tabNote[t.id] && <span className="conn-tab-note">{tabNote[t.id]}</span>}
+            </button>
+          ))}
         </div>
 
         <div className="modal-body">
-          <div className="form-grid">
-            {/* Name */}
+         <div className="conn-tabpanel" role="tabpanel" id="conn-panel-general" aria-labelledby="conn-tab-general" hidden={tab !== 'general'}>
+          {/* Engine first: it decides the default port and which fields exist. */}
+          <div className="conn-seg" role="radiogroup" aria-label="Database engine">
+            {ENGINES.map((e) => (
+              <button
+                key={e.type}
+                type="button"
+                role="radio"
+                aria-checked={form.type === e.type}
+                className={`conn-seg-opt${form.type === e.type ? ' active' : ''}`}
+                onClick={() => handleTypeChange(e.type)}
+              >
+                {e.label}
+              </button>
+            ))}
+          </div>
+
+          <section className="conn-section" aria-label="Identity">
             <div className="form-row">
               <label htmlFor="conn-name">Name</label>
               <input
@@ -229,28 +293,53 @@ export default function ConnectionModal(): JSX.Element {
                 type="text"
                 value={form.name}
                 onChange={(e) => setField('name', e.target.value)}
-                placeholder="My Database"
+                placeholder="How you want to see it in the sidebar"
                 autoFocus
               />
             </div>
-
-            {/* Type */}
-            <div className="form-row">
-              <label htmlFor="conn-type">Type</label>
-              <select
-                id="conn-type"
-                value={form.type}
-                onChange={(e) => handleTypeChange(e.target.value as ConnectionType)}
-              >
-                <option value="postgres">PostgreSQL</option>
-                <option value="mysql">MySQL</option>
-                <option value="mariadb">MariaDB</option>
-                <option value="mongodb">MongoDB</option>
-              </select>
+            <div className="conn-row-split">
+              <div className="form-row">
+                <label>Color</label>
+                <div className="color-swatches" role="radiogroup" aria-label="Connection color">
+                  {COLOR_SWATCHES.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      role="radio"
+                      aria-checked={form.color === c}
+                      className={`swatch${form.color === c ? ' selected' : ''}`}
+                      style={{ background: c }}
+                      onClick={() => setField('color', c)}
+                      aria-label={c}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div className="form-row">
+                <label htmlFor="conn-environment">
+                  Environment <span className="hint">optional tag, e.g. PROD</span>
+                </label>
+                <input
+                  id="conn-environment"
+                  type="text"
+                  list="conn-environment-options"
+                  maxLength={ENVIRONMENT_MAX_LENGTH}
+                  value={form.environment}
+                  onChange={(e) => setField('environment', e.target.value)}
+                  placeholder="PROD"
+                />
+                <datalist id="conn-environment-options">
+                  {ENVIRONMENT_SUGGESTIONS.map((s) => (
+                    <option key={s} value={s} />
+                  ))}
+                </datalist>
+              </div>
             </div>
+          </section>
 
-            {/* Host + Port */}
-            <div className="form-row-2">
+          <section className="conn-section" aria-labelledby="conn-sec-server">
+            <h3 id="conn-sec-server" className="conn-section-title">Server</h3>
+            <div className="conn-row-host">
               <div className="form-row">
                 <label htmlFor="conn-host">Host</label>
                 <input
@@ -266,39 +355,25 @@ export default function ConnectionModal(): JSX.Element {
                 <input
                   id="conn-port"
                   type="number"
-                  value={form.port}
+                  value={Number.isFinite(form.port) && form.port !== 0 ? form.port : ''}
                   min={1}
                   max={65535}
                   onChange={(e) => setField('port', Number(e.target.value))}
                 />
               </div>
             </div>
-
-            {/* Username + Database */}
-            <div className="form-row-2">
-              <div className="form-row">
-                <label htmlFor="conn-user">Username</label>
-                <input
-                  id="conn-user"
-                  type="text"
-                  value={form.username}
-                  onChange={(e) => setField('username', e.target.value)}
-                />
-              </div>
-              <div className="form-row">
-                <label htmlFor="conn-db">Database</label>
-                <input
-                  id="conn-db"
-                  type="text"
-                  value={form.database}
-                  onChange={(e) => setField('database', e.target.value)}
-                  placeholder={form.type === 'mongodb' ? 'blank = browse all databases' : ''}
-                />
-              </div>
+            <div className="form-row">
+              <label htmlFor="conn-db">
+                Database {isMongo && <span className="hint">blank = browse all databases</span>}
+              </label>
+              <input
+                id="conn-db"
+                type="text"
+                value={form.database}
+                onChange={(e) => setField('database', e.target.value)}
+              />
             </div>
-
-            {/* Mongo-only: auth source + replica set */}
-            {form.type === 'mongodb' && (
+            {isMongo && (
               <div className="form-row-2">
                 <div className="form-row">
                   <label htmlFor="conn-authsource">Auth source</label>
@@ -322,118 +397,87 @@ export default function ConnectionModal(): JSX.Element {
                 </div>
               </div>
             )}
-
-            {/* Password */}
-            <div className="form-row">
-              <label htmlFor="conn-password">Password</label>
-              <input
-                id="conn-password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder={isEdit ? 'leave blank to keep current' : ''}
-              />
-            </div>
-
-            {/* Color */}
-            <div className="form-row">
-              <label>Color</label>
-              <div className="color-swatches" role="radiogroup" aria-label="Connection color">
-                {COLOR_SWATCHES.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    role="radio"
-                    aria-checked={form.color === c}
-                    className={`swatch${form.color === c ? ' selected' : ''}`}
-                    style={{ background: c }}
-                    onClick={() => setField('color', c)}
-                    aria-label={c}
+            <div className="form-row-2">
+              <div className="form-row">
+                <label htmlFor="conn-user">Username</label>
+                <input
+                  id="conn-user"
+                  type="text"
+                  autoComplete="off"
+                  value={form.username}
+                  onChange={(e) => setField('username', e.target.value)}
+                />
+              </div>
+              <div className="form-row">
+                <label htmlFor="conn-password">Password</label>
+                <div className="conn-secret">
+                  <input
+                    id="conn-password"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="off"
+                    value={password}
+                    onChange={(e) => { setPassword(e.target.value); touched() }}
+                    placeholder={isEdit ? 'Unchanged' : ''}
                   />
-                ))}
+                  <button
+                    type="button"
+                    className="conn-secret-toggle"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-pressed={showPassword}
+                    disabled={password === ''}
+                  >
+                    {showPassword ? 'Hide' : 'Show'}
+                  </button>
+                </div>
               </div>
             </div>
+            {isEdit && <p className="form-hint">Leave the password empty to keep the one already saved.</p>}
+          </section>
 
-            {/* Environment */}
-            <div className="form-row">
-              <label htmlFor="conn-environment">
-                Environment{' '}
-                <span className="hint">Shown next to the connection&apos;s name. Optional.</span>
-              </label>
+         </div>
+
+         <div className="conn-tabpanel" role="tabpanel" id="conn-panel-options" aria-labelledby="conn-tab-options" hidden={tab !== 'options'}>
+          <section className="conn-section" aria-labelledby="conn-sec-safety">
+            <h3 id="conn-sec-safety" className="conn-section-title">Security and safety</h3>
+            <label className="conn-toggle">
+              <input type="checkbox" checked={form.ssl} onChange={(e) => setField('ssl', e.target.checked)} />
+              <span>
+                <span className="conn-toggle-name">SSL/TLS</span>
+                <span className="conn-toggle-hint">Encrypt the connection to the server.</span>
+              </span>
+            </label>
+            <label className="conn-toggle">
+              <input type="checkbox" checked={form.readOnly} onChange={(e) => setField('readOnly', e.target.checked)} />
+              <span>
+                <span className="conn-toggle-name">Read-only</span>
+                <span className="conn-toggle-hint">Block anything that writes: no edits, no data-changing statements.</span>
+              </span>
+            </label>
+            <label className={`conn-toggle${form.readOnly ? ' disabled' : ''}`}>
               <input
-                id="conn-environment"
-                type="text"
-                list="conn-environment-options"
-                maxLength={ENVIRONMENT_MAX_LENGTH}
-                value={form.environment}
-                onChange={(e) => setField('environment', e.target.value)}
-                placeholder="PROD"
+                type="checkbox"
+                checked={form.requireCommit}
+                disabled={form.readOnly}
+                onChange={(e) => setField('requireCommit', e.target.checked)}
               />
-              <datalist id="conn-environment-options">
-                {ENVIRONMENT_SUGGESTIONS.map((s) => (
-                  <option key={s} value={s} />
-                ))}
-              </datalist>
-            </div>
+              <span>
+                <span className="conn-toggle-name">Stage cell edits until I commit</span>
+                <span className="conn-toggle-hint">
+                  {form.readOnly
+                    ? 'Not applicable: a read-only connection has no edits.'
+                    : 'Edits in the results grid wait for an explicit Commit instead of writing at once.'}
+                </span>
+              </span>
+            </label>
+          </section>
 
-            {/* SSL + Read-only */}
+          {/* Linked repo — gives the assistant code context (ORM models, migrations) */}
+          <section className="conn-section" aria-labelledby="conn-sec-repo">
+            <h3 id="conn-sec-repo" className="conn-section-title">Assistant</h3>
             <div className="form-row">
-              <label className="checkbox-row">
-                <input
-                  type="checkbox"
-                  checked={form.ssl}
-                  onChange={(e) => setField('ssl', e.target.checked)}
-                />
-                SSL/TLS
+              <label htmlFor="conn-repo">
+                Linked repo <span className="hint">the assistant reads it for query context</span>
               </label>
-            </div>
-            <div className="form-row">
-              <label className="checkbox-row">
-                <input
-                  type="checkbox"
-                  checked={form.readOnly}
-                  onChange={(e) => setField('readOnly', e.target.checked)}
-                />
-                Read-only mode
-              </label>
-            </div>
-            <div className="form-row">
-              <label className="checkbox-row">
-                <input
-                  type="checkbox"
-                  checked={form.requireCommit}
-                  disabled={form.readOnly}
-                  onChange={(e) => setField('requireCommit', e.target.checked)}
-                />
-                Require explicit commit for cell edits
-                <span className="hint"> — prevents fast commit/push; edits stage until you click Commit</span>
-              </label>
-            </div>
-
-            {/* SSH tunnel */}
-            <div className="form-row">
-              <label className="checkbox-row">
-                <input
-                  type="checkbox"
-                  checked={!!form.ssh?.enabled}
-                  onChange={(e) => setSshEnabled(e.target.checked)}
-                />
-                Use SSH tunnel
-              </label>
-            </div>
-            {form.ssh?.enabled && (
-              <SshHopEditor
-                ssh={form.ssh}
-                secrets={sshSecrets}
-                isEdit={isEdit}
-                onChange={(ssh) => setField('ssh', ssh)}
-                onSecretChange={(hopId, value) => setSshSecrets((prev) => ({ ...prev, [hopId]: value }))}
-              />
-            )}
-
-            {/* Linked repo — gives the assistant code context (ORM models, migrations) */}
-            <div className="form-row">
-              <label htmlFor="conn-repo">Linked repo <span className="hint">(optional — the assistant reads it for query context)</span></label>
               <div className="repo-path-row">
                 <input
                   id="conn-repo"
@@ -448,35 +492,53 @@ export default function ConnectionModal(): JSX.Element {
                 )}
               </div>
             </div>
+          </section>
+         </div>
 
-            {/* Test status */}
-            {testStatus.kind === 'ok' && (
-              <div className="status ok" role="status">✓ Connection OK</div>
+         <div className="conn-tabpanel" role="tabpanel" id="conn-panel-ssh" aria-labelledby="conn-tab-ssh" hidden={tab !== 'ssh'}>
+          <section className="conn-section" aria-labelledby="conn-sec-ssh">
+            <label className="conn-toggle">
+              <input type="checkbox" checked={!!form.ssh?.enabled} onChange={(e) => setSshEnabled(e.target.checked)} />
+              <span>
+                <span id="conn-sec-ssh" className="conn-toggle-name">Connect through an SSH tunnel</span>
+                <span className="conn-toggle-hint">For servers only reachable from a bastion or jump host.</span>
+              </span>
+            </label>
+            {form.ssh?.enabled && (
+              <SshHopEditor
+                ssh={form.ssh}
+                secrets={sshSecrets}
+                isEdit={isEdit}
+                onChange={(ssh) => setField('ssh', ssh)}
+                onSecretChange={(hopId, value) => { setSshSecrets((prev) => ({ ...prev, [hopId]: value })); touched() }}
+              />
             )}
-            {testStatus.kind === 'err' && (
-              <div className="status err" role="alert">{testStatus.message}</div>
-            )}
+          </section>
+         </div>
 
-            {/* Save error */}
-            {saveError && (
-              <div className="status err" role="alert">{saveError}</div>
-            )}
-          </div>
+        </div>
+
+        {/* Outcome of Test and Save: always in view, right above the buttons. */}
+        <div className="conn-feedback" aria-live="polite">
+          {testing && <div className="status" role="status">Testing the connection…</div>}
+          {testStatus.kind === 'ok' && <div className="status ok" role="status">✓ Connection OK</div>}
+          {testStatus.kind === 'err' && (
+            <div className="status err" role="alert">
+              <strong>Could not connect.</strong> {testStatus.message}
+            </div>
+          )}
+          {saveError && <div className="status err" role="alert">{saveError}</div>}
         </div>
 
         <div className="modal-footer">
           {isEdit && (
-            <button
-              className="btn danger"
-              onClick={handleDelete}
-              disabled={actions.removing}
-            >
+            <button type="button" className="btn ghost conn-danger" onClick={handleDelete} disabled={actions.removing}>
               {actions.removing ? 'Deleting…' : 'Delete'}
             </button>
           )}
-
           {isEdit && (
             <button
+              type="button"
               className="btn ghost"
               onClick={handleDuplicate}
               disabled={actions.duplicating}
@@ -486,29 +548,26 @@ export default function ConnectionModal(): JSX.Element {
             </button>
           )}
 
+          <span className="spacer" />
+          {problem && <span className="conn-problem">{problem}</span>}
+
           <button
-            className="btn ghost"
+            type="button"
+            className="btn"
             onClick={handleTest}
-            disabled={testStatus.kind === 'pending' || !canSave}
+            disabled={testing || !canSave}
             aria-label="Test connection"
           >
-            {testStatus.kind === 'pending' ? 'Testing…' : 'Test'}
+            {testing ? 'Testing…' : 'Test connection'}
           </button>
-
-          <span className="spacer" />
-
-          <button className="btn ghost" onClick={closeModal}>
+          <button type="button" className="btn ghost" onClick={closeModal}>
             Cancel
           </button>
-          <button
-            className="btn primary"
-            onClick={handleSave}
-            disabled={!canSave || save.isPending}
-          >
-            {save.isPending ? 'Saving…' : 'Save'}
+          <button type="submit" className="btn primary" disabled={!canSave || save.isPending}>
+            {save.isPending ? 'Saving…' : isEdit ? 'Save changes' : 'Create connection'}
           </button>
         </div>
-      </div>
+      </form>
     </div>
   )
 }

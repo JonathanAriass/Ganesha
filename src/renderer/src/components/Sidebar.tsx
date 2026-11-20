@@ -9,6 +9,10 @@ import {
   clampSideWidth, dragSideWidth, loadSideWidth, saveSideWidth,
   SIDE_DEFAULT_WIDTH, SIDE_MIN_WIDTH, SIDE_MAX_WIDTH
 } from '../lib/side-panel'
+import {
+  clampSidebarSplit, dragSidebarSplit, loadSidebarSplit, saveSidebarSplit,
+  SIDEBAR_SPLIT_DEFAULT, SIDEBAR_SPLIT_MIN, SIDEBAR_SPLIT_MAX
+} from '../lib/shell-prefs'
 
 /** The connection sidebar: Connections above the per-connection Explorer, right-edge
  *  drag to resize; collapsed (⌘B) it becomes a narrow column of badges. While the
@@ -50,6 +54,38 @@ export default function Sidebar(): JSX.Element {
     commitWidth(clampSideWidth(widthRef.current + step))
   }
 
+  // The line between the two zones: drag it to change how much of the sidebar the
+  // connection list may take before it scrolls. Same DOM-write-then-commit as the width.
+  const [split, setSplit] = useState(() => loadSidebarSplit())
+  const splitRef = useRef(split)
+  function commitSplit(f: number): void {
+    const next = clampSidebarSplit(f)
+    splitRef.current = next
+    setSplit(next)
+    saveSidebarSplit(next)
+  }
+  function splitAt(clientY: number): number | null {
+    if (!panelRef.current) return null
+    const r = panelRef.current.getBoundingClientRect()
+    return dragSidebarSplit(clientY, r.top, r.height)
+  }
+  function onSplitPointerMove(e: React.PointerEvent<HTMLDivElement>): void {
+    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
+    const f = splitAt(e.clientY)
+    if (f !== null) panelRef.current!.style.setProperty('--sidebar-split', `${f * 100}%`)
+  }
+  function onSplitPointerEnd(e: React.PointerEvent<HTMLDivElement>): void {
+    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
+    const f = splitAt(e.clientY)
+    if (f !== null) commitSplit(f)
+  }
+  function onSplitKeyDown(e: React.KeyboardEvent<HTMLDivElement>): void {
+    const step = e.key === 'ArrowDown' ? 0.04 : e.key === 'ArrowUp' ? -0.04 : null
+    if (step === null) return
+    e.preventDefault()
+    commitSplit(splitRef.current + step)
+  }
+
   if (!open) return <SidebarBadges />
 
   // The sidebar header's Home and Collapse: shown in the Connections zone, or in the
@@ -79,7 +115,10 @@ export default function Sidebar(): JSX.Element {
   )
 
   return (
-    <aside className="sidebar" ref={panelRef} style={{ width }} aria-label="Sidebar">
+    <aside className="sidebar" ref={panelRef} 
+      style={{ width, '--sidebar-split': `${split * 100}%` } as React.CSSProperties}
+      aria-label="Sidebar"
+    >
       {/* Resizer first (position: absolute → visually unchanged) so keyboard users
           reach it without tabbing through the whole tree; matches AssistantPanel. */}
       <div
@@ -100,6 +139,25 @@ export default function Sidebar(): JSX.Element {
         onKeyDown={onResizeKeyDown}
       />
       {!hideConnections && <SidebarConnections home={home} collapse={collapse} />}
+      {!hideConnections && (
+        <div
+          className="sidebar-split"
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="Resize connection list"
+          aria-valuemin={Math.round(SIDEBAR_SPLIT_MIN * 100)}
+          aria-valuemax={Math.round(SIDEBAR_SPLIT_MAX * 100)}
+          aria-valuenow={Math.round(split * 100)}
+          tabIndex={0}
+          title="Drag to resize · double-click to reset · ↑/↓ to adjust"
+          onPointerDown={onResizePointerDown}
+          onPointerMove={onSplitPointerMove}
+          onPointerUp={onSplitPointerEnd}
+          onPointerCancel={onSplitPointerEnd}
+          onDoubleClick={() => commitSplit(SIDEBAR_SPLIT_DEFAULT)}
+          onKeyDown={onSplitKeyDown}
+        />
+      )}
       {/* Same slot either way, so toggling the dashboard never remounts the tree (filter, expansion). */}
       <SidebarExplorer headerEnd={hideConnections ? <>{home}{collapse}</> : undefined} />
     </aside>

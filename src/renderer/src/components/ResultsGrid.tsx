@@ -21,6 +21,7 @@ import { useDensity } from '../lib/hooks'
 import { DENSITY_METRICS } from '../lib/density'
 import EditingCell from './EditingCell'
 import RowInspector from './RowInspector'
+import ScrollArrows from './ScrollArrows'
 
 interface Props {
   columns: ColumnMeta[]
@@ -310,6 +311,7 @@ export default function ResultsGrid({
 
   return (
     <div className="grid-area">
+      <ScrollArrows target=".grid-wrap" axis="both" insetTop=".grid-header" />
       <div className="grid-col">
         <div className="grid-wrap" ref={parentRef} style={wrapStyle}>
           {/* sticky header stack: column names + optional per-column filter row */}

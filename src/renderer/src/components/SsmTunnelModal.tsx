@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react'
 import { useSaveSsmTunnel, useConnections } from '../lib/hooks'
 import type { SsmTunnel, SsmTunnelInput, AwsInstance } from '@shared/domain'
+import { filterInstances, INSTANCE_LIST_LIMIT } from '../lib/instance-filter'
 
 const EMPTY: SsmTunnelInput = {
   name: '', profile: '', region: 'eu-west-3', instanceId: '', remotePort: 3306, localPort: 13306, connectionId: null
 }
 
-/** Type-to-search instance picker: filters the live instance list by name or id as you type; pick a
- *  match or paste an id manually (the field IS the instance id). */
+/** Type-to-search instance picker: filters the live instance list by name, host name or id as you
+ *  type; pick a match or paste an id manually (the field IS the instance id). */
 function InstanceCombobox({ instances, value, onChange }: { instances: AwsInstance[]; value: string; onChange: (id: string) => void }): JSX.Element {
   const [open, setOpen] = useState(false)
-  const q = value.trim().toLowerCase()
-  const matches = instances.filter((i) => i.name.toLowerCase().includes(q) || i.instanceId.toLowerCase().includes(q))
+  const matches = filterInstances(instances, value)
+  const chosen = instances.find((i) => i.instanceId === value.trim())
   return (
     <div className="combo">
       <input
@@ -26,11 +27,12 @@ function InstanceCombobox({ instances, value, onChange }: { instances: AwsInstan
       {open && instances.length > 0 && (
         <div className="combo-list">
           {matches.length === 0 && <div className="combo-empty">No instance matches.</div>}
-          {matches.slice(0, 50).map((i) => (
+          {matches.slice(0, INSTANCE_LIST_LIMIT).map((i) => (
             <button
               type="button"
               key={i.instanceId}
-              className="combo-item"
+              className={`combo-item${i === chosen ? ' active' : ''}`}
+              title={i.host ? `${i.name} — ${i.host}` : i.name}
               // mousedown-preventDefault keeps the input focused so this click lands before the blur.
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => { onChange(i.instanceId); setOpen(false) }}
@@ -40,8 +42,14 @@ function InstanceCombobox({ instances, value, onChange }: { instances: AwsInstan
               <span className="combo-id">{i.instanceId}</span>
             </button>
           ))}
+          {matches.length > INSTANCE_LIST_LIMIT && (
+            <div className="combo-empty">
+              Showing {INSTANCE_LIST_LIMIT} of {matches.length} — keep typing to narrow it down.
+            </div>
+          )}
         </div>
       )}
+      {chosen && !open && <div className="hint combo-chosen">{chosen.name}</div>}
     </div>
   )
 }
@@ -65,6 +73,7 @@ export default function SsmTunnelModal({ tunnel, onClose }: { tunnel: SsmTunnel 
   const [auth, setAuth] = useState<Auth>({ status: 'idle' })
   const [instances, setInstances] = useState<AwsInstance[]>([])
   const [loadingInstances, setLoadingInstances] = useState(false)
+  const [instancesError, setInstancesError] = useState<string | null>(null)
   const [loginBusy, setLoginBusy] = useState(false)
 
   useEffect(() => {
@@ -78,14 +87,16 @@ export default function SsmTunnelModal({ tunnel, onClose }: { tunnel: SsmTunnel 
   function set<K extends keyof SsmTunnelInput>(k: K, v: SsmTunnelInput[K]): void {
     setForm((f) => ({ ...f, [k]: v }))
     setError(null)
-    if (k === 'profile' || k === 'region') { setAuth({ status: 'idle' }); setInstances([]) }
+    if (k === 'profile' || k === 'region') { setAuth({ status: 'idle' }); setInstances([]); setInstancesError(null) }
   }
 
   async function loadInstances(): Promise<void> {
     setLoadingInstances(true)
+    setInstancesError(null)
     const r = await window.api.aws.instances(form.profile, form.region)
     setLoadingInstances(false)
     if (r.ok) setInstances(r.data)
+    else setInstancesError(r.error)
   }
   async function checkLogin(): Promise<void> {
     if (!form.profile || !form.region) return
@@ -163,8 +174,10 @@ export default function SsmTunnelModal({ tunnel, onClose }: { tunnel: SsmTunnel 
             <div className="form-row">
               <label htmlFor="ssm-instance">
                 Instance {loadingInstances && <span className="hint">loading…</span>}
+                {!loadingInstances && instances.length > 0 && <span className="hint">{instances.length} found</span>}
               </label>
               <InstanceCombobox instances={instances} value={form.instanceId} onChange={(id) => set('instanceId', id)} />
+              {instancesError && <div className="aws-error">Could not list instances: {instancesError}</div>}
             </div>
 
             <div className="form-row-2">

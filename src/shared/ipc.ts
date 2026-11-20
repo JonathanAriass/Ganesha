@@ -4,7 +4,7 @@ import type {
   SavedQuery, SavedQueryInput, SavedQueryPatch, SessionTab,
   LocalModel, CatalogModel, LlmConversation, LlmMessage, SsmTunnel, SsmTunnelInput, AwsInstance
 } from './domain'
-import type { ExportResult, ImportPreview, ImportResult } from './transfer'
+import type { DetectedImport, ExportResult, ImportPreview, ImportResult } from './transfer'
 import type { QueryResult, RowEdit, FilterQuery } from './query'
 import type { DbObject, ObjectRef, ColumnInfo, Relationship, TableColumns, TableInfo } from './schema'
 import type { TelescopeEntry, TelescopeEntryDetail, TelescopePage, TelescopeDetectResult, TelescopeFilter } from './telescope'
@@ -31,8 +31,13 @@ export interface IpcChannels {
   'connections.export': { req: { connectionIds: string[] | null; passphrase: string | null }; res: ExportResult | null }
   /** Shows an open dialog and parses the picked file (kept in main until imported); null = cancelled. */
   'connections.importPick': { req: void; res: ImportPreview | null }
-  /** Imports the file picked by importPick. passphrase null = skip the file's secrets. */
-  'connections.import': { req: { passphrase: string | null }; res: ImportResult }
+  /** Other database tools installed here whose saved connections can be imported. */
+  'connections.importSources': { req: void; res: DetectedImport[] }
+  /** Like importPick, for one of the sources importSources listed. */
+  'connections.importDetected': { req: string; res: ImportPreview }
+  /** Imports the file picked by importPick. includeSecrets false = leave its passwords behind;
+   *  passphrase is only needed (and null otherwise) for passphrase-encrypted secrets. */
+  'connections.import': { req: { passphrase: string | null; includeSecrets: boolean }; res: ImportResult }
   'groups.list': { req: void; res: ConnectionGroup[] }
   'groups.create': { req: { name: string; parentId: string | null }; res: ConnectionGroup }
   'groups.rename': { req: { id: string; name: string }; res: ConnectionGroup }

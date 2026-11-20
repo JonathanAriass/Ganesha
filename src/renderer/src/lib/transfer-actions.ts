@@ -7,11 +7,14 @@ export type TransferModalState =
   | { mode: 'export'; connections: ConnectionConfig[] }
   | { mode: 'import'; preview: ImportPreview }
 
-/** Native file picker first; the dialog only opens once a valid file is chosen.
+/** Native file picker first (or, with `detectedId`, the connections of another tool found on
+ *  this machine); the dialog only opens once there is something valid to import.
  *  Resolves null on success or cancel, or the error message on failure. */
-export async function startImport(): Promise<string | null> {
+export async function startImport(detectedId?: string): Promise<string | null> {
   try {
-    const preview = unwrap(await window.api.connections.importPick())
+    const preview = unwrap(
+      detectedId === undefined ? await window.api.connections.importPick() : await window.api.connections.importDetected(detectedId)
+    )
     if (preview) useAppStore.getState().setTransferModal({ mode: 'import', preview })
     return null
   } catch (e) {

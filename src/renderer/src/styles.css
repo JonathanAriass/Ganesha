@@ -62,6 +62,11 @@
   --results-radius: var(--radius-lg);
   --results-bg: var(--bg-2);
   --grid-zebra: transparent;
+  /* Panels: every region (connections, explorer, editor, results) is its own bordered surface
+     on a darker canvas. light-dark() follows the theme's color-scheme. */
+  --canvas: light-dark(color-mix(in srgb, var(--bg) 92%, #000), color-mix(in srgb, var(--bg) 62%, #000));
+  --panel-border: light-dark(color-mix(in srgb, var(--border) 78%, #000), color-mix(in srgb, var(--border) 70%, #fff));
+  --panel-gap: 10px;
 }
 :root[data-density='compact'] {
   --fs-base: 13px;
@@ -80,11 +85,12 @@
   --cell-pad-x: 8px;
   --grid-head-pad-y: 4px;
   --results-pad-x: 10px;
-  /* Edge to edge and striped, as before. */
-  --results-inset: 0px;
-  --results-radius: 0px;
-  --results-bg: transparent;
+  /* Same panels as comfortable, with the tighter margin and radius; rows stay striped. */
+  --results-inset: var(--pad-x);
+  --results-radius: var(--radius-lg);
+  --results-bg: var(--bg-2);
   --grid-zebra: var(--row-odd);
+  --panel-gap: 6px;
 }
 
 /* ── Light theme overrides ── */
@@ -276,10 +282,22 @@ button, input, select, textarea {
   color: inherit;
 }
 
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--scroll-thumb-hover); }
+/* Every scrollbar is a 4px rounded pill in a 12px lane (4px of air on each side, so it never
+   hugs a panel's border): always visible in the panels' border
+   tone, brighter while the pointer (or keyboard focus) is inside the scrolling area, accent
+   while grabbed. */
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--panel-border);
+  background-clip: padding-box;
+  border: 4px solid transparent;
+  border-radius: 6px;
+}
+:hover::-webkit-scrollbar-thumb,
+:focus-within::-webkit-scrollbar-thumb { background-color: color-mix(in srgb, var(--panel-border) 55%, var(--text-2)); }
+::-webkit-scrollbar-thumb:hover,
+::-webkit-scrollbar-thumb:active { background-color: var(--accent); }
 
 /* ── App shell ── */
 .app {
@@ -446,7 +464,6 @@ button, input, select, textarea {
   border-color: var(--card-accent, var(--accent));
   box-shadow: 0 0 0 1px var(--card-accent, var(--accent));
 }
-.dash-card-strip { position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--card-accent, var(--accent)); }
 .dash-card-head { display: flex; align-items: center; gap: 8px; width: 100%; }
 .dash-card-name { font-weight: 600; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dash-card-edit { display: inline-flex; margin-left: auto; color: var(--text-2); border-radius: 5px; padding: 1px 5px; opacity: 0; transition: opacity 0.12s; flex-shrink: 0; }
@@ -614,18 +631,26 @@ button, input, select, textarea {
 }
 
 /* ── Connection sidebar: Connections zone over the Explorer zone; badges when collapsed ── */
-/* No right rule: --bg-2 against the editor's --bg separates them. */
 .sidebar {
   position: relative; flex-shrink: 0;
   background: var(--bg-2);
   display: flex; flex-direction: column; min-height: 0; overflow: hidden;
-  /* The two zones are separated by space, not a rule. */
-  gap: calc(var(--gap) * 2);
   padding-top: var(--gap);
 }
 .sidebar-zone { display: flex; flex-direction: column; min-height: 0; }
-/* The connection list takes at most ~45% of the sidebar and scrolls on its own. */
-.sidebar-connections { flex: 0 1 auto; max-height: 45%; }
+/* The connection list takes at most --sidebar-split of the sidebar (45% unless dragged) and
+   scrolls on its own. */
+.sidebar-connections { flex: 0 1 auto; max-height: var(--sidebar-split, 45%); }
+/* The rule between the zones, and the handle that moves it: a 1px line centred in a taller
+   grab area, so a list cut mid-row reads as scrolled rather than broken. */
+.sidebar-split {
+  flex: 0 0 calc(var(--gap) * 2);
+  cursor: row-resize; touch-action: none;
+  background: linear-gradient(var(--border), var(--border)) center / 100% 1px no-repeat;
+}
+.sidebar-split:hover, .sidebar-split:focus-visible {
+  background: linear-gradient(var(--accent), var(--accent)) center / 100% 2px no-repeat; outline: none;
+}
 .sidebar-explorer { flex: 1 1 0; }
 .sidebar-head {
   display: flex; align-items: center; gap: 2px; flex-shrink: 0;
@@ -803,10 +828,13 @@ button, input, select, textarea {
 /* subtle focused-pane cue: shortcuts drive THIS pane */
 .editor-pane.focused { box-shadow: inset 0 2px 0 var(--accent); }
 
-/* No top rule: --bg-2 under the editor's --bg separates it. The font sits half a pixel above
-   --fs-xs, which keeps the 11.5px it has always had in compact. */
+/* A top rule: the sidebar shares its --bg-2, so without one the status text reads as the
+   tree's last row. The font sits half a pixel above --fs-xs, which keeps the 11.5px it has
+   always had in compact. */
 .statusbar {
   height: var(--statusbar-h);
+  box-sizing: border-box;
+  border-top: 1px solid var(--border);
   display: flex; align-items: center; gap: calc(var(--gap) * 2);
   padding: 0 var(--pad-x);
   background: var(--bg-2);
@@ -1533,6 +1561,8 @@ input[type="password"]::placeholder {
      When the window is so short the two constraints cross, min-height wins —
      the editor floor holds and .results scrolls. */
   max-height: calc(100% - 122px - var(--control-h) - var(--results-inset));
+  /* Same side margin as the environment bar and the results surface (none in compact). */
+  margin: 0 var(--results-inset);
 }
 
 .editor-host {
@@ -1543,6 +1573,7 @@ input[type="password"]::placeholder {
   flex: 0 0 6px;
   cursor: row-resize;
   touch-action: none; /* the drag is pointer-captured — never let touch scroll eat it */
+  margin: 0 var(--results-inset);
   /* 1px visual line centered in a 6px grab area (replaces the old editor border-bottom) */
   background: linear-gradient(var(--border), var(--border)) center / 100% 1px no-repeat;
 }
@@ -2625,7 +2656,8 @@ mark.hl {
 .dock-content { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .dock-content[hidden] { display: none; }
 .assistant-peek {
-  position: fixed; right: 0; top: calc(var(--topbar-h) + 56px); z-index: 899;
+  /* Starts below the tab strip and the environment bar, so it never sits on their buttons. */
+  position: fixed; right: 0; top: calc(var(--topbar-h) + var(--control-h) * 2 + 36px); z-index: 899;
   padding: 12px 6px; background: var(--bg-2); color: var(--accent);
   border: 1px solid var(--border); border-right: none; border-radius: 8px 0 0 8px;
   cursor: pointer; box-shadow: -6px 4px 18px -8px rgba(0, 0, 0, 0.45);
@@ -2802,6 +2834,8 @@ mark.hl {
 .combo-empty { padding: 8px 10px; font-size: 12px; color: var(--text-2); }
 .combo-item { display: flex; align-items: baseline; gap: 8px; width: 100%; text-align: left; padding: 6px 10px; background: none; border: none; cursor: pointer; font-size: 12px; color: var(--text); }
 .combo-item:hover { background: var(--hover-overlay); }
+.combo-item.active { background: var(--hover-overlay); }
+.combo-chosen { margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .combo-name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .combo-id { color: var(--text-2); font-family: ui-monospace, 'SF Mono', monospace; font-size: 11px; margin-left: auto; flex-shrink: 0; }
 .combo-ping { color: var(--warn); font-size: 10px; flex-shrink: 0; }
@@ -3474,3 +3508,403 @@ mark.hl {
   font-size: var(--fs-base);
 }
 .pane-empty-head { display: flex; align-items: center; gap: var(--gap); color: var(--text); font-size: 16px; font-weight: 600; }
+
+/* ── Panels ── every region is a bordered surface of its own on the darker --canvas, with a
+   gap between neighbours, so connections, explorer, editor and results read as separate boxes.
+   Kept together at the end: these override the flat, rule-less surfaces defined above. */
+.app { background: var(--canvas); }
+.topbar, .statusbar, .sidebar, .sidebar-badges { background: transparent; }
+.statusbar { border-top: none; }
+.app-body > .main { background: transparent; }
+
+.sidebar { padding: 0 0 var(--panel-gap) var(--panel-gap); }
+.sidebar-zone {
+  background: var(--bg-2);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+/* The gap between the two zones is the handle; the accent line shows on hover / focus. */
+.sidebar-split { flex-basis: var(--panel-gap); background: none; }
+.sidebar-badges {
+  margin: 0 0 var(--panel-gap) var(--panel-gap);
+  background: var(--bg-2);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-lg);
+}
+
+.env-bar { border-color: var(--panel-border); }
+.qt-editor-pane {
+  background: var(--bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--results-radius);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+/* The editor/results divider is the gap between the two panels. */
+.qt-divider { flex-basis: var(--panel-gap); background: none; }
+.results { border: 1px solid var(--panel-border); box-sizing: border-box; }
+.right-dock { border-left-color: var(--panel-border); }
+/* The tab strip is a panel like the others: a bordered surface inset to the content margin,
+   level with the top of the sidebar. Its scrollbar stays clear of the rounded corners. */
+.tabbar-wrap { padding-top: 0; }
+.tabbar {
+  margin: 0 var(--pad-x) var(--panel-gap);
+  padding: 4px 6px;
+  background: var(--bg-2);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-lg);
+}
+/* No scrollbar on the strip: an arrow shows on each side that has tabs out of view, over a
+   fade of the panel's surface, and scrolls that way when clicked. */
+.tabbar::-webkit-scrollbar { display: none; }
+.tabbar-wrap { position: relative; }
+.tab-more {
+  position: absolute; z-index: 2; top: 1px; bottom: calc(var(--panel-gap) + 1px);
+  width: 52px; padding: 0; border: none; cursor: pointer;
+  display: flex; align-items: center; color: var(--text-2);
+}
+.tab-more:hover { color: var(--text); }
+.tab-more:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.tab-more-left {
+  left: calc(var(--pad-x) + 1px); justify-content: flex-start; padding-left: 8px;
+  border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+  background: linear-gradient(to right, var(--bg-2) 55%, transparent);
+}
+.tab-more-right {
+  right: calc(var(--pad-x) + 1px); justify-content: flex-end; padding-right: 8px;
+  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+  background: linear-gradient(to left, var(--bg-2) 55%, transparent);
+}
+
+/* ── Scroll arrows ── the main areas (connection list, explorer, results, editor) have no
+   scrollbar: an arrow shows on each side that has more out of view, over a fade of the area's
+   surface, and scrolls that way when clicked. Only the round button takes the pointer, so the
+   rows under the fade stay clickable. */
+.sidebar-list, .side-body, .grid-wrap { scrollbar-width: none; }
+.sidebar-list::-webkit-scrollbar, .side-body::-webkit-scrollbar, .grid-wrap::-webkit-scrollbar { display: none; }
+.sidebar-zone, .qt-editor-pane { position: relative; }
+.qt-editor-pane { --arrow-surface: var(--bg); }
+.scroll-arrows { position: absolute; z-index: 5; pointer-events: none; }
+.scroll-arrow { position: absolute; display: flex; align-items: center; justify-content: center; }
+.scroll-arrow-up, .scroll-arrow-down { left: 0; right: 0; height: 40px; }
+.scroll-arrow-left, .scroll-arrow-right { top: 0; bottom: 0; width: 40px; }
+.scroll-arrow-up { top: 0; align-items: flex-start; padding-top: 4px; background: linear-gradient(to bottom, var(--arrow-surface, var(--bg-2)) 25%, transparent); }
+.scroll-arrow-down { bottom: 0; align-items: flex-end; padding-bottom: 4px; background: linear-gradient(to top, var(--arrow-surface, var(--bg-2)) 25%, transparent); }
+.scroll-arrow-left { left: 0; justify-content: flex-start; padding-left: 4px; background: linear-gradient(to right, var(--arrow-surface, var(--bg-2)) 25%, transparent); }
+.scroll-arrow-right { right: 0; justify-content: flex-end; padding-right: 4px; background: linear-gradient(to left, var(--arrow-surface, var(--bg-2)) 25%, transparent); }
+.scroll-arrow button {
+  pointer-events: auto;
+  display: flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; padding: 0; border-radius: 50%;
+  background: var(--bg-3); border: 1px solid var(--panel-border);
+  color: var(--text-2); cursor: pointer;
+}
+.scroll-arrow button:hover { color: var(--text); border-color: var(--accent); }
+
+/* ── No header ── search (⌘K), the assistant, tunnels and settings all open from the status
+   bar, so the panels start at the top of the window. */
+.app-body { padding-top: var(--panel-gap); }
+/* Status-bar actions: search, the two side panels and settings, as one quiet group at the
+   right end. A panel's button stays lit while that panel is open. */
+.sb-actions { display: inline-flex; align-items: center; gap: 2px; margin-right: calc(var(--pad-x) * -0.5); }
+.sb-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: calc(var(--statusbar-h) - 6px); padding: 0 8px;
+  border: 1px solid transparent; border-radius: var(--radius-md);
+  background: none; color: inherit; font: inherit; white-space: nowrap; cursor: pointer;
+}
+.sb-btn:hover { color: var(--text); background: var(--hover-overlay); }
+.sb-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.sb-btn[aria-pressed='true'] { color: var(--text); background: var(--bg-3); border-color: var(--panel-border); }
+.sb-btn-accent { color: var(--accent); }
+.sb-btn kbd { font: inherit; padding: 0 5px; border: 1px solid var(--border); border-radius: 4px; }
+.sb-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); }
+
+/* ── Right dock ── a panel like the others: bordered, rounded, with a gap to the window edge.
+   Its left edge is the resize handle, invisible until hovered (the border is the rule). */
+.right-dock {
+  margin: 0 var(--panel-gap) var(--panel-gap) 0;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.assistant-resizer { background: none; }
+.dock-head { padding: 0 var(--gap); }
+.dock-tab { padding: 0 14px; height: calc(var(--control-h) - 6px); }
+
+/* Tunnels tab: each tunnel is a two-line card (name over address and state), an "Add tunnel"
+   row closes the list, and the output is a sunken well instead of a bare terminal. */
+.ssm-list { max-height: 50%; padding: var(--gap); border-bottom: none; display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+.ssm-empty { padding: 4px 6px; font-size: var(--fs-sm); }
+.ssm-row {
+  gap: 10px; padding: 8px 8px 8px 12px; font-size: var(--fs-sm);
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-md);
+}
+.ssm-row:hover { background: var(--bg); border-color: var(--panel-border); }
+.ssm-row.selected { background: var(--bg); border-color: var(--accent); }
+.ssm-id { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.ssm-name { flex: none; font-weight: 600; }
+.ssm-port { font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ssm-add {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  height: var(--control-h); border: 1px dashed var(--panel-border); border-radius: var(--radius-md);
+  background: none; color: var(--text-2); font: inherit; font-size: var(--fs-sm); cursor: pointer;
+}
+.ssm-add:hover { color: var(--text); border-color: var(--accent); }
+.ssm-output {
+  margin: 0 var(--gap) var(--gap);
+  background: var(--canvas); border: 1px solid var(--border); border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.ssm-output-head { padding: 8px 12px; font-size: var(--fs-xs); font-weight: 600; }
+.ssm-output-body { padding: 10px 12px; font-size: var(--fs-xs); }
+.ssm-output-empty {
+  flex: 1; display: flex; align-items: center; justify-content: center; text-align: center;
+  padding: 16px; color: var(--text-2); font-size: var(--fs-sm);
+}
+
+/* ── Modals ── the same panel as everywhere else: the panels' border and radius, no rules
+   under the header or over the footer (space separates them). */
+.modal { border-color: var(--panel-border); border-radius: var(--radius-lg); }
+.modal-header { display: flex; align-items: center; padding: 18px 20px 6px; border-bottom: none; }
+.modal-header h2 { flex: 1; font-size: 16px; }
+.modal-footer { padding: 6px 20px 18px; border-top: none; }
+
+/* Settings: each setting is a section card on the editor's surface. Themes sit in an even
+   grid, density is a two-way segmented control. */
+.settings-modal { width: 560px; }
+.settings-modal .form-grid { gap: 10px; }
+.settings-modal .form-row {
+  gap: 10px; padding: 14px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-md);
+}
+.settings-modal .theme-group-label { margin: 12px 0 6px; }
+.settings-modal .theme-group-label:first-child { margin-top: 0; }
+.settings-modal .theme-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.settings-modal .theme-opt {
+  background: var(--bg-2); border-radius: var(--radius-md); padding: 7px 10px 7px 8px; font-size: var(--fs-sm);
+  min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.settings-modal .theme-list.seg {
+  display: flex; gap: 2px; padding: 2px;
+  background: var(--canvas); border: 1px solid var(--border); border-radius: var(--radius-md);
+}
+.settings-modal .seg .theme-opt {
+  flex: 1; justify-content: center; border-color: transparent; background: none; color: var(--text-2);
+  border-radius: calc(var(--radius-md) - 2px); padding: 6px 10px;
+}
+.settings-modal .seg .theme-opt:hover { color: var(--text); background: var(--hover-overlay); }
+.settings-modal .seg .theme-opt.active { background: var(--bg-3); color: var(--text); box-shadow: none; border-color: var(--panel-border); }
+.settings-modal .datadir-path { height: var(--control-h); line-height: calc(var(--control-h) - 2px); background: var(--canvas); border-radius: var(--radius-md); }
+
+/* Every column ends on the same line: results, sidebar and dock all keep one panel gap above
+   the status bar. */
+.results { margin-bottom: var(--panel-gap); }
+
+/* ── Connections dashboard ── same language as the rest: a head strip (title + actions) like
+   the tab strip, then one panel per group on the canvas, with the connection cards inside.
+   Only the groups scroll, with arrows instead of a scrollbar. */
+.dash-panel {
+  flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; position: relative;
+  margin: 0 var(--pad-x) var(--panel-gap);
+}
+.dash-head {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap);
+  margin-bottom: var(--panel-gap); padding: 6px 6px 6px 14px;
+  background: var(--bg-2); border: 1px solid var(--panel-border); border-radius: var(--radius-lg);
+}
+.dash-title { font-size: 14px; font-weight: 650; margin: 0; }
+.dash-actions { flex: 1; justify-content: flex-end; max-width: none; margin: 0; }
+.dash-filter { max-width: 280px; background: var(--bg); border-color: var(--panel-border); }
+.dash { padding: 0; display: flex; flex-direction: column; gap: var(--panel-gap); }
+.dash::-webkit-scrollbar { display: none; }
+.dash-group {
+  max-width: none; margin: 0; padding: 12px 14px 14px;
+  background: var(--bg-2); border: 1px solid var(--panel-border); border-radius: var(--radius-lg);
+  outline-offset: -1px;
+}
+.dash-group-head { margin-bottom: 10px; padding-bottom: 0; }
+.dash-grid { max-width: none; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.dash-card { background: var(--bg); border-color: var(--panel-border); }
+.dash-card:hover { background: var(--bg); transform: none; box-shadow: none; border-color: var(--card-accent, var(--accent)); }
+.dash-subgroup { margin: 12px 0 0; padding: 0 0 0 12px; border-left: 2px solid var(--panel-border); border-radius: 0; }
+.dash-subgroup .dash-group-head { margin-bottom: 8px; }
+.dash-newgroup.sub { margin: 10px 0 0 14px; }
+.dash-hint, .dash-error, .dash-empty { margin: 0; padding: 2px 4px; }
+
+/* Fewer lines: only the head and the group panels are outlined. Inside them, surfaces are
+   told apart by fill — cards, badges and secondary buttons carry no border — the connection
+   color is the usual dot, subgroups are set off by indent alone, and a group's menu button
+   shows on hover or focus. The selected card keeps the one accent outline. */
+.dash-count { color: var(--text-2); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.dash-actions .btn:not(.primary) { background: none; border-color: transparent; color: var(--text-2); }
+.dash-actions .btn:not(.primary):hover { background: var(--hover-overlay); color: var(--text); }
+.dash-filter { border-color: transparent; }
+.dash-card { border-color: transparent; padding: 12px 14px; }
+.dash-card:hover { border-color: transparent; background: color-mix(in srgb, var(--bg) 60%, var(--bg-3)); }
+.dash-card.active { border-color: var(--card-accent, var(--accent)); box-shadow: none; }
+.dash-badge { border: none; }
+.dash-subgroup { border-left: none; padding-left: 0; margin-top: 14px; }
+.dash-subgroup .dash-group-name { color: var(--text-2); font-size: var(--fs-xs); letter-spacing: 0.4px; text-transform: uppercase; }
+.dash-group-menu { opacity: 0; }
+.dash-group-head:hover .dash-group-menu, .dash-group-menu:focus-visible { opacity: 1; }
+
+/* ── Connection modal ── engine picker on top, then one filled card per topic (identity,
+   server, safety, SSH, more). Cards are told apart by fill, not rules. The body scrolls
+   between a fixed header and a fixed footer, so the test/save outcome and the buttons are
+   always in view. */
+.conn-modal { width: 760px; display: flex; flex-direction: column; overflow: hidden; }
+.conn-modal .modal-header { gap: 10px; flex-shrink: 0; }
+.conn-modal .modal-body {
+  flex: 1; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; gap: var(--panel-gap);
+  padding: 10px 20px 12px;
+}
+.conn-modal .modal-footer { flex-shrink: 0; flex-wrap: wrap; }
+.conn-seg {
+  display: flex; gap: 2px; padding: 2px; flex-shrink: 0;
+  background: var(--canvas); border-radius: var(--radius-md);
+}
+.conn-seg-opt {
+  flex: 1; height: var(--control-h); padding: 0 10px;
+  background: none; border: 1px solid transparent; border-radius: calc(var(--radius-md) - 2px);
+  color: var(--text-2); font: inherit; font-size: var(--fs-sm); cursor: pointer; white-space: nowrap;
+}
+.conn-seg-opt:hover { color: var(--text); background: var(--hover-overlay); }
+.conn-seg-opt.active { background: var(--bg-3); color: var(--text); border-color: var(--panel-border); }
+.conn-seg-opt:focus-visible, .conn-secret-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.conn-section {
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; flex-shrink: 0;
+  padding: 12px 14px; background: var(--bg); border-radius: var(--radius-md);
+}
+.conn-section-title {
+  margin: 0; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-2);
+}
+/* Field labels are sentence case here; the uppercase is kept for section titles. */
+.conn-modal .form-row label { font-size: var(--fs-sm); font-weight: 500; letter-spacing: 0; text-transform: none; }
+.conn-modal .form-row label .hint { font-weight: 400; margin-left: 4px; opacity: 0.8; }
+.conn-modal input[type='text'], .conn-modal input[type='number'], .conn-modal input[type='password'], .conn-modal select {
+  height: var(--control-h); background: var(--bg-3); border-color: transparent; border-radius: var(--radius-md);
+}
+.conn-modal input:focus, .conn-modal select:focus { border-color: var(--accent); }
+.conn-row-host { display: grid; grid-template-columns: minmax(0, 1fr) 110px; gap: 10px; }
+.conn-row-split { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 20px; align-items: start; }
+.conn-row-split .color-swatches { height: var(--control-h); align-items: center; }
+.conn-secret { position: relative; }
+.conn-secret input { padding-right: 52px; }
+.conn-secret-toggle {
+  position: absolute; right: 4px; top: 4px; bottom: 4px; padding: 0 8px;
+  background: none; border: none; border-radius: calc(var(--radius-md) - 2px);
+  color: var(--text-2); font: inherit; font-size: var(--fs-xs); cursor: pointer;
+}
+.conn-secret-toggle:hover:not(:disabled) { color: var(--text); background: var(--hover-overlay); }
+.conn-secret-toggle:disabled { opacity: 0; pointer-events: none; }
+.conn-modal .form-hint { margin: 0; }
+/* A switch row: checkbox, then a name with a one-line explanation under it. */
+.conn-toggle { display: grid; grid-template-columns: 14px minmax(0, 1fr); gap: 10px; align-items: start; cursor: pointer; }
+.conn-toggle input[type='checkbox'] { width: 14px; height: 14px; margin: 2px 0 0; accent-color: var(--accent); cursor: pointer; }
+.conn-toggle.disabled { cursor: default; opacity: 0.6; }
+.conn-toggle-name { display: block; font-size: var(--fs-sm); font-weight: 500; color: var(--text); }
+.conn-toggle-hint { display: block; font-size: var(--fs-xs); color: var(--text-2); line-height: 1.45; }
+/* SSH hops sit inside the SSH card: one step lighter, no outline. */
+.conn-modal .ssh-hops { margin-top: 0; }
+.conn-modal .ssh-hop { border: none; background: var(--bg-2); border-radius: var(--radius-md); padding: 12px; display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
+.conn-modal .ssh-hop-head { margin-bottom: 0; }
+.conn-modal .ssh-hops > .btn { justify-self: start; align-self: flex-start; }
+.conn-feedback { flex-shrink: 0; display: grid; gap: 6px; padding: 0 20px; }
+.conn-feedback:empty { display: none; }
+.conn-feedback .status {
+  padding: 8px 10px; border-radius: var(--radius-md); font-size: var(--fs-sm); line-height: 1.45;
+  background: var(--bg); color: var(--text-2); max-height: 96px; overflow-y: auto; overflow-wrap: anywhere;
+}
+.conn-feedback .status.ok { background: color-mix(in srgb, var(--ok) 12%, transparent); border: none; color: var(--ok); }
+.conn-feedback .status.err { background: color-mix(in srgb, var(--danger-text) 12%, transparent); border: none; color: var(--danger-text); }
+.conn-modal .modal-footer { padding-top: 12px; }
+.conn-problem { font-size: var(--fs-xs); color: var(--text-2); }
+.btn.ghost.conn-danger { color: var(--danger-text); }
+
+/* Tabs split the form: what every connection needs, the SSH tunnel, the rest. The body keeps
+   one height so the dialog does not jump between tabs. A note on a tab says what is set there. */
+.conn-tabs { display: flex; gap: 4px; padding: 0 20px 2px; flex-shrink: 0; }
+.conn-tab {
+  display: inline-flex; align-items: center; gap: 6px; height: var(--control-h); padding: 0 12px;
+  background: none; border: none; border-radius: var(--radius-md);
+  color: var(--text-2); font: inherit; font-size: var(--fs-sm); cursor: pointer; white-space: nowrap;
+}
+.conn-tab:hover { color: var(--text); background: var(--hover-overlay); }
+.conn-tab.active { color: var(--text); background: var(--bg); font-weight: 500; }
+.conn-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.conn-tab-note {
+  padding: 1px 6px; border-radius: 999px; font-size: var(--fs-xs); font-weight: 500;
+  background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent);
+}
+.conn-modal .modal-body { flex: 0 1 580px; }
+.conn-tabpanel { display: flex; flex-direction: column; gap: var(--panel-gap); }
+.conn-tabpanel[hidden] { display: none; }
+
+/* Import dialog: the entries a foreign file has that will not be imported. */
+.xfer-skipped { font-size: var(--fs-sm); color: var(--text-2); }
+.xfer-skipped summary { cursor: pointer; }
+.xfer-skipped ul { margin: 6px 0 0; padding-left: 18px; max-height: 120px; overflow-y: auto; }
+
+/* ── Split view ── the two panes sit one panel gap apart, like every other pair of panels:
+   the inner side of each pane drops the page margin, and the divider is that gap (the accent
+   line shows on hover / focus, as on the sidebar split). The pane that shortcuts drive is
+   marked on its tab strip's outline instead of by a rule across the top of the pane. */
+.pane-slot:not(.pane-slot-right) :is(.tabbar, .env-bar, .qt-editor-pane, .qt-divider, .results, .dash-panel, .telescope, .diagram) { margin-right: 0; }
+.pane-slot:not(.pane-slot-right) .tab-more-right { right: 1px; }
+.pane-slot-right :is(.tabbar, .env-bar, .qt-editor-pane, .qt-divider, .results, .dash-panel, .telescope, .diagram) { margin-left: 0; }
+.pane-slot-right .tab-more-left { left: 1px; }
+.pane-divider { flex-basis: var(--panel-gap); background: none; }
+.editor-pane.focused { box-shadow: none; }
+.editor-pane.focused .tabbar { border-color: color-mix(in srgb, var(--accent) 60%, var(--panel-border)); }
+
+/* ── Telescope ── two panels inside the content margin: the entry types, and the entries
+   (search on top, the open entry as an inset surface at the right). Surfaces are told apart
+   by fill, rows carry no rules, and the lists scroll with arrows. */
+.telescope {
+  flex: 1; height: auto; min-width: 0; gap: var(--panel-gap);
+  margin: 0 var(--pad-x) var(--panel-gap); background: none;
+}
+.tele-sidebar, .tele-main {
+  background: var(--bg-2); border: 1px solid var(--panel-border); border-radius: var(--radius-lg);
+  box-sizing: border-box;
+}
+.tele-sidebar { padding: 8px; }
+.tele-sidebar::-webkit-scrollbar, .tele-list::-webkit-scrollbar { display: none; }
+.tele-main { overflow: hidden; }
+.tele-filterbar { padding: 8px 8px 6px; border-bottom: none; background: none; }
+.tele-search, .tele-tag-select { height: var(--control-h); border-color: transparent; border-radius: var(--radius-md); }
+.tele-search:focus, .tele-tag-select:focus { border-color: var(--accent); }
+.tele-listpane { position: relative; --arrow-surface: var(--bg-2); }
+.tele-content.with-detail .tele-listpane { border-right: none; }
+.tele-newbanner { border-bottom: none; margin: 0 8px 6px; border-radius: var(--radius-md); }
+.tele-row { border-bottom: none; border-left: none; padding: 0 16px; }
+.tele-row.selected { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.tele-detailpane { margin: 0 8px 8px 0; border-radius: var(--radius-lg); overflow: hidden; }
+.tele-detail-head { background: none; border-bottom: none; padding: 14px 14px 8px; }
+.tele-tabs { background: none; border-bottom: none; padding: 0 10px; }
+.tele-detail-body { padding: 12px 14px; }
+.tele-kv-row, .tele-frame { border-bottom: none; }
+.tele-kv-row { padding: 4px 0; }
+.tele-json, .tele-code { border-color: transparent; }
+
+/* ── Schema diagram ── a toolbar strip, then one panel per region (search matches, the canvas,
+   the focused table, the selected table's details), a panel gap apart. No rules inside. */
+.diagram { margin: 0 var(--pad-x) var(--panel-gap); gap: var(--panel-gap); min-width: 0; }
+.diagram-toolbar {
+  padding: 6px 12px 6px 6px; border: 1px solid var(--panel-border); border-radius: var(--radius-lg);
+  min-height: var(--control-h);
+}
+.diagram-toolbar .filter-input { background: var(--bg); border-color: transparent; }
+.diagram-main { gap: var(--panel-gap); }
+.diagram-main > * { border: 1px solid var(--panel-border); border-radius: var(--radius-lg); overflow: hidden; box-sizing: border-box; }
+.diagram-side, .diagram-focus, .diagram-matches { border-left-color: var(--panel-border); border-right-color: var(--panel-border); }
+.ds-head, .df-head, .dm-head { border-bottom: none; background: none; }
+.ds-body::-webkit-scrollbar, .dm-body::-webkit-scrollbar { width: 12px; }
+.diagram-zoom { border-color: var(--panel-border); border-radius: var(--radius-md); }
+.diagram-focus .diagram-canvas { border-radius: 0; }
+
+/* The tag a connection keeps when it came from an import: the tool's name behind an arrow. */
+.dash-badge-origin { display: inline-flex; align-items: center; gap: 4px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--text); }

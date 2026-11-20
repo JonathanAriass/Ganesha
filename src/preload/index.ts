@@ -21,7 +21,9 @@ const api: DbClientApi = {
     setGroup: (connectionId, groupId) => invoke('connections.setGroup', { connectionId, groupId }),
     export: (connectionIds, passphrase) => invoke('connections.export', { connectionIds, passphrase }),
     importPick: () => invoke('connections.importPick', undefined),
-    import: (passphrase) => invoke('connections.import', { passphrase })
+    importSources: () => invoke('connections.importSources', undefined),
+    importDetected: (id) => invoke('connections.importDetected', id),
+    import: (passphrase, includeSecrets) => invoke('connections.import', { passphrase, includeSecrets })
   },
   groups: {
     list: () => invoke('groups.list', undefined),

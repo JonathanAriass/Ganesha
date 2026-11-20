@@ -1,4 +1,5 @@
-import { useState, type DragEvent } from 'react'
+import { useState, type DragEvent, type MouseEvent } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import type { ConnectionConfig, ConnectionGroup } from '@shared/domain'
 import { useAppStore } from '../state/store'
 import { useConnections, useGroups, useCreateGroup, useRenameGroup, useDeleteGroup, useSetConnectionGroup } from '../lib/hooks'
@@ -9,6 +10,14 @@ import EnvTag from './EnvTag'
 import { Icon } from './icons'
 import { mod } from '../lib/platform'
 import { startImport } from '../lib/transfer-actions'
+import { unwrap } from '../lib/result'
+import ScrollArrows from './ScrollArrows'
+
+// The tag an imported connection keeps on its card, and its tooltip.
+const IMPORTED_LABEL = { ganesha: 'Imported', compass: 'Compass', dbeaver: 'DBeaver' } as const
+const IMPORTED_TITLE = {
+  ganesha: 'Imported from a Ganesha export', compass: 'Imported from MongoDB Compass', dbeaver: 'Imported from DBeaver'
+} as const
 
 /** The connections dashboard, shown in the main area when no tabs are open or from the
  *  sidebar's Home button: every connection as a card (click = select, double-click = open
@@ -47,10 +56,47 @@ export default function Welcome(): JSX.Element {
   // Dashboard filter (name / host / engine).
   const [filter, setFilter] = useState('')
 
-  async function importConnections(): Promise<void> {
+  // Other tools installed here (DBeaver, MongoDB Compass) whose connections can be brought in.
+  const { data: importSources = [] } = useQuery({
+    queryKey: ['import-sources'],
+    queryFn: async () => unwrap(await window.api.connections.importSources()),
+    staleTime: 0
+  })
+  const [importMenu, setImportMenu] = useState<{ x: number; y: number } | null>(null)
+
+  async function importConnections(detectedId?: string): Promise<void> {
+    setImportMenu(null)
     setImportError(null)
-    setImportError(await startImport())
+    setImportError(await startImport(detectedId))
   }
+  // With nothing detected the button goes straight to the file picker; otherwise it lists
+  // the tools found, and the file picker last.
+  function onImportClick(e: MouseEvent<HTMLButtonElement>): void {
+    if (importSources.length === 0) { void importConnections(); return }
+    const r = e.currentTarget.getBoundingClientRect()
+    setImportMenu({ x: r.left, y: r.bottom + 4 })
+  }
+  const importMenuEl = importMenu && (
+    <div className="tab-menu-backdrop" onMouseDown={() => setImportMenu(null)}>
+      <div
+        className="tab-menu"
+        role="menu"
+        aria-label="Import connections"
+        style={{ left: importMenu.x, top: importMenu.y }}
+        onMouseDown={(e) => e.stopPropagation()}
+        onKeyDown={(e) => { if (e.key === 'Escape') setImportMenu(null) }}
+      >
+        {importSources.map((s, i) => (
+          <button key={s.id} className="tab-menu-item" role="menuitem" autoFocus={i === 0} onClick={() => void importConnections(s.id)}>
+            From {s.label} <span className="dash-count">{s.connections}</span>
+          </button>
+        ))}
+        <button className="tab-menu-item" role="menuitem" onClick={() => void importConnections()}>
+          From a file…
+        </button>
+      </div>
+    </div>
+  )
 
   if (isLoading || groupsLoading) {
     return (
@@ -81,8 +127,13 @@ export default function Welcome(): JSX.Element {
         <button className="btn primary" onClick={() => openModal({ mode: 'create' })}>
           + New connection
         </button>
+        {importSources.map((s) => (
+          <button key={s.id} className="btn" onClick={() => void importConnections(s.id)}>
+            Import {s.connections} from {s.label}
+          </button>
+        ))}
         <button className="btn" onClick={() => void importConnections()}>
-          Import connections…
+          {importSources.length > 0 ? 'Import from a file…' : 'Import connections…'}
         </button>
         {importError && (
           <p className="dash-error" role="alert">
@@ -233,8 +284,8 @@ export default function Welcome(): JSX.Element {
       }}
       aria-pressed={c.id === activeConnectionId}
     >
-      <span className="dash-card-strip" aria-hidden="true" />
       <span className="dash-card-head">
+        <span className="conn-dot" style={{ background: c.color }} aria-hidden="true" />
         <span className="dash-card-name">{c.name}</span>
         {/* span-as-button: a real <button> can't nest inside the card button */}
         <span
@@ -261,6 +312,11 @@ export default function Welcome(): JSX.Element {
       <span className="dash-card-meta">
         <span className="dash-badge">{c.type}</span>
         <EnvTag connection={c} />
+        {c.importedFrom && (
+          <span className="dash-badge dash-badge-origin" title={IMPORTED_TITLE[c.importedFrom]}>
+            <Icon name="import" size={11} /> {IMPORTED_LABEL[c.importedFrom]}
+          </span>
+        )}
         {modeShort && (
           <span className="dash-card-mode" title={connectionModeText(c)}>
             {modeShort}
@@ -310,7 +366,8 @@ export default function Welcome(): JSX.Element {
       ) : (
         <span className="dash-group-name">{g ? g.name : 'Ungrouped'}</span>
       )}
-      <span className="dash-badge">{count}</span>
+      {/* A group that only holds subgroups shows no "0". */}
+      {count > 0 && <span className="dash-count">{count}</span>}
       {g && (
         <button
           className="dash-group-menu"
@@ -347,8 +404,11 @@ export default function Welcome(): JSX.Element {
   }
 
   return (
-    <div className="dash">
+    <div className="dash-panel">
+      {/* The head is a strip of its own, like the tab strip; only the groups below scroll. */}
+      <header className="dash-head">
       <h2 className="dash-title">Connections</h2>
+      <span className="dash-count">{connections.length}</span>
       <div className="dash-actions">
         <div className="dash-filter">
           <Icon name="search" size={14} />
@@ -363,7 +423,7 @@ export default function Welcome(): JSX.Element {
             }}
           />
         </div>
-        <button className="btn" onClick={() => void importConnections()}>
+        <button className="btn" aria-haspopup={importSources.length > 0 ? 'menu' : undefined} onClick={onImportClick}>
           <Icon name="import" size={14} /> Import…
         </button>
         <button className="btn" onClick={() => setTransferModal({ mode: 'export', connections })}>
@@ -391,7 +451,8 @@ export default function Welcome(): JSX.Element {
           <Icon name="plus" size={14} /> New connection
         </button>
       </div>
-      <p className="dash-sub">Click a card to select it — double-click to open a query tab.</p>
+      </header>
+      <div className="dash">
       {mutErrorMsg && (
         <p className="dash-error" role="alert">
           {mutErrorMsg}
@@ -411,8 +472,9 @@ export default function Welcome(): JSX.Element {
           >
             {hasGroups && groupHead(g, section.connections.length)}
             {section.connections.length === 0 ? (
-              // Drops are off while filtering, so the hint would mislead.
-              !filtering && <p className="dash-drop-hint">Drag connections here</p>
+              // Drops are off while filtering, so the hint would mislead; a group that only
+              // holds subgroups is not empty, so it gets no hint either.
+              !filtering && section.sub.length === 0 && <p className="dash-drop-hint">Drag connections here</p>
             ) : (
               <div className="dash-grid">{section.connections.map(card)}</div>
             )}
@@ -436,10 +498,13 @@ export default function Welcome(): JSX.Element {
           </section>
         )
       })}
-      {menuEl}
       <p className="dash-hint">
-        {mod}K palette · double-click a table to query it · {mod}B toggles the side panel
+        Click a card to select it · double-click to open a query tab · {mod}K searches · {mod}B toggles the side panel
       </p>
+      </div>
+      <ScrollArrows target=".dash" />
+      {menuEl}
+      {importMenuEl}
     </div>
   )
 }

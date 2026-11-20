@@ -5,7 +5,8 @@ import { Icon } from './icons'
 import AssistantPanel from './AssistantPanel'
 import SsmPanel from './SsmPanel'
 
-/** One dock at the right of the app body holding the assistant and the SSM tunnels panel. Both
+/** One dock at the right of the app body holding the assistant and the SSM tunnels panel; it
+ *  opens from the status bar. Both
  *  panels stay mounted always (the aside is `hidden` when the dock is closed, and the inactive
  *  panel is `hidden` when it is open) so SSM output keeps
  *  buffering and an assistant generation keeps streaming while the other tab is showing. */
@@ -16,11 +17,11 @@ export default function RightDock(): JSX.Element {
   const closeDock = useAppStore((s) => s.closeDock)
 
   // Closing hides the aside, so focus (on the close button) would drop to <body>: hand it to
-  // the peek once React has rendered it (the peek only exists while the dock is closed).
-  const peekRef = useRef<HTMLButtonElement>(null)
+  // the status-bar button that opens the panel just closed.
   function close(): void {
+    const opener = dock === 'tunnels' ? 'tunnels' : 'assistant'
     closeDock()
-    requestAnimationFrame(() => peekRef.current?.focus())
+    requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-dock-toggle="${opener}"]`)?.focus())
   }
 
   // ── Horizontal resize (drag the left edge) ──
@@ -57,11 +58,6 @@ export default function RightDock(): JSX.Element {
 
   return (
     <>
-      {dock === null && (
-        <button ref={peekRef} className="assistant-peek" onClick={toggleAssistant} aria-label="Open assistant">
-          <span className="assistant-peek-label">✦ Assistant</span>
-        </button>
-      )}
       <aside className="right-dock" ref={panelRef} style={{ width }} aria-label="Side panel" hidden={dock === null}>
         <div
           className="assistant-resizer"

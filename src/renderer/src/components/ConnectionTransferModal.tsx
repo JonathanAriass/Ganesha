@@ -5,7 +5,8 @@ import { unwrap } from '../lib/result'
 import { useRestoreFocus } from '../lib/use-restore-focus'
 import type { TransferModalState } from '../lib/transfer-actions'
 
-const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`
+const plural = (n: number, word: string, many = `${word}s`): string => `${n} ${n === 1 ? word : many}`
+const SOURCE_LABEL = { ganesha: '', compass: ' (MongoDB Compass)', dbeaver: ' (DBeaver)' } as const
 
 /** Export / import connections dialog. Rendered only while open (`App` gates it),
  *  so its state resets per open. Passwords never reach this component: export sends ids
@@ -14,6 +15,11 @@ export default function ConnectionTransferModal({ state, onClose }: { state: Tra
   const qc = useQueryClient()
   const isExport = state.mode === 'export'
   const fileHasSecrets = state.mode === 'import' && state.preview.hasSecrets
+  // Passwords an import can bring without a passphrase (DBeaver, an unprotected Compass export).
+  const openSecrets = state.mode === 'import' ? state.preview.openSecrets : 0
+  // Passwords another app keeps behind a keychain key: asking for it is the user's choice.
+  const keychainSecrets = state.mode === 'import' && state.preview.keychainSecrets
+  const [bringSecrets, setBringSecrets] = useState(true)
 
   const [selected, setSelected] = useState<Set<string>>(
     () => new Set(state.mode === 'export' ? state.connections.map((c) => c.id) : [])
@@ -55,7 +61,8 @@ export default function ConnectionTransferModal({ state, onClose }: { state: Tra
           )
         }
       } else {
-        const res = unwrap(await window.api.connections.import(fileHasSecrets && passphrase !== '' ? passphrase : null))
+        const pass = fileHasSecrets && passphrase !== '' ? passphrase : null
+        const res = unwrap(await window.api.connections.import(pass, fileHasSecrets ? pass !== null : (openSecrets > 0 || keychainSecrets) && bringSecrets))
         void qc.invalidateQueries({ queryKey: ['connections'] })
         void qc.invalidateQueries({ queryKey: ['groups'] })
         const parts = [`Imported ${plural(res.imported, 'connection')}`]
@@ -140,7 +147,7 @@ export default function ConnectionTransferModal({ state, onClose }: { state: Tra
                 ) : (
                   <>
                     <p className="form-hint">
-                      <strong>{state.preview.fileName}</strong> — {plural(state.preview.connections, 'connection')}
+                      <strong>{state.preview.fileName}</strong>{SOURCE_LABEL[state.preview.source]} — {plural(state.preview.connections, 'connection')}
                       {state.preview.groups > 0 ? `, ${plural(state.preview.groups, 'group')}` : ''}. They are added to your
                       dashboard; nothing you already have is changed, and connections you already have are skipped.
                     </p>
@@ -152,8 +159,43 @@ export default function ConnectionTransferModal({ state, onClose }: { state: Tra
                           This file includes encrypted passwords. Leave blank to import the connections without them.
                         </p>
                       </div>
-                    ) : (
+                    ) : openSecrets > 0 ? (
+                      <div className="form-row">
+                        <label className="checkbox-row">
+                          <input type="checkbox" checked={bringSecrets} onChange={(e) => setBringSecrets(e.target.checked)} />
+                          Import passwords and SSH secrets
+                        </label>
+                        <p className="form-hint">
+                          {openSecrets} of {plural(state.preview.connections, 'connection')} {openSecrets === 1 ? 'has' : 'have'} one
+                          in this file. They go into Ganesha’s encrypted store.
+                        </p>
+                      </div>
+                    ) : keychainSecrets ? (
+                      <div className="form-row">
+                        <label className="checkbox-row">
+                          <input type="checkbox" checked={bringSecrets} onChange={(e) => setBringSecrets(e.target.checked)} />
+                          Import passwords and SSH secrets
+                        </label>
+                        <p className="form-hint">
+                          They are protected by a key in your keychain: macOS will ask for your permission to let Ganesha
+                          read it. They go into Ganesha’s encrypted store.
+                        </p>
+                      </div>
+                    ) : state.preview.notes.length > 0 ? null : (
                       <p className="form-hint">This file has no passwords — set them by editing each connection after importing.</p>
+                    )}
+                    {state.preview.notes.map((n) => (
+                      <p key={n} className="form-hint">{n}</p>
+                    ))}
+                    {state.preview.skipped.length > 0 && (
+                      <details className="xfer-skipped">
+                        <summary>{plural(state.preview.skipped.length, 'entry', 'entries')} will be left out</summary>
+                        <ul>
+                          {state.preview.skipped.map((sk, i) => (
+                            <li key={i}><strong>{sk.name}</strong> — {sk.reason}</li>
+                          ))}
+                        </ul>
+                      </details>
                     )}
                   </>
                 )}

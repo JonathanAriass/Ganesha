@@ -4,6 +4,7 @@ import { useAppStore } from '../state/store'
 import { useSettings, useDensity, useSetSetting, useDataDir, useSetDataDir } from '../lib/hooks'
 import { unwrap } from '../lib/result'
 import { useRestoreFocus } from '../lib/use-restore-focus'
+import { Icon } from './icons'
 
 export default function SettingsModal(): JSX.Element {
   const closeSettings = useAppStore((s) => s.closeSettings)
@@ -55,9 +56,12 @@ export default function SettingsModal(): JSX.Element {
         if (e.target === e.currentTarget) closeSettings()
       }}
     >
-      <div className="modal" role="dialog" aria-modal="true" aria-label="Settings">
+      <div className="modal settings-modal" role="dialog" aria-modal="true" aria-label="Settings">
         <div className="modal-header">
           <h2>Settings</h2>
+          <button className="btn ghost xs modal-close" onClick={closeSettings} aria-label="Close settings">
+            <Icon name="close" size={14} />
+          </button>
         </div>
         <div className="modal-body">
           <div className="form-grid">
@@ -77,7 +81,7 @@ export default function SettingsModal(): JSX.Element {
 
             <div className="form-row">
               <label>Density</label>
-              <div className="theme-list" role="radiogroup" aria-label="Density">
+              <div className="theme-list seg" role="radiogroup" aria-label="Density">
                 {DENSITIES.map((d: Density) => (
                   <button
                     key={d}
