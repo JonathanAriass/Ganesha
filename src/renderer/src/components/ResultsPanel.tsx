@@ -293,7 +293,11 @@ export default function ResultsPanel({ tab }: Props): JSX.Element {
         />
       ) : (
         <DocumentView
+          key={tab.resultQueryId ?? ''}
           documents={result.documents!}
+          hasMore={tab.hasMore}
+          loadingMore={tab.loadingMore}
+          onLoadMore={loadMore}
           tabId={tab.id}
           editable={connection && !connection.readOnly ? result.editable : null}
           readOnly={connection?.readOnly ?? true}

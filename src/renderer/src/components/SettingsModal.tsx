@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { DENSITIES, THEMES, type Density, type ThemeMeta } from '@shared/domain'
+import { DENSITIES, THEMES, DEFAULT_SETTINGS, MAX_DEFAULT_LIMIT, parseDefaultLimit, type Density, type ThemeMeta } from '@shared/domain'
 import { useAppStore } from '../state/store'
 import { useSettings, useDensity, useSetSetting, useDataDir, useSetDataDir } from '../lib/hooks'
 import { unwrap } from '../lib/result'
@@ -18,6 +18,15 @@ export default function SettingsModal(): JSX.Element {
   useRestoreFocus()
 
   const theme = settings?.theme ?? 'midnight'
+  // Typed freely, saved on blur or Enter; null = showing the saved value.
+  const [limitDraft, setLimitDraft] = useState<string | null>(null)
+  const savedLimit = settings?.defaultLimit ?? DEFAULT_SETTINGS.defaultLimit
+  function commitLimit(): void {
+    if (limitDraft === null) return
+    const next = parseDefaultLimit(limitDraft)
+    if (next !== savedLimit) setSetting.mutate({ key: 'defaultLimit', value: String(next) })
+    setLimitDraft(null)
+  }
   const density = useDensity()
 
   const renderTheme = (t: ThemeMeta): JSX.Element => (
@@ -94,6 +103,26 @@ export default function SettingsModal(): JSX.Element {
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div className="form-row">
+              <label htmlFor="settings-default-limit">Default row limit</label>
+              <input
+                id="settings-default-limit"
+                className="settings-number"
+                type="number"
+                min={1}
+                max={MAX_DEFAULT_LIMIT}
+                step={1}
+                value={limitDraft ?? savedLimit}
+                onChange={(e) => setLimitDraft(e.target.value)}
+                onBlur={commitLimit}
+                onKeyDown={(e) => { if (e.key === 'Enter') commitLimit() }}
+              />
+              <p className="form-hint">
+                Rows or documents asked for when you open a table or collection (1 to {MAX_DEFAULT_LIMIT.toLocaleString('en-US')}).
+                It only sets the limit in the query written for you — edit the query to fetch more.
+              </p>
             </div>
 
             <div className="form-row">

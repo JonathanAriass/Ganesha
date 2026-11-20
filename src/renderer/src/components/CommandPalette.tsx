@@ -168,7 +168,7 @@ export default function CommandPalette(): JSX.Element {
                         text: defaultTableQuery(activeConn.type, {
                           schema: o.schema,
                           name: o.name,
-                        }),
+                        }, settings?.defaultLimit),
                         runOnOpen: true,
                       })
                       close()

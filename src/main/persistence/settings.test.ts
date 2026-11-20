@@ -8,7 +8,7 @@ beforeEach(() => { db = new Database(':memory:'); migrate(db) })
 
 describe('settings service', () => {
   it('returns defaults when nothing is stored', () => {
-    expect(getSettings(db)).toEqual({ theme: 'midnight', density: 'comfortable' })
+    expect(getSettings(db)).toEqual({ theme: 'midnight', density: 'comfortable', defaultLimit: 100 })
   })
   it('persists and reads back an overridden setting', () => {
     setSetting(db, 'theme', 'light')
@@ -16,7 +16,7 @@ describe('settings service', () => {
   })
   it('ignores unknown keys when building typed settings', () => {
     setSetting(db, 'bogus', 'x')
-    expect(getSettings(db)).toEqual({ theme: 'midnight', density: 'comfortable' })
+    expect(getSettings(db)).toEqual({ theme: 'midnight', density: 'comfortable', defaultLimit: 100 })
   })
   it('preserves any known theme id (not just light)', () => {
     setSetting(db, 'theme', 'dracula')
@@ -25,6 +25,16 @@ describe('settings service', () => {
   it('falls back to the default for an unknown theme value', () => {
     setSetting(db, 'theme', 'not-a-theme')
     expect(getSettings(db).theme).toBe('midnight')
+  })
+  it('reads the default limit, capping it and ignoring nonsense', () => {
+    setSetting(db, 'defaultLimit', '250')
+    expect(getSettings(db).defaultLimit).toBe(250)
+    setSetting(db, 'defaultLimit', '9999999')
+    expect(getSettings(db).defaultLimit).toBe(50000)
+    for (const bad of ['0', '-5', '1.5', 'abc', '']) {
+      setSetting(db, 'defaultLimit', bad)
+      expect(getSettings(db).defaultLimit).toBe(100)
+    }
   })
   it('defaults density to comfortable and persists compact', () => {
     expect(getSettings(db).density).toBe('comfortable')

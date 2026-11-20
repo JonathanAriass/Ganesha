@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { DbObject } from '@shared/schema'
 import { useAppStore } from '../state/store'
-import { useObjects, useColumns, useConnections } from '../lib/hooks'
+import { useObjects, useColumns, useConnections, useSettings } from '../lib/hooks'
 import { defaultTableQuery } from '../lib/tabquery'
 import { filterObjects, substringMatch } from '../lib/object-filter'
 import { sortObjects, loadSortMode, saveSortMode, type SortMode } from '../lib/object-sort'
@@ -128,6 +128,7 @@ export default function ObjectTree(): JSX.Element {
   const [menu, setMenu] = useState<{ obj: DbObject; x: number; y: number } | null>(null)
 
   const { data: connections = [] } = useConnections()
+  const { data: settings } = useSettings()
   const { data: objects, isLoading, error } = useObjects(activeConnectionId)
 
   const activeConn = connections.find((c) => c.id === activeConnectionId)
@@ -168,7 +169,7 @@ export default function ObjectTree(): JSX.Element {
     openTableQuery({
       connectionId: activeConnectionId,
       title: obj.name,
-      text: defaultTableQuery(activeConn.type, ref),
+      text: defaultTableQuery(activeConn.type, ref, settings?.defaultLimit),
     })
   }
 

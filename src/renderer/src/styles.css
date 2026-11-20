@@ -1541,14 +1541,6 @@ input[type="password"]::placeholder {
   border-top: 1px solid var(--border);
 }
 
-/* Notice atop the Documents view when it renders only a leading slice of a large result. */
-.doc-view-cap {
-  padding: 5px 10px;
-  font-size: 12px;
-  color: var(--text-2);
-  border-bottom: 1px solid var(--border);
-}
-
 .qt-editor-pane {
   /* flex-basis comes inline from React (the persisted drag fraction); this is
      just the no-JS floor matching DEFAULT_EDITOR_FRACTION. */
@@ -3908,3 +3900,15 @@ mark.hl {
 
 /* The tag a connection keeps when it came from an import: the tool's name behind an arrow. */
 .dash-badge-origin { display: inline-flex; align-items: center; gap: 4px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--text); }
+
+/* ── Document view ── a virtualized list: each document is its own surface, told apart from
+   the panel by fill, with its position in the result at the top right. */
+.doc-view { padding: 8px; }
+.doc-list { position: relative; width: 100%; }
+.doc-slot { position: absolute; top: 0; left: 0; width: 100%; padding-bottom: 6px; box-sizing: border-box; }
+.doc-item { position: relative; padding: 10px 12px; background: var(--bg); border-radius: var(--radius-md); overflow-x: auto; }
+.doc-index { position: absolute; top: 8px; right: 12px; font-size: var(--fs-xs); color: var(--text-2); pointer-events: none; }
+.doc-loading { padding: 6px 12px; font-size: var(--fs-xs); color: var(--text-2); }
+
+/* Settings: a short numeric field does not need the row's full width. */
+.modal .form-row input.settings-number { width: 120px; }

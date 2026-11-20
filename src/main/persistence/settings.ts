@@ -1,7 +1,7 @@
 import { copyFileSync, existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import type { DB } from './db'
-import { type AppSettings, DEFAULT_SETTINGS, DENSITIES, THEMES } from '../../shared/domain'
+import { type AppSettings, DEFAULT_SETTINGS, DENSITIES, THEMES, parseDefaultLimit } from '../../shared/domain'
 import { getDataDir, setDataDir, DB_FILENAME } from './paths'
 import { closeDb } from './db'
 
@@ -25,7 +25,8 @@ export function getSettings(db: DB): AppSettings {
   // Accept any known theme id; unknown/legacy/null values fall back to the default.
   return {
     theme: THEMES.some((t) => t.id === theme) ? (theme as AppSettings['theme']) : DEFAULT_SETTINGS.theme,
-    density: DENSITIES.some((d) => d === density) ? (density as AppSettings['density']) : DEFAULT_SETTINGS.density
+    density: DENSITIES.some((d) => d === density) ? (density as AppSettings['density']) : DEFAULT_SETTINGS.density,
+    defaultLimit: parseDefaultLimit(getSetting(db, 'defaultLimit'))
   }
 }
 

@@ -189,9 +189,22 @@ export type Density = (typeof DENSITIES)[number]
 export interface AppSettings {
   theme: ThemeId
   density: Density
+  /** Rows the query written for you asks for when you open a table or collection. */
+  defaultLimit: number
 }
 
-export const DEFAULT_SETTINGS: AppSettings = { theme: 'midnight', density: 'comfortable' }
+export const DEFAULT_SETTINGS: AppSettings = { theme: 'midnight', density: 'comfortable', defaultLimit: 100 }
+
+/** Largest default limit: what the app keeps of one result. */
+export const MAX_DEFAULT_LIMIT = 50000
+
+/** A stored or typed default limit as a whole number from 1 to MAX_DEFAULT_LIMIT; anything
+ *  else (blank, text, zero, negative) is the default. Larger values are capped. */
+export function parseDefaultLimit(value: string | null): number {
+  const n = value === null || value.trim() === '' ? NaN : Number(value)
+  if (!Number.isInteger(n) || n < 1) return DEFAULT_SETTINGS.defaultLimit
+  return Math.min(n, MAX_DEFAULT_LIMIT)
+}
 
 // ── Local LLM assistant ──
 
